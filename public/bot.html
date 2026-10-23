@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chat — Botworks</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="/dashboard.html"><span class="mark"></span> Botworks</a>
+  <nav>
+    <a href="/dashboard.html">&larr; Your bots</a>
+  </nav>
+</header>
+
+<div class="tab-strip">
+  <button id="tab-chat" class="active">Chat</button>
+  <button id="tab-settings" style="display:none">Settings &amp; documents</button>
+</div>
+
+<!-- CHAT VIEW -->
+<section id="view-chat" class="chat-shell">
+  <div class="chat-header">
+    <div>
+      <h2 id="bot-name">Loading…</h2>
+      <p id="bot-desc"></p>
+    </div>
+  </div>
+  <div class="chat-log" id="chat-log"></div>
+  <form class="chat-input-row" id="chat-form">
+    <textarea id="chat-input" placeholder="Say something…" required></textarea>
+    <button type="submit" class="btn btn-primary">Send</button>
+  </form>
+</section>
+
+<!-- SETTINGS VIEW -->
+<section id="view-settings" class="page" style="display:none; max-width: 640px;">
+  <div class="error-msg" id="settings-error"></div>
+
+  <div class="card">
+    <h2>Bot settings</h2>
+    <form id="settings-form">
+      <div class="field">
+        <label for="set-name">Name</label>
+        <input type="text" id="set-name" required>
+      </div>
+      <div class="field">
+        <label for="set-description">Short description</label>
+        <input type="text" id="set-description">
+      </div>
+      <div class="field">
+        <label for="set-instructions">Instructions</label>
+        <textarea id="set-instructions" required></textarea>
+      </div>
+      <div class="field checkbox-row">
+        <input type="checkbox" id="set-public">
+        <label for="set-public">Public — other users can find and chat with this bot</label>
+      </div>
+      <button type="submit" class="btn btn-primary">Save changes</button>
+    </form>
+  </div>
+
+  <div class="card mt-24">
+    <h2>Documents</h2>
+    <p>Upload .txt, .md, or .pdf files. Your bot will search them for relevant snippets when answering questions.</p>
+    <input type="file" id="doc-file" accept=".txt,.md,.pdf">
+    <button class="btn btn-ghost" id="doc-upload-btn" style="margin-top:10px">Upload</button>
+    <div id="doc-list" class="mt-24"></div>
+  </div>
+
+  <div class="card mt-24">
+    <h2 style="color:var(--danger)">Danger zone</h2>
+    <p>Deleting a bot removes it and all of its documents and chat history permanently.</p>
+    <button class="btn btn-danger" id="delete-bot-btn">Delete this bot</button>
+  </div>
+</section>
+
+<script src="/js/api.js"></script>
+<script>
+(async function init() {
+  const user = await requireLogin();
+  const botId = new URLSearchParams(window.location.search).get('id');
+  if (!botId) { window.location.href = '/dashboard.html'; return; }
+
+  let bot, isOwner;
+  try {
+    const res = await api('/bots/' + botId);
+    bot = res.bot;
+    isOwner = res.isOwner;
+  } catch (err) {
+    alert(err.message);
+    window.location.href = '/dashboard.html';
+    return;
+  }
+
+  document.getElementById('bot-name').textContent = bot.name;
+  document.getElementById('bot-desc').textContent = bot.description || '';
+  document.title = bot.name + ' — Botworks';
+
+  // ---- tabs ----
+  const tabChat = document.getElementById('tab-chat');
+  const tabSettings = document.getElementById('tab-settings');
+  const viewChat = document.getElementById('view-chat');
+  const viewSettings = document.getElementById('view-settings');
+
+  if (isOwner) {
+    tabSettings.style.display = 'inline-block';
+    document.getElementById('set-name').value = bot.name;
+    document.getElementById('set-description').value = bot.description;
+    document.getElementById('set-instructions').value = bot.instructions;
+    document.getElementById('set-public').checked = bot.isPublic;
+    loadDocs();
+  }
+
+  tabChat.addEventListener('click', () => {
+    tabChat.classList.add('active'); tabSettings.classList.remove('active');
+    viewChat.style.display = 'flex'; viewSettings.style.display = 'none';
+  });
+  tabSettings.addEventListener('click', () => {
+    tabSettings.classList.add('active'); tabChat.classList.remove('active');
+    viewSettings.style.display = 'block'; viewChat.style.display = 'none';
+  });
+
+  // ---- chat ----
+  const log = document.getElementById('chat-log');
+  const form = document.getElementById('chat-form');
+  const input = document.getElementById('chat-input');
+
+  function renderMessage(role, content, pending) {
+    const div = document.createElement('div');
+    div.className = 'msg ' + role + (pending ? ' pending' : '');
+    div.textContent = content;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+    return div;
+  }
+
+  (async function loadHistory() {
+    const { messages } = await api('/chat/' + botId + '/messages');
+    if (messages.length === 0) {
+      renderMessage('assistant', `Hi, I'm ${bot.name}. ${bot.description || "Ask me anything."}`, false);
+    } else {
+      messages.forEach((m) => renderMessage(m.role, m.content, false));
+    }
+  })();
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    renderMessage('user', text, false);
+    const pending = renderMessage('assistant', 'Thinking…', true);
+
+    try {
+      const { message } = await api('/chat/' + botId + '/messages', { method: 'POST', body: { content: text } });
+      pending.textContent = message.content;
+      pending.classList.remove('pending');
+    } catch (err) {
+      pending.textContent = 'Error: ' + err.message;
+      pending.classList.remove('pending');
+    }
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      form.requestSubmit();
+    }
+  });
+
+  if (!isOwner) return; // everything below is owner-only
+
+  // ---- settings form ----
+  document.getElementById('settings-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errBox = document.getElementById('settings-error');
+    errBox.classList.remove('show');
+    try {
+      const { bot: updated } = await api('/bots/' + botId, {
+        method: 'PUT',
+        body: {
+          name: document.getElementById('set-name').value,
+          description: document.getElementById('set-description').value,
+          instructions: document.getElementById('set-instructions').value,
+          isPublic: document.getElementById('set-public').checked
+        }
+      });
+      document.getElementById('bot-name').textContent = updated.name;
+      document.getElementById('bot-desc').textContent = updated.description;
+    } catch (err) {
+      errBox.textContent = err.message;
+      errBox.classList.add('show');
+    }
+  });
+
+  // ---- documents ----
+  async function loadDocs() {
+    const { documents } = await api('/documents/' + botId);
+    const list = document.getElementById('doc-list');
+    if (documents.length === 0) {
+      list.innerHTML = '<p class="muted">No documents uploaded yet.</p>';
+      return;
+    }
+    list.innerHTML = documents.map((d) => `
+      <div class="doc-row" data-id="${d.id}">
+        <span>${escapeHtml(d.filename)} <span class="muted">(${d.chunkCount} chunks)</span></span>
+        <button class="btn btn-ghost doc-delete" data-id="${d.id}">Remove</button>
+      </div>`).join('');
+
+    list.querySelectorAll('.doc-delete').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        await api('/documents/' + botId + '/' + btn.dataset.id, { method: 'DELETE' });
+        loadDocs();
+      });
+    });
+  }
+
+  document.getElementById('doc-upload-btn').addEventListener('click', async () => {
+    const fileInput = document.getElementById('doc-file');
+    const errBox = document.getElementById('settings-error');
+    errBox.classList.remove('show');
+    if (!fileInput.files[0]) return;
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    try {
+      await api('/documents/' + botId, { method: 'POST', body: formData });
+      fileInput.value = '';
+      loadDocs();
+    } catch (err) {
+      errBox.textContent = err.message;
+      errBox.classList.add('show');
+    }
+  });
+
+  document.getElementById('delete-bot-btn').addEventListener('click', async () => {
+    if (!confirm('Delete "' + bot.name + '" permanently? This cannot be undone.')) return;
+    await api('/bots/' + botId, { method: 'DELETE' });
+    window.location.href = '/dashboard.html';
+  });
+})();
+</script>
+</body>
+</html>

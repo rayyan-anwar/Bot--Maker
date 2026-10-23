@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Botworks — make your own AI bot</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <span class="brand"><span class="mark"></span> Botworks</span>
+</header>
+
+<main class="page narrow">
+  <h1>Make an AI bot that's yours</h1>
+  <p>Give it a personality, hand it some documents to learn from, and chat with it — or share it so others can too.</p>
+
+  <div class="tabs">
+    <button id="tab-login" class="active">Log in</button>
+    <button id="tab-signup">Sign up</button>
+  </div>
+
+  <div class="error-msg" id="error"></div>
+
+  <form id="login-form">
+    <div class="field">
+      <label for="login-email">Email</label>
+      <input type="email" id="login-email" required autocomplete="email">
+    </div>
+    <div class="field">
+      <label for="login-password">Password</label>
+      <input type="password" id="login-password" required autocomplete="current-password">
+    </div>
+    <button type="submit" class="btn btn-primary btn-block">Log in</button>
+  </form>
+
+  <form id="signup-form" style="display:none">
+    <div class="field">
+      <label for="signup-name">Your name</label>
+      <input type="text" id="signup-name" required autocomplete="name">
+    </div>
+    <div class="field">
+      <label for="signup-email">Email</label>
+      <input type="email" id="signup-email" required autocomplete="email">
+    </div>
+    <div class="field">
+      <label for="signup-password">Password</label>
+      <input type="password" id="signup-password" required minlength="8" autocomplete="new-password">
+    </div>
+    <button type="submit" class="btn btn-primary btn-block">Create account</button>
+  </form>
+</main>
+
+<script src="/js/api.js"></script>
+<script>
+const tabLogin = document.getElementById('tab-login');
+const tabSignup = document.getElementById('tab-signup');
+const loginForm = document.getElementById('login-form');
+const signupForm = document.getElementById('signup-form');
+const errorBox = document.getElementById('error');
+
+function showTab(which) {
+  const loginActive = which === 'login';
+  tabLogin.classList.toggle('active', loginActive);
+  tabSignup.classList.toggle('active', !loginActive);
+  loginForm.style.display = loginActive ? 'block' : 'none';
+  signupForm.style.display = loginActive ? 'none' : 'block';
+  errorBox.classList.remove('show');
+}
+tabLogin.addEventListener('click', () => showTab('login'));
+tabSignup.addEventListener('click', () => showTab('signup'));
+
+function showError(message) {
+  errorBox.textContent = message;
+  errorBox.classList.add('show');
+}
+
+loginForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  errorBox.classList.remove('show');
+  try {
+    await api('/auth/login', {
+      method: 'POST',
+      body: {
+        email: document.getElementById('login-email').value,
+        password: document.getElementById('login-password').value
+      }
+    });
+    window.location.href = '/dashboard.html';
+  } catch (err) {
+    showError(err.message);
+  }
+});
+
+signupForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  errorBox.classList.remove('show');
+  try {
+    await api('/auth/signup', {
+      method: 'POST',
+      body: {
+        name: document.getElementById('signup-name').value,
+        email: document.getElementById('signup-email').value,
+        password: document.getElementById('signup-password').value
+      }
+    });
+    window.location.href = '/dashboard.html';
+  } catch (err) {
+    showError(err.message);
+  }
+});
+
+// If already logged in, skip straight to the dashboard.
+api('/auth/me').then(() => { window.location.href = '/dashboard.html'; }).catch(() => {});
+</script>
+</body>
+</html>

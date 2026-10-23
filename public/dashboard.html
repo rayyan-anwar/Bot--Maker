@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your bots — Botworks</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="/dashboard.html"><span class="mark"></span> Botworks</a>
+  <nav>
+    <span class="muted" id="whoami"></span>
+    <a href="#" id="logout">Log out</a>
+  </nav>
+</header>
+
+<main class="page">
+  <div class="section-head">
+    <h1 style="margin:0">Your bots</h1>
+    <button class="btn btn-primary" id="new-bot-btn">+ New bot</button>
+  </div>
+  <div id="my-bots" class="bot-grid"></div>
+  <div id="my-bots-empty" class="empty-state" style="display:none">
+    You haven't made a bot yet. Click <strong>New bot</strong> to give one a name and a personality.
+  </div>
+
+  <div class="section-head">
+    <h2 style="margin:0">Bots others have shared</h2>
+  </div>
+  <div id="public-bots" class="bot-grid"></div>
+  <div id="public-bots-empty" class="empty-state" style="display:none">
+    No public bots yet. Make one and share it!
+  </div>
+</main>
+
+<!-- New bot modal (simple inline card, no library) -->
+<div id="new-bot-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); align-items:center; justify-content:center; padding:20px;">
+  <div class="card" style="max-width:480px; width:100%;">
+    <h2>New bot</h2>
+    <div class="error-msg" id="new-bot-error"></div>
+    <form id="new-bot-form">
+      <div class="field">
+        <label for="bot-name">Name</label>
+        <input type="text" id="bot-name" required placeholder="e.g. Recipe Helper">
+      </div>
+      <div class="field">
+        <label for="bot-description">Short description <span class="muted">(optional)</span></label>
+        <input type="text" id="bot-description" placeholder="What is this bot for?">
+      </div>
+      <div class="field">
+        <label for="bot-instructions">Instructions — how should it behave?</label>
+        <textarea id="bot-instructions" required placeholder="You are a friendly cooking assistant. Keep answers short and suggest substitutions when an ingredient is missing."></textarea>
+      </div>
+      <div class="field checkbox-row">
+        <input type="checkbox" id="bot-public">
+        <label for="bot-public">Make this bot public, so other users can chat with it</label>
+      </div>
+      <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
+        <button type="button" class="btn btn-ghost" id="cancel-new-bot">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create bot</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+(async function init() {
+  const user = await requireLogin();
+  document.getElementById('whoami').textContent = user.name;
+
+  document.getElementById('logout').addEventListener('click', async (e) => {
+    e.preventDefault();
+    await api('/auth/logout', { method: 'POST' });
+    window.location.href = '/index.html';
+  });
+
+  function botCard(bot, isOwn) {
+    const tag = isOwn ? (bot.isPublic ? 'Public' : 'Private') : 'Public · by someone else';
+    return `
+      <a class="bot-card" href="/bot.html?id=${bot.id}">
+        <h3>${escapeHtml(bot.name)}</h3>
+        <p>${escapeHtml(bot.description || 'No description yet.')}</p>
+        <span class="tag">${tag}</span>
+      </a>`;
+  }
+
+  async function loadBots() {
+    const { bots: mine } = await api('/bots/mine');
+    const mineEl = document.getElementById('my-bots');
+    mineEl.innerHTML = mine.map((b) => botCard(b, true)).join('');
+    document.getElementById('my-bots-empty').style.display = mine.length ? 'none' : 'block';
+
+    const { bots: pub } = await api('/bots/public');
+    const theirs = pub.filter((b) => b.ownerId !== user.id);
+    const pubEl = document.getElementById('public-bots');
+    pubEl.innerHTML = theirs.map((b) => botCard(b, false)).join('');
+    document.getElementById('public-bots-empty').style.display = theirs.length ? 'none' : 'block';
+  }
+  loadBots();
+
+  const overlay = document.getElementById('new-bot-overlay');
+  document.getElementById('new-bot-btn').addEventListener('click', () => { overlay.style.display = 'flex'; });
+  document.getElementById('cancel-new-bot').addEventListener('click', () => { overlay.style.display = 'none'; });
+
+  document.getElementById('new-bot-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errorBox = document.getElementById('new-bot-error');
+    errorBox.classList.remove('show');
+    try {
+      const { bot } = await api('/bots', {
+        method: 'POST',
+        body: {
+          name: document.getElementById('bot-name').value,
+          description: document.getElementById('bot-description').value,
+          instructions: document.getElementById('bot-instructions').value,
+          isPublic: document.getElementById('bot-public').checked
+        }
+      });
+      window.location.href = '/bot.html?id=' + bot.id;
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.classList.add('show');
+    }
+  });
+})();
+</script>
+</body>
+</html>
