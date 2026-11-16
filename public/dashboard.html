@@ -21,7 +21,7 @@
     <h1 style="margin:0">Your bots</h1>
     <button class="btn btn-primary" id="new-bot-btn">+ New bot</button>
   </div>
-  <div id="my-bots" class="bot-grid"></div>
+  <div class="card usage-card" id="usage-card" style="margin-top:20px"><div class="flex-between"><div><h2 style="margin:0">Usage today</h2><p id="usage-copy" style="margin:4px 0 0">Loading usage…</p></div><strong id="usage-count">—</strong></div><div class="usage-track"><span id="usage-progress"></span></div></div><div id="my-bots" class="bot-grid"></div>
   <div id="my-bots-empty" class="empty-state" style="display:none">
     You haven't made a bot yet. Click <strong>New bot</strong> to give one a name and a personality.
   </div>
@@ -100,6 +100,11 @@
     document.getElementById('public-bots-empty').style.display = theirs.length ? 'none' : 'block';
   }
   loadBots();
+  api('/chat/usage/me').then(({used,limit,remaining})=>{
+    document.getElementById('usage-copy').textContent=remaining+' messages remaining today';
+    document.getElementById('usage-count').textContent=used+' / '+limit;
+    document.getElementById('usage-progress').style.width=Math.min(100,used/limit*100)+'%';
+  }).catch(()=>{document.getElementById('usage-copy').textContent='Usage information unavailable';});
 
   const overlay = document.getElementById('new-bot-overlay');
   document.getElementById('new-bot-btn').addEventListener('click', () => { overlay.style.display = 'flex'; });
@@ -116,7 +121,7 @@
           name: document.getElementById('bot-name').value,
           description: document.getElementById('bot-description').value,
           instructions: document.getElementById('bot-instructions').value,
-          isPublic: document.getElementById('bot-public').checked
+          isPublic: document.getElementById('bot-public').checked,\n          provider: document.getElementById('bot-provider').value
         }
       });
       window.location.href = '/bot.html?id=' + bot.id;
