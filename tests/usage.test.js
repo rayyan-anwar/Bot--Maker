@@ -7,4 +7,17 @@ test('a failed request releases only its own reservation',async()=>{const a=awai
 test('successful usage atomically replaces its reservation',async()=>{const slot=await usage.assertCanSend(user3);await usage.recordUsage({userId:user3,botId:'33333333-3333-4333-8333-333333333333',provider:'anthropic',model:'test-model',inputTokens:10,outputTokens:5,reservationId:slot.reservationId});const summary=await usage.usageSummary(user3);assert.equal(summary.used,1);assert.equal(summary.pending,0);assert.equal(summary.remaining,1);});
 test('async store API preserves JSON development adapter behavior',async()=>{const record={id:require('node:crypto').randomUUID(),email:'async@example.com'};await store.insertAsync('users',record);assert.deepEqual(await store.findByIdAsync('users',record.id),record);assert.equal((await store.allAsync('users')).some(x=>x.id===record.id),true);assert.equal(await store.deleteByIdAsync('users',record.id),true);assert.equal(await store.findByIdAsync('users',record.id),null);});
 test('async store rejects malformed UUIDs safely',async()=>{assert.equal(await store.findByIdAsync('bots','not-a-uuid'),null);assert.equal(await store.updateByIdAsync('bots','not-a-uuid',{name:'bad'}),null);assert.equal(await store.deleteByIdAsync('bots','not-a-uuid'),false);});
-test.after(async()=>{await store.close();fs.rmSync(tempDir,{recursive:true,force:true});});
+
+test('chat turn persistence stores both messages and usage as one unit',async()=>{
+ const user='55555555-5555-4555-8555-555555555555';
+ const bot='66666666-6666-4666-8666-666666666666';
+ const slot=await usage.assertCanSend(user);
+ const userMessage={id:require('node:crypto').randomUUID(),userId:user,botId:bot,role:'user',content:'hello',createdAt:new Date().toISOString()};
+ const assistantMessage={id:require('node:crypto').randomUUID(),userId:user,botId:bot,role:'assistant',content:'hi',createdAt:new Date().toISOString()};
+ const usageRecord={id:require('node:crypto').randomUUID(),userId:user,botId:bot,provider:'anthropic',model:'test',inputTokens:1,outputTokens:1,day:new Date().toISOString().slice(0,10),createdAt:new Date().toISOString()};
+ await store.commitChatTurn({userMessage,assistantMessage,usageRecord},slot.reservationId);
+ assert.equal((await store.allAsync('messages')).filter(m=>m.userId===user).length,2);
+ assert.equal((await usage.usageSummary(user)).used,1);
+ assert.equal((await usage.usageSummary(user)).pending,0);
+});
+\ntest.after(async()=>{await store.close();fs.rmSync(tempDir,{recursive:true,force:true});});
