@@ -1,6 +1,6 @@
-# Botworks — build-your-own AI bot platform
+# BotForge — Build. Train. Deploy. Your AI.
 
-A small web app where people sign up, create their own custom AI bots (name +
+BotForge is evolving from a small web app where people sign up, create their own custom AI bots (name +
 personality instructions + optional reference documents), and chat with them
 — or make them public so other users can chat with them too.
 
@@ -154,3 +154,22 @@ data/db.json        — all app data lives here (auto-created on first run)
 uploads/              — temp folder used while processing an upload (files
                          are deleted right after their text is extracted)
 ```
+
+
+## BotForge product direction
+
+The current repository remains an early MVP. The planned commercial product direction, technical audit, security gates, interface specification and phased roadmap are documented in:
+
+- [Technical audit](docs/TECHNICAL_AUDIT.md)
+- [Production roadmap](docs/PRODUCTION_ROADMAP.md)
+- [Product and business strategy](docs/PRODUCT_STRATEGY.md)
+- [UI/UX specification](docs/UX_UI_SPEC.md)
+- [Security and release checklist](docs/SECURITY_AND_RELEASE_CHECKLIST.md)
+
+**Important:** these documents describe findings and planned capabilities. They do not mean that PostgreSQL, multi-provider inference, vector RAG, billing, production monitoring or enterprise security are already implemented. The working app still uses JSON-file persistence and a Claude-only chat path until the roadmap phases are completed and tested.
+
+### Competitor references
+
+- [Botpress pricing and plans](https://botpress.com/pricing)
+- [Dify product and open-source platform](https://dify.ai/)
+- [Voiceflow documentation](https://www.voiceflow.com/docs)
