@@ -7,6 +7,7 @@ const path=require('node:path');
 test('billing endpoints enforce authentication and fail closed when providers are not configured',async(t)=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-billing-'));
  process.env.JWT_SECRET='test-only-secret-with-at-least-thirty-two-characters';
+ process.env.BOTFORGE_ADMIN_EMAIL='billing-test@example.com';
  process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
  for(const key of ['STRIPE_SECRET_KEY','STRIPE_WEBHOOK_SECRET','STRIPE_PRICE_PLUS','STRIPE_PRICE_PRO','STRIPE_SUCCESS_URL','STRIPE_CANCEL_URL','RAZORPAY_KEY_ID','RAZORPAY_KEY_SECRET','RAZORPAY_WEBHOOK_SECRET','RAZORPAY_PLAN_PLUS','RAZORPAY_PLAN_PRO'])delete process.env[key];
  const {start,shutdown}=require('../server/index');
