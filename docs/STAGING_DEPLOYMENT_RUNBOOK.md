@@ -42,6 +42,8 @@ The importer runs in one transaction and records a one-time marker. It does not 
 
 For a fresh database, apply `migrations/001_initial_schema.sql` using the database migration process, then start the app. The app creates the JSONB runtime repository and quota reservation table during startup.
 
+For a reproducible local PostgreSQL staging rehearsal, copy `.env.example` to `.env`, set `POSTGRES_PASSWORD` and `JWT_SECRET`, then run `docker compose -f docker-compose.staging.yml up --build -d`. Wait for the `botforge` service healthcheck, then run the staging smoke tests below. This stack is for staging only, not public production hosting.
+
 ## 4. Staging smoke tests
 
 Before inviting users, verify all of the following:
@@ -62,6 +64,8 @@ Use synthetic test accounts and non-sensitive documents only.
 ## 5. Backups and rollback
 
 - Enable managed PostgreSQL automated backups and point-in-time recovery where available.
+- Create an operator-side custom-format backup with `npm run backup:postgres` (requires PostgreSQL client tools and `DATABASE_URL`).
+- Restore only to an explicitly selected target database with `BACKUP_FILE=... CONFIRM_RESTORE=YES npm run restore:postgres`; verify the target connection before confirming.
 - Before every schema or release change, record a backup identifier and test restoration into a separate staging database.
 - Keep the previous application image/release available for rollback.
 - If migration or smoke tests fail, stop traffic, preserve logs, restore the pre-migration database snapshot if required, and redeploy the previous application release.
