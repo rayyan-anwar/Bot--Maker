@@ -178,14 +178,15 @@ The current repository remains an early MVP. The planned commercial product dire
 The `botforge-production-upgrade` branch now also includes:
 - Anthropic, OpenAI Responses API and Google Gemini provider adapters, with current default model IDs configurable through environment variables.
 - Server-side daily message quota and token usage event recording (MVP JSON store).
-- Per-user, per-bot editable memory notes.
+- Per-user, per-bot editable memory notes plus opt-in automatic memory extraction (users can enable/disable it per bot).
+- Configurable Free/Plus/Pro daily message quotas and allowlisted admin endpoints to assign plans.
 - Provider choice during bot creation.
 - Private bot instructions excluded from public bot responses.
 - Request size/rate controls, security headers, origin checks, safer auth validation and upload bounds.
 - PostgreSQL JSONB runtime repository, PostgreSQL baseline schema and transactional JSON importer (live managed-database verification still pending).
 - Basic retrieval unit tests and CI syntax-check workflow.
 
-**Still not production-ready:** PostgreSQL runtime support is implemented but has not yet been tested against a live managed PostgreSQL database; retrieval supports optional OpenAI embedding generation and hybrid semantic/keyword ranking when `BOTFORGE_EMBEDDINGS_ENABLED=true` and an OpenAI API key is configured; no pgvector index or large-scale vector infrastructure is implemented; there is no billing/payment system, plan admin console, workspace/role system, streaming or completed live database/security/load test. Provider credentials must be configured by the operator in environment variables before each provider can be used.
+**Still not production-ready:** PostgreSQL runtime support is implemented but has not yet been tested against a live managed PostgreSQL database; retrieval supports optional OpenAI embedding generation and hybrid semantic/keyword ranking when `BOTFORGE_EMBEDDINGS_ENABLED=true` and an OpenAI API key is configured; no pgvector index or large-scale vector infrastructure is implemented; there is no billing/payment integration, admin web console, workspace/role system, streaming or completed live database/security/load test. Provider credentials must be configured by the operator in environment variables before each provider can be used.
 
 ### Current model references
 - Anthropic model overview: https://platform.claude.com/docs/en/models/overview
