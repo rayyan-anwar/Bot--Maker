@@ -6,6 +6,7 @@ const path=require('node:path');
 
 test('public signup works, admin email is reserved, and three wrong passwords lock a user account',async(t)=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-public-auth-'));
+ process.env.NODE_ENV='test';
  process.env.JWT_SECRET='public-auth-test-secret-with-at-least-thirty-two-characters';
  process.env.BOTFORGE_ADMIN_EMAIL='owner@example.com';
  process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
