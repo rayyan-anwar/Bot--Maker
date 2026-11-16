@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Your bots — Botworks</title>
+<title>Your bots — BotForge</title>
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
 
 <header class="topbar">
-  <a class="brand" href="/dashboard.html"><span class="mark"></span> Botworks</a>
+  <a class="brand" href="/dashboard.html"><span class="mark"></span> BotForge</a>
   <nav>
     <span class="muted" id="whoami"></span>
     <a href="#" id="logout">Log out</a>
@@ -48,6 +48,10 @@
       <div class="field">
         <label for="bot-description">Short description <span class="muted">(optional)</span></label>
         <input type="text" id="bot-description" placeholder="What is this bot for?">
+      </div>
+      <div class="field">
+        <label for="bot-provider">AI provider</label>
+        <select id="bot-provider"><option value="anthropic">Anthropic Claude</option><option value="openai">OpenAI</option><option value="gemini">Google Gemini</option></select>
       </div>
       <div class="field">
         <label for="bot-instructions">Instructions — how should it behave?</label>
@@ -121,7 +125,7 @@
           name: document.getElementById('bot-name').value,
           description: document.getElementById('bot-description').value,
           instructions: document.getElementById('bot-instructions').value,
-          isPublic: document.getElementById('bot-public').checked,\n          provider: document.getElementById('bot-provider').value
+          isPublic: document.getElementById('bot-public').checked,\n          provider: document.getElementById('bot-provider').value,\n          provider: document.getElementById('bot-provider').value
         }
       });
       window.location.href = '/bot.html?id=' + bot.id;
