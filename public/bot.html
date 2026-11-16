@@ -185,9 +185,28 @@
     const pending = renderMessage('assistant', 'Thinking…', true);
 
     try {
-      const { message } = await api('/chat/' + botId + '/messages', { method: 'POST', body: { content: text } });
+      const { message, sources = [] } = await api('/chat/' + botId + '/messages', { method: 'POST', body: { content: text } });
       pending.textContent = message.content;
       pending.classList.remove('pending');
+      if (sources.length) {
+        const panel = document.createElement('div');
+        panel.className = 'citation-list';
+        panel.style.cssText = 'margin:8px 0 14px 12px;padding:10px 12px;border-left:2px solid var(--border);font-size:0.88rem;color:var(--muted)';
+        const heading = document.createElement('strong');
+        heading.textContent = 'Sources used';
+        panel.appendChild(heading);
+        sources.forEach(source => {
+          const item = document.createElement('div');
+          item.style.marginTop = '6px';
+          const label = document.createElement('strong');
+          label.textContent = '[' + source.citation + '] ' + source.filename;
+          const excerpt = document.createElement('div');
+          excerpt.textContent = source.excerpt;
+          item.append(label, excerpt);
+          panel.appendChild(item);
+        });
+        pending.after(panel);
+      }
     } catch (err) {
       pending.textContent = 'Error: ' + err.message;
       pending.classList.remove('pending');
