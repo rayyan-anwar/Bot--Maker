@@ -111,25 +111,24 @@ For anything beyond testing with friends, either:
 - Upgrade the storage layer to a real database (see below) and use a free
   one like Neon or Supabase (Postgres) or MongoDB Atlas.
 
+## Database migration preparation
+
+The repository includes a PostgreSQL baseline schema and an import script for moving an existing JSON dataset into PostgreSQL. This is a migration aid only: the application still reads and writes the JSON store. The script does not switch runtime persistence.
+
+Before running an import, create a PostgreSQL database with the `pgcrypto` and `vector` extensions available, take a separate backup of `data/db.json`, and configure `DATABASE_URL`. Then run:
+
+```bash
+npm install
+cp .env.example .env
+# Set DATABASE_URL in .env, then:
+npm run migrate:postgres
+```
+
+The import runs in a database transaction and records a one-time migration marker. Re-running it after success exits without importing again. Keep the JSON backup unchanged until row counts and application-level behavior have been independently verified. The importer does not copy uploaded originals, does not provide dual-write, and does not change the app runtime.
+
 ## Growing past this
 
-This is a working MVP, not a finished product. Natural next steps, roughly
-in order of how soon you'd hit them:
-
-1. **Swap `server/store.js` for a real database.** Every other file only
-   calls functions like `store.insert(...)` and `store.findById(...)`, so
-   this is a contained change — rewrite `store.js` to talk to Postgres (or
-   similar) and nothing else needs to change.
-2. **Rate-limit chat requests** so one user can't run up your Anthropic
-   bill. (`express-rate-limit` is a common choice.)
-3. **Smarter document search.** The current search is keyword-matching,
-   which works okay for most documents but isn't as sharp as "real" AI
-   search. The standard upgrade is an embeddings API (Anthropic recommends
-   Voyage AI) plus a vector database — this only touches `server/retrieval.js`.
-4. **Usage limits / billing**, if you want this to be a real product instead
-   of something you're paying the API bill for personally.
-5. **Password reset / email verification**, for a production-grade signup
-   flow.
+This is an MVP foundation, not a finished commercial service. The next critical engineering step is a tested PostgreSQL repository implementation that replaces JSON persistence across every route, followed by tenant-isolation tests and a staged migration/rollback procedure. Other required work includes embeddings and vector retrieval, configurable plan enforcement, billing, email verification/password recovery, production secrets, monitoring, backups and security/load testing.
 
 ## Project structure
 
@@ -183,10 +182,10 @@ The `botforge-production-upgrade` branch now also includes:
 - Provider choice during bot creation.
 - Private bot instructions excluded from public bot responses.
 - Request size/rate controls, security headers, origin checks, safer auth validation and upload bounds.
-- PostgreSQL/pgvector schema draft for the planned production migration.
+- PostgreSQL/pgvector schema and a transactional one-time JSON import utility (not runtime integration).
 - Basic retrieval unit tests and CI syntax-check workflow.
 
-**Still not production-ready:** the active application persistence remains JSON-file-based; the SQL migration is a schema draft and is not wired to the app; retrieval remains keyword-based (no embedding generation/vector search yet); there is no billing/payment system, plan admin console, workspace/role system, streaming, deployment configuration or completed security/load test. Provider credentials must be configured by the operator in environment variables before each provider can be used.
+**Still not production-ready:** the active application persistence remains JSON-file-based; the SQL schema/import utility does not switch runtime persistence; retrieval remains keyword-based (no embedding generation/vector search yet); there is no billing/payment system, plan admin console, workspace/role system, streaming, deployment configuration or completed security/load test. Provider credentials must be configured by the operator in environment variables before each provider can be used.
 
 ### Current model references
 - Anthropic model overview: https://platform.claude.com/docs/en/models/overview
