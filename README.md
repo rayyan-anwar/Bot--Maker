@@ -165,6 +165,8 @@ The current repository remains an early MVP. The planned commercial product dire
 - [Security and release checklist](docs/SECURITY_AND_RELEASE_CHECKLIST.md)
 - [Staging deployment runbook](docs/STAGING_DEPLOYMENT_RUNBOOK.md)
 - Admin dashboard: `/admin.html` (requires `BOTFORGE_ADMIN_EMAILS`)
+- PostgreSQL staging stack: `docker-compose.staging.yml`
+- PostgreSQL backup/restore: `npm run backup:postgres` and `npm run restore:postgres` (restore requires explicit confirmation)
 - Plan and checkout page: `/billing.html` (requires Stripe configuration)
 
 **Important:** these documents describe findings and planned capabilities. They do not mean that PostgreSQL, multi-provider inference, vector RAG, billing, production monitoring or enterprise security are already implemented. The working app supports PostgreSQL persistence when `DATABASE_URL` is configured (JSON remains the local default); provider adapters are available but require server-side credentials.
