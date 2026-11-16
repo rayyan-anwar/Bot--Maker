@@ -10,8 +10,7 @@ personality instructions + optional reference documents), and chat with them
 - **Bot builder** — each user creates bots with a name, description, and
   instructions (a system prompt)
 - **Document upload** — attach `.txt`, `.md`, or `.pdf` files to a bot; the
-  bot searches them for relevant snippets when answering (lightweight keyword
-  search, no external vector database needed)
+  bot searches them with keyword retrieval by default; optional OpenAI embeddings enable hybrid semantic + keyword retrieval
 - **Chat** — talks to the bot using the Claude API, with the bot's
   instructions + relevant document snippets + conversation history
 - **Public/private bots** — keep a bot to yourself, or let other signed-up
@@ -128,7 +127,7 @@ The import runs in a database transaction and records a one-time migration marke
 
 ## Growing past this
 
-This is an MVP foundation, not a finished commercial service. The PostgreSQL JSONB repository is now wired into application routes. The application exposes `/healthz` for liveness and `/readyz` for database readiness. The next critical engineering step is tenant-isolation integration tests and a staged migration/rollback procedure. Other required work includes embeddings and vector retrieval, configurable plan enforcement, billing, email verification/password recovery, production secrets, monitoring, backups and security/load testing.
+This is an MVP foundation, not a finished commercial service. The PostgreSQL JSONB repository is now wired into application routes. The application exposes `/healthz` for liveness and `/readyz` for database readiness. Tenant-scoped repository queries now filter at the storage layer rather than loading every tenant's records into route handlers. Optional hybrid retrieval is implemented with OpenAI embeddings and a keyword fallback; it is opt-in and stores vectors with document chunks. Remaining work includes automatic memory, configurable plan enforcement, billing, email verification/password recovery, live PostgreSQL staging, production secrets, monitoring, backups and security/load testing.
 
 ## Project structure
 
@@ -186,7 +185,7 @@ The `botforge-production-upgrade` branch now also includes:
 - PostgreSQL JSONB runtime repository, PostgreSQL baseline schema and transactional JSON importer (live managed-database verification still pending).
 - Basic retrieval unit tests and CI syntax-check workflow.
 
-**Still not production-ready:** PostgreSQL runtime support is implemented but has not yet been tested against a live managed PostgreSQL database; retrieval remains keyword-based (no embedding generation/vector search yet); there is no billing/payment system, plan admin console, workspace/role system, streaming, deployment configuration or completed security/load test. Provider credentials must be configured by the operator in environment variables before each provider can be used.
+**Still not production-ready:** PostgreSQL runtime support is implemented but has not yet been tested against a live managed PostgreSQL database; retrieval supports optional OpenAI embedding generation and hybrid semantic/keyword ranking when `BOTFORGE_EMBEDDINGS_ENABLED=true` and an OpenAI API key is configured; no pgvector index or large-scale vector infrastructure is implemented; there is no billing/payment system, plan admin console, workspace/role system, streaming or completed live database/security/load test. Provider credentials must be configured by the operator in environment variables before each provider can be used.
 
 ### Current model references
 - Anthropic model overview: https://platform.claude.com/docs/en/models/overview
