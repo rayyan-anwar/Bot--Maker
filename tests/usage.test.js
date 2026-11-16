@@ -51,4 +51,15 @@ test('expired or missing reservations cannot commit chat turns or usage',async()
  assert.equal((await store.allAsync('usage')).length,beforeUsage);
 });
 
+
+test('scoped collection queries return only records matching every requested tenant key',async()=>{
+ const a='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',b='cccccccc-cccc-4ccc-8ccc-cccccccccccc',bot='dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+ await store.insertAsync('messages',{id:require('node:crypto').randomUUID(),userId:a,botId:bot,role:'user',content:'private'});
+ await store.insertAsync('messages',{id:require('node:crypto').randomUUID(),userId:b,botId:bot,role:'user',content:'other'});
+ await store.insertAsync('messages',{id:require('node:crypto').randomUUID(),userId:a,botId:'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',role:'user',content:'other bot'});
+ const rows=await store.findManyAsync('messages',{userId:a,botId:bot});
+ assert.equal(rows.length,1);assert.equal(rows[0].content,'private');
+ assert.throws(()=>store.findManyAsync('messages',{passwordHash:'x'}),/Unsupported data filter/);
+});
+
 test.after(async()=>{await store.close();fs.rmSync(tempDir,{recursive:true,force:true});});
