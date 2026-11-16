@@ -89,8 +89,10 @@ router.post('/password/forgot',async(req,res,next)=>{
   const token=crypto.randomBytes(32).toString('hex'),tokenHash=crypto.createHash('sha256').update(token).digest('hex'),expires=new Date(Date.now()+20*60*1000).toISOString();
   await store.updateByIdAsync('users',user.id,{passwordResetTokenHash:tokenHash,passwordResetExpiresAt:expires});
   const link=base+'/reset-password.html?token='+token;
-  const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{authorization:'Bearer '+process.env.RESEND_API_KEY,'content-type':'application/json'},body:JSON.stringify({from,to:[user.email],subject:'Reset your BotForge password',text:'Use this one-time link within 20 minutes to reset your BotForge password: '+link+'\nIf you did not request this, ignore this email.'}),signal:AbortSignal.timeout(10000)});
-  if(!response.ok)await store.updateByIdAsync('users',user.id,{passwordResetTokenHash:null,passwordResetExpiresAt:null});
+  try{
+   const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{authorization:'Bearer '+process.env.RESEND_API_KEY,'content-type':'application/json'},body:JSON.stringify({from,to:[user.email],subject:'Reset your BotForge password',text:'Use this one-time link within 20 minutes to reset your BotForge password: '+link+'\nIf you did not request this, ignore this email.'}),signal:AbortSignal.timeout(10000)});
+   if(!response.ok)await store.updateByIdAsync('users',user.id,{passwordResetTokenHash:null,passwordResetExpiresAt:null});
+  }catch(_){await store.updateByIdAsync('users',user.id,{passwordResetTokenHash:null,passwordResetExpiresAt:null});}
   return res.status(202).json({message:'If an eligible account exists, password reset instructions will be sent.'});
  }catch(e){next(e);}
 });
