@@ -8,3 +8,12 @@ test('Stripe webhook signature validates raw body and rejects tampering',()=>{
  assert.equal(signatureValid(body,'t='+(timestamp-600)+',v1='+digest,secret),false);
  assert.equal(signatureValid(body,'t='+timestamp+',v1='+digest,''),false);
 });
+
+const {razorpaySignatureValid}=require('../server/billing');
+test('Razorpay webhook signature validates raw body and rejects tampering',()=>{
+ const secret='razorpay_test_webhook_secret',body=Buffer.from(JSON.stringify({event:'subscription.activated'}));
+ const digest=crypto.createHmac('sha256',secret).update(body).digest('hex');
+ assert.equal(razorpaySignatureValid(body,digest,secret),true);
+ assert.equal(razorpaySignatureValid(Buffer.from('tampered'),digest,secret),false);
+ assert.equal(razorpaySignatureValid(body,digest,''),false);
+});
