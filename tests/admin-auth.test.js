@@ -14,7 +14,9 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  t.after(async()=>{await shutdown();fs.rmSync(dir,{recursive:true,force:true});});
  const base='http://127.0.0.1:'+server.address().port;
  async function post(route,body){return fetch(base+route,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});}
- const oauthUnavailable=await fetch(base+'/api/auth/oauth/google');
+ const recoveryRequest=await post('/api/auth/password/forgot',{email:'customer@example.com'});
+ assert.equal(recoveryRequest.status,202);
+  const oauthUnavailable=await fetch(base+'/api/auth/oauth/google');
  assert.equal(oauthUnavailable.status,503);
   const reserved=await post('/api/auth/signup',{name:'Owner',email:'owner@example.com',password:'strong-admin-password-123'});
  assert.equal(reserved.status,409);
