@@ -59,7 +59,7 @@ test('scoped collection queries return only records matching every requested ten
  await store.insertAsync('messages',{id:require('node:crypto').randomUUID(),userId:a,botId:'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',role:'user',content:'other bot'});
  const rows=await store.findManyAsync('messages',{userId:a,botId:bot});
  assert.equal(rows.length,1);assert.equal(rows[0].content,'private');
- assert.throws(()=>store.findManyAsync('messages',{passwordHash:'x'}),/Unsupported data filter/);
+ await assert.rejects(()=>store.findManyAsync('messages',{passwordHash:'x'}),/Unsupported data filter/);
 });
 
 test.after(async()=>{await store.close();fs.rmSync(tempDir,{recursive:true,force:true});});
