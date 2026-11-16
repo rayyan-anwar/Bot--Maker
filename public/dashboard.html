@@ -104,6 +104,16 @@
     document.getElementById('public-bots-empty').style.display = theirs.length ? 'none' : 'block';
   }
   loadBots();
+  api('/chat/providers').then(({providers})=>{
+    const select=document.getElementById('bot-provider');
+    providers.forEach(provider=>{
+      const option=select.querySelector('option[value="'+provider.id+'"]');
+      if(option){
+        option.disabled=!provider.configured;
+        option.textContent=option.textContent+(provider.configured?'':' (server key not configured)');
+      }
+    });
+  }).catch(()=>{});
   api('/chat/usage/me').then(({used,limit,remaining})=>{
     document.getElementById('usage-copy').textContent=remaining+' messages remaining today';
     document.getElementById('usage-count').textContent=used+' / '+limit;
