@@ -1,0 +1,30 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const os=require('node:os');
+const path=require('node:path');
+
+test('bot and document listing routes return collections after async store reads',async(t)=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-listing-'));
+ process.env.JWT_SECRET='test-only-secret-with-at-least-thirty-two-characters';
+ process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
+ const {start,shutdown}=require('../server/index');
+ const server=await start(0,'127.0.0.1');
+ t.after(async()=>{await shutdown();fs.rmSync(dir,{recursive:true,force:true});});
+ const base='http://127.0.0.1:'+server.address().port;
+ const signup=await fetch(base+'/api/auth/signup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'listing-test@example.com',password:'a-secure-test-password-123',name:'Listing Test'})});
+ assert.equal(signup.status,201);
+ const cookie=(signup.headers.get('set-cookie')||'').split(';')[0];
+ const created=await fetch(base+'/api/bots',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({name:'Test bot',instructions:'Answer clearly.',isPublic:true})});
+ assert.equal(created.status,201);
+ const bot=(await created.json()).bot;
+ const mine=await fetch(base+'/api/bots/mine',{headers:{cookie}});
+ assert.equal(mine.status,200);
+ assert.equal((await mine.json()).bots[0].id,bot.id);
+ const shared=await fetch(base+'/api/bots/public',{headers:{cookie}});
+ assert.equal(shared.status,200);
+ assert.equal((await shared.json()).bots[0].id,bot.id);
+ const docs=await fetch(base+'/api/documents/'+bot.id,{headers:{cookie}});
+ assert.equal(docs.status,200);
+ assert.deepEqual((await docs.json()).documents,[]);
+});
