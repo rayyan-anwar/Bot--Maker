@@ -16,3 +16,17 @@ test('topChunks ranks matching content and returns source filename',()=>{
  assert.equal(result[0].filename,'guide.txt');
  assert.match(result[0].text,/database/);
 });
+
+
+test('tokenization supports Hindi and other Unicode scripts',()=>{
+ const docs=[{filename:'hindi.txt',chunks:[{text:'कृत्रिम बुद्धिमत्ता और मशीन लर्निंग'}]}];
+ const result=topChunks(docs,'मशीन लर्निंग',1);
+ assert.equal(result.length,1);
+ assert.equal(result[0].filename,'hindi.txt');
+});
+
+test('chunkText rejects invalid sizes instead of looping forever',()=>{
+ assert.throws(()=>chunkText('some text',0,0),RangeError);
+ assert.throws(()=>chunkText('some text',10,10),RangeError);
+ assert.throws(()=>chunkText('some text',10,-1),RangeError);
+});
