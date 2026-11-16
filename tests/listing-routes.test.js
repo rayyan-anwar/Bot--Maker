@@ -13,9 +13,11 @@ test('administrator-only bot and document listing routes require the configured 
  const server=await start(0,'127.0.0.1');
  t.after(async()=>{await shutdown();fs.rmSync(dir,{recursive:true,force:true});});
  const base='http://127.0.0.1:'+server.address().port;
- const signup=await fetch(base+'/api/auth/signup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'listing-test@example.com',password:'a-secure-admin-password-123',name:'Admin'})});
- assert.equal(signup.status,201);
- const cookie=(signup.headers.get('set-cookie')||'').split(';')[0];
+ const bcrypt=require('bcryptjs'),{v4:uuidv4}=require('uuid'),store=require('../server/store');
+ await store.insertAsync('users',{id:uuidv4(),email:'listing-test@example.com',name:'Admin',passwordHash:await bcrypt.hash('a-secure-admin-password-123',12),createdAt:new Date().toISOString()});
+ const login=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'listing-test@example.com',password:'a-secure-admin-password-123'})});
+ assert.equal(login.status,200);
+ const cookie=(login.headers.get('set-cookie')||'').split(';')[0];
  const created=await fetch(base+'/api/bots',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({name:'Test bot',instructions:'Answer clearly.',isPublic:true})});
  assert.equal(created.status,201);
  const bot=(await created.json()).bot;
