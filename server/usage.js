@@ -1,6 +1,7 @@
 const store=require('./store');
 
-const configuredLimit=Number(process.env.FREE_DAILY_MESSAGES || 30);\nconst DEFAULT_DAILY_LIMIT=Number.isFinite(configuredLimit)&&configuredLimit>0?Math.floor(configuredLimit):30;
+const configuredLimit=Number(process.env.FREE_DAILY_MESSAGES || 30);
+const DEFAULT_DAILY_LIMIT=Number.isFinite(configuredLimit)&&configuredLimit>0?Math.floor(configuredLimit):30;
 function dayKey(date=new Date()) { return date.toISOString().slice(0,10); }
 function getDailyUsage(userId,date=new Date()) {
   const key=dayKey(date);
