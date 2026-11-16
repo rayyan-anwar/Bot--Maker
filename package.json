@@ -8,7 +8,9 @@
     "start": "node server/index.js",
     "dev": "node server/index.js",
     "test": "node --test",
-    "migrate:postgres": "node scripts/migrate-json-to-postgres.js"
+    "migrate:postgres": "node scripts/migrate-json-to-postgres.js",
+    "backup:postgres": "bash scripts/backup-postgres.sh",
+    "restore:postgres": "bash scripts/restore-postgres.sh"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
