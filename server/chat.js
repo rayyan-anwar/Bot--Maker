@@ -72,7 +72,8 @@ router.post('/:botId/messages',requireAuth,requireBotAccess,async(req,res)=>{
   store.insert('messages',userMessage);
   store.insert('messages',assistant);
   usage.recordUsage({userId:req.user.id,botId:req.bot.id,provider,model:req.bot.model||providers.getDefaultModel(provider),inputTokens:result.inputTokens,outputTokens:result.outputTokens});
-  res.json({message:publicMessage(assistant),usage:usage.usageSummary(req.user.id)});
+  const sources=relevant.map((chunk,index)=>({citation:index+1,filename:chunk.filename,excerpt:chunk.text.slice(0,280),documentId:chunk.documentId}));
+  res.json({message:publicMessage(assistant),sources,usage:usage.usageSummary(req.user.id)});
  }catch(err){
   usage.releaseReservation(req.user.id);
   console.error('Chat request failed:',{provider,status:err.status||null,message:err.message});
