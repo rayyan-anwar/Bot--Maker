@@ -38,7 +38,7 @@ app.use(express.static(path.join(__dirname,'..','public')));
 app.get(/^(?!\/api\/).*/,(req,res)=>res.sendFile(path.join(__dirname,'..','public','index.html')));
 app.use((err,req,res,next)=>{
  if(err instanceof SyntaxError&&'body' in err)return res.status(400).json({error:'Invalid JSON body.'});
- if(err&&err.code==='LIMIT_FILE_SIZE')return res.status(413).json({error:'File exceeds the 10 MB upload limit.'});
+ if(err&&err.code==='LIMIT_FILE_SIZE')return res.status(413).json({error:'File exceeds the 5 MB upload limit.'});
  console.error('Unhandled request error:',{message:err.message,requestId:res.getHeader('X-Request-Id')});
  res.status(500).json({error:'An unexpected server error occurred.'});
 });
