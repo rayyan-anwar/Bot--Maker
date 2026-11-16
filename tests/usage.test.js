@@ -20,4 +20,5 @@ test('chat turn persistence stores both messages and usage as one unit',async()=
  assert.equal((await usage.usageSummary(user)).used,1);
  assert.equal((await usage.usageSummary(user)).pending,0);
 });
-\ntest.after(async()=>{await store.close();fs.rmSync(tempDir,{recursive:true,force:true});});
+
+test.after(async()=>{await store.close();fs.rmSync(tempDir,{recursive:true,force:true});});
