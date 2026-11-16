@@ -1,0 +1,80 @@
+# BotForge staging deployment runbook
+
+This runbook prepares a controlled staging deployment. It does not claim that a cloud environment has been provisioned or that a live database has been tested.
+
+## 1. Required services
+
+- A Node.js 20+ application host with persistent environment variables and HTTPS.
+- A managed PostgreSQL database reachable from the application host.
+- A private persistent volume or S3-compatible object store if original uploads will be retained in a future release. The current app extracts text and deletes temporary upload files.
+- At least one server-side AI provider API key with billing enabled.
+- A trusted reverse proxy/load balancer. Set `TRUST_PROXY=1` only when the app is behind exactly one trusted proxy.
+
+## 2. Configure secrets
+
+Set these in the hosting provider's secret manager. Never commit real values to Git.
+
+- `NODE_ENV=production`
+- `PORT` to the port supplied by the host.
+- `JWT_SECRET` to a cryptographically random value of at least 32 characters.
+- `DATABASE_URL` to the managed PostgreSQL connection string.
+- `PGSSL_REJECT_UNAUTHORIZED=true` when the provider supplies a trusted TLS certificate.
+- `PG_POOL_MAX` to a conservative connection count within the database plan.
+- `FREE_DAILY_MESSAGES` to the staging quota.
+- One or more of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_GEMINI_API_KEY`.
+
+Do not set `PGSSL=disable` for a public managed database. Do not expose provider keys or `DATABASE_URL) to browser code.
+
+## 3. Prepare and migrate data
+
+For an existing JSON installation:
+
+1. Stop writes to the old instance and take a timestamped backup of `data/db.json`.
+2. Keep the backup read-only and store a separate copy outside the application host.
+3. Configure `DATABASE_URL) in a protected staging environment.
+4. Run `npm ci`, then `npm run migrate:postgres -- --dry-run`.
+5. Review preflight counts and errors. Do not proceed if any record fails validation.
+6. Run `npm run migrate:postgres` once.
+7. Verify imported collection counts and the migration marker directly in PostgreSQL.
+8. Start the app with the same `DATABASE_URL). Startup creates the runtime repository and quota reservation table if absent.
+
+The importer runs in one transaction and records a one-time marker. It does not copy original uploaded files. Do not delete or overwrite the JSON backup after migration.
+
+For a fresh database, apply `migrations/001_initial_schema.sql` using the database migration process, then start the app. The app creates the JSONB runtime repository and quota reservation table during startup.
+
+## 4. Staging smoke tests
+
+Before inviting users, verify all of the following:
+
+- `GET /healthz` returns HTTP 200.
+- `GET /readyz` returns HTTP 200 and reports `database: postgres).
+- Sign-up, login, logout and session restoration work over HTTPS.
+- A user can create a private bot; another account cannot read or edit it.
+- A public bot can be opened by another signed-in account without exposing private instructions.
+- Document upload, retrieval citations and document deletion work for the owner only.
+- Chat works with a real provider key; provider failures release quota reservations.
+- Concurrent requests at the daily limit do not exceed the configured quota across multiple app instances.
+- Bot deletion removes its dependent runtime records.
+- Restart the app and confirm users, bots, documents, messages and usage remain available.
+
+Use synthetic test accounts and non-sensitive documents only.
+
+## 5. Backups and rollback
+
+- Enable managed PostgreSQL automated backups and point-in-time recovery where available.
+- Before every schema or release change, record a backup identifier and test restoration into a separate staging database.
+- Keep the previous application image/release available for rollback.
+- If migration or smoke tests fail, stop traffic, preserve logs, restore the pre-migration database snapshot if required, and redeploy the previous application release.
+- Never point an old JSON-backed application at a partially migrated database or delete the source backup until reconciliation is signed off.
+
+## 6. Release gates
+
+Do not call the service production-ready until:
+
+- A live managed PostgreSQL staging rehearsal and rollback have passed.
+- Tenant-isolation, provider failure, quota concurrency and upload security tests pass.
+- HTTPS, secret rotation, rate limits, backups and restore have been verified.
+- Browser end-to-end, load and independent security testing have passed.
+- Monitoring and an incident contact/process are in place.
+
+Billing, automated memory, semantic/vector RAG, workspaces/RBAC and enterprise controls are not included in this deployment runbook's current application capabilities.
