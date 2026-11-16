@@ -24,7 +24,7 @@ test('bot and document listing routes return collections after async store reads
  const shared=await fetch(base+'/api/bots/public',{headers:{cookie}});
  assert.equal(shared.status,200);
  assert.equal((await shared.json()).bots[0].id,bot.id);
- const docs=await fetch(base+'/api/documents/'+bot.id,{headers:{cookie}});
+ const history=await fetch(base+'/api/chat/'+bot.id+'/messages',{headers:{cookie}});\n assert.equal(history.status,200);\n assert.deepEqual((await history.json()).messages,[]);\n const docs=await fetch(base+'/api/documents/'+bot.id,{headers:{cookie}});
  assert.equal(docs.status,200);
  assert.deepEqual((await docs.json()).documents,[]);
 });
