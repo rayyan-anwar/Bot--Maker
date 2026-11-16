@@ -64,7 +64,7 @@ function topChunks(documents, query, k = 4) {
       for (const t of tokens) counts.set(t, (counts.get(t) || 0) + 1);
       const score = scoreChunk(counts, queryTokens);
       if (score > 0) {
-        scored.push({ text: chunk.text, filename: doc.filename, score });
+        scored.push({ text: chunk.text, filename: doc.filename, documentId: doc.id, chunkId: chunk.id, score });
       }
     }
   }
