@@ -26,6 +26,7 @@ async function extractText(filePath,originalName){
   if(buffer.subarray(0,5).toString()!=='%PDF-')throw new Error('Invalid PDF signature.');
   const pdfParse=require('pdf-parse');const data=await pdfParse(buffer);
   if(data.numpages>100)throw new Error('PDF exceeds the 100-page limit.');
+  if(typeof data.text!=='string'||data.text.length>1000000)throw new Error('Extracted document text exceeds the 1 million character limit.');
   return data.text;
  }
  if(buffer.includes(0))throw new Error('Binary files are not supported.');
