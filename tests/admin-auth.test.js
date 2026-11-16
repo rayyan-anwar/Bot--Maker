@@ -14,7 +14,9 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  t.after(async()=>{await shutdown();fs.rmSync(dir,{recursive:true,force:true});});
  const base='http://127.0.0.1:'+server.address().port;
  async function post(route,body){return fetch(base+route,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});}
- const reserved=await post('/api/auth/signup',{name:'Owner',email:'owner@example.com',password:'strong-admin-password-123'});
+ const oauthUnavailable=await fetch(base+'/api/auth/oauth/google');
+ assert.equal(oauthUnavailable.status,503);
+  const reserved=await post('/api/auth/signup',{name:'Owner',email:'owner@example.com',password:'strong-admin-password-123'});
  assert.equal(reserved.status,409);
  const signup=await post('/api/auth/signup',{name:'Customer',email:'customer@example.com',password:'strong-customer-password-123'});
  assert.equal(signup.status,201);
@@ -24,6 +26,7 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.equal(me.status,200);
  assert.equal((await me.json()).user.role,'user');
  const adminApi=await fetch(base+'/api/admin/plans',{headers:{cookie}});
+ assert.equal((await fetch(base+'/api/admin/engineer/diagnose-ci',{method:'POST',headers:{cookie,'content-type':'application/json'},body:'{}'})).status,403);
  assert.equal(adminApi.status,403);
  assert.equal((await fetch(base+'/admin.html',{headers:{cookie}})).status,403);
  for(let i=0;i<2;i++)assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'wrong-password'})).status,401);
@@ -38,6 +41,7 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.equal(adminLogin.status,200);
  assert.equal((await adminLogin.json()).user.role,'admin');
  const adminCookie=adminLogin.headers.get('set-cookie');
+ assert.equal((await fetch(base+'/api/admin/engineer/diagnose-ci',{method:'POST',headers:{cookie:adminCookie,'content-type':'application/json'},body:'{}'})).status,503);
  assert.equal((await fetch(base+'/api/admin/plans',{headers:{cookie:adminCookie}})).status,200);
  assert.equal((await fetch(base+'/admin.html',{headers:{cookie:adminCookie}})).status,200);
  for(let i=0;i<2;i++)assert.equal((await post('/api/auth/login',{email:'owner@example.com',password:'incorrect-admin-password'})).status,401);
