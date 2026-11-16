@@ -1,0 +1,52 @@
+# Local staging rehearsal with a real PostgreSQL service.
+# Copy .env.example to .env and set POSTGRES_PASSWORD, JWT_SECRET and provider keys.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: botforge
+      POSTGRES_USER: botforge
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - botforge-staging-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U botforge -d botforge"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  botforge:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      DATABASE_URL: postgres://botforge:${POSTGRES_PASSWORD}@postgres:5432/botforge
+      PGSSL: disable
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY:-}
+      FREE_DAILY_MESSAGES: ${FREE_DAILY_MESSAGES:-30}
+      BOTFORGE_EMBEDDINGS_ENABLED: ${BOTFORGE_EMBEDDINGS_ENABLED:-false}
+      BOTFORGE_ADMIN_EMAILS: ${BOTFORGE_ADMIN_EMAILS:-}
+      BOTFORGE_PLANS_JSON: ${BOTFORGE_PLANS_JSON:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_PLUS: ${STRIPE_PRICE_PLUS:-}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
+      STRIPE_SUCCESS_URL: ${STRIPE_SUCCESS_URL:-}
+      STRIPE_CANCEL_URL: ${STRIPE_CANCEL_URL:-}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+volumes:
+  botforge-staging-db:
