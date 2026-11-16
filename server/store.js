@@ -81,5 +81,5 @@ async function usageStats(userId,day){
  if(!isPostgres()){const used=load().usage.filter(x=>x.userId===userId&&x.day===day).length;const now=Date.now();for(const [id,r] of localReservations)if(r.expiresAt<=now)localReservations.delete(id);const pending=[...localReservations.values()].filter(x=>x.userId===userId&&x.day===day).length;return {used,pending};}
  await initialize();const r=await pool.query("SELECT (SELECT count(*)::int FROM botforge_records WHERE collection='usage' AND data->>'userId'=$1 AND data->>'day'=$2) AS used,(SELECT count(*)::int FROM botforge_quota_reservations WHERE user_id=$1 AND usage_day=$2 AND expires_at>now()) AS pending",[userId,day]);return r.rows[0];
 }
-\nasync function close(){if(pool){await pool.end();pool=null;}initialized=false;}
+async function close(){if(pool){await pool.end();pool=null;}initialized=false;}
 module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotData,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,usageStats,load,persist};
