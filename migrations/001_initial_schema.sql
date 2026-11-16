@@ -1,7 +1,6 @@
 -- BotForge PostgreSQL baseline schema.
 -- Apply with a migration tool in production; do not run ad-hoc against live data.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
-CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE IF NOT EXISTS users (
   id uuid PRIMARY KEY,
   email text NOT NULL UNIQUE,
@@ -54,7 +53,7 @@ CREATE TABLE IF NOT EXISTS document_chunks (
   document_id uuid NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
   chunk_index integer NOT NULL,
   content text NOT NULL,
-  embedding vector(1536),
+  -- Embeddings are intentionally deferred until the vector-search feature is implemented.
   UNIQUE(document_id,chunk_index)
 );
 CREATE TABLE IF NOT EXISTS usage_events (
