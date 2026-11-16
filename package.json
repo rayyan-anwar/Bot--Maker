@@ -10,7 +10,8 @@
     "test": "node --test",
     "migrate:postgres": "node scripts/migrate-json-to-postgres.js",
     "backup:postgres": "bash scripts/backup-postgres.sh",
-    "restore:postgres": "bash scripts/restore-postgres.sh"
+    "restore:postgres": "bash scripts/restore-postgres.sh",
+    "admin:reset-password": "node scripts/reset-admin-password.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
