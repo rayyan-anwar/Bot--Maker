@@ -7,7 +7,7 @@ const router=express.Router(),JWT_SECRET=process.env.JWT_SECRET,COOKIE_NAME='ses
 function adminEmail(){return String(process.env.BOTFORGE_ADMIN_EMAIL||'').trim().toLowerCase();}
 function isAdminEmail(email){return !!adminEmail()&&String(email||'').trim().toLowerCase()===adminEmail();}
 function publicUser(u){return {id:u.id,email:u.email,name:u.name,role:isAdminEmail(u.email)?'admin':'user',plan:u.plan||'free'};}
-function isValidEmail(e){return typeof e==='string'&&e.length<=254&&/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(e);}
+function isValidEmail(e){return typeof e==='string'&&e.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);}
 function cookieOptions(){return {httpOnly:true,sameSite:'lax',secure:process.env.NODE_ENV==='production',maxAge:8*60*60*1000,path:'/'};}
 async function getUserFromRequest(req){const token=req.cookies&&req.cookies[COOKIE_NAME];if(!token)return null;try{const p=jwt.verify(token,JWT_SECRET);const user=await store.findByIdAsync('users',p.userId);if(!user||user.lockedAt)return null;return user;}catch(_){return null;}}
 function requireAuth(req,res,next){getUserFromRequest(req).then(user=>{if(!user)return res.status(401).json({error:'Sign in to continue.'});req.user=user;next();}).catch(next);}
