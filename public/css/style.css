@@ -295,3 +295,7 @@ body,.card,.bot-card,input,textarea,.btn,.tab-strip button,.tabs button {
 @media(prefers-reduced-motion:reduce) {
  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+select{width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:11px 13px;font:inherit}
+.usage-track{height:8px;background:var(--surface-2);border-radius:999px;overflow:hidden;margin-top:14px}
+.usage-track span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:inherit;transition:width 300ms ease}
