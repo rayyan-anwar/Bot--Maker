@@ -13,6 +13,7 @@ function signatureValid(raw,header,secret){
  const a=Buffer.from(expected,'hex'),b=Buffer.from(signature,'hex');
  return a.length===b.length&&crypto.timingSafeEqual(a,b);
 }
+router.get('/plans',requireAuth,async(req,res,next)=>{try{const user=await store.findByIdAsync('users',req.user.id);res.json({plans:plans.getPlans(),currentPlan:plans.getPlanName(user)});}catch(e){next(e);}});
 router.post('/checkout',requireAuth,async(req,res,next)=>{try{
  const {plan}=req.body||{},available=plans.getPlans();
  if(typeof plan!=='string'||!['plus','pro'].includes(plan)||!available[plan])return res.status(400).json({error:'Choose a paid plan.'});
