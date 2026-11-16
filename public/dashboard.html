@@ -114,8 +114,8 @@
       }
     });
   }).catch(()=>{});
-  api('/chat/usage/me').then(({used,limit,remaining})=>{
-    document.getElementById('usage-copy').textContent=remaining+' messages remaining today';
+  api('/chat/usage/me').then(({used,limit,remaining,plan})=>{
+    document.getElementById('usage-copy').textContent=(plan?plan.toUpperCase()+' plan · ':'')+remaining+' messages remaining today';
     document.getElementById('usage-count').textContent=used+' / '+limit;
     document.getElementById('usage-progress').style.width=Math.min(100,used/limit*100)+'%';
   }).catch(()=>{document.getElementById('usage-copy').textContent='Usage information unavailable';});
