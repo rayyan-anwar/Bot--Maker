@@ -173,3 +173,22 @@ The current repository remains an early MVP. The planned commercial product dire
 - [Botpress pricing and plans](https://botpress.com/pricing)
 - [Dify product and open-source platform](https://dify.ai/)
 - [Voiceflow documentation](https://www.voiceflow.com/docs)
+
+## Current upgrade branch implementation
+
+The `botforge-production-upgrade` branch now also includes:
+- Anthropic, OpenAI Responses API and Google Gemini provider adapters, with current default model IDs configurable through environment variables.
+- Server-side daily message quota and token usage event recording (MVP JSON store).
+- Per-user, per-bot editable memory notes.
+- Provider choice during bot creation.
+- Private bot instructions excluded from public bot responses.
+- Request size/rate controls, security headers, origin checks, safer auth validation and upload bounds.
+- PostgreSQL/pgvector schema draft for the planned production migration.
+- Basic retrieval unit tests and CI syntax-check workflow.
+
+**Still not production-ready:** the active application persistence remains JSON-file-based; the SQL migration is a schema draft and is not wired to the app; retrieval remains keyword-based (no embedding generation/vector search yet); there is no billing/payment system, plan admin console, workspace/role system, streaming, deployment configuration or completed security/load test. Provider credentials must be configured by the operator in environment variables before each provider can be used.
+
+### Current model references
+- Anthropic model overview: https://platform.claude.com/docs/en/models/overview
+- OpenAI model guidance: https://developers.openai.com/api/docs/guides/model-selection
+- Gemini model catalog: https://ai.google.dev/gemini-api/docs/models
