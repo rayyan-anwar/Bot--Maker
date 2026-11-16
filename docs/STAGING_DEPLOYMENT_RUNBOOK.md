@@ -82,7 +82,7 @@ Billing, automated memory, semantic/vector RAG, workspaces/RBAC and enterprise c
 ## 7. Optional product configuration
 
 - For semantic/hybrid document retrieval, set `BOTFORGE_EMBEDDINGS_ENABLED=true` and configure `OPENAI_API_KEY`. This sends document chunks and chat queries to the OpenAI embeddings API and may incur usage charges. Leave it disabled to use keyword retrieval only.
-- Configure `BOTFORGE_ADMIN_EMAILS` with comma-separated administrator account emails to unlock `/admin.html) and the `/api/admin` endpoints. Keep this allowlist short and controlled.
+- Configure `BOTFORGE_ADMIN_EMAILS` with comma-separated administrator account emails to unlock `/admin.html` and the `/api/admin` endpoints. Keep this allowlist short and controlled.
 - Configure `BOTFORGE_PLANS_JSON` to override daily message quotas for Free, Plus and Pro. The defaults are intended for development and must be reviewed before commercial use.
-- For subscriptions, configure `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PLUS`, `STRIPE_PRICE_PRO`, `STRIPE_SUCCESS_URL` and `STRIPE_CANCEL_URL`. Register `POST /api/billing/webhook` as a Stripe webhook endpoint and subscribe to `checkout.session.completed` and `customer.subscription.deleted). Test with Stripe test mode before enabling live payments.
+- For subscriptions, configure `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PLUS`, `STRIPE_PRICE_PRO`, `STRIPE_SUCCESS_URL` and `STRIPE_CANCEL_URL`. Register `POST /api/billing/webhook` as a Stripe webhook endpoint and subscribe to `checkout.session.completed` and `customer.subscription.deleted`. Test with Stripe test mode before enabling live payments.
 - Users can manage opt-in automatic memory from the bot chat memory panel. It triggers an additional provider request after a chat turn; review provider cost and retention policies before enabling it broadly.
