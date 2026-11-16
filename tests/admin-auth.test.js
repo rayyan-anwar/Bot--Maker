@@ -4,23 +4,28 @@ const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 
-test('public registration is disabled and three wrong passwords lock the configured administrator until server reset',async(t)=>{
- const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-admin-auth-'));
- process.env.JWT_SECRET='admin-auth-test-secret-with-at-least-thirty-two-characters';
+test('public signup works, admin email is reserved, and three wrong passwords lock a user account',async(t)=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-public-auth-'));
+ process.env.JWT_SECRET='public-auth-test-secret-with-at-least-thirty-two-characters';
  process.env.BOTFORGE_ADMIN_EMAIL='owner@example.com';
  process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
  const {start,shutdown}=require('../server/index');
  const server=await start(0,'127.0.0.1');
  t.after(async()=>{await shutdown();fs.rmSync(dir,{recursive:true,force:true});});
  const base='http://127.0.0.1:'+server.address().port;
- const bcrypt=require('bcryptjs'),{v4:uuidv4}=require('uuid'),store=require('../server/store');
- assert.equal((await fetch(base+'/api/auth/signup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'owner@example.com',password:'strong-admin-password-123',name:'Owner'})})).status,403);
- await store.insertAsync('users',{id:uuidv4(),email:'owner@example.com',name:'Owner',passwordHash:await bcrypt.hash('strong-admin-password-123',12),failedLoginAttempts:0,createdAt:new Date().toISOString()});
- for(let i=0;i<2;i++){const response=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'owner@example.com',password:'wrong-password'})});assert.equal(response.status,401);}
- const third=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'owner@example.com',password:'wrong-password'})});
- assert.equal(third.status,423);
- const locked=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'owner@example.com',password:'strong-admin-password-123'})});
- assert.equal(locked.status,423);
- const me=await fetch(base+'/api/auth/me');
- assert.equal(me.status,401);
+ async function post(route,body){return fetch(base+route,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});}
+ const reserved=await post('/api/auth/signup',{name:'Owner',email:'owner@example.com',password:'strong-admin-password-123'});
+ assert.equal(reserved.status,409);
+ const signup=await post('/api/auth/signup',{name:'Customer',email:'customer@example.com',password:'strong-customer-password-123'});
+ assert.equal(signup.status,201);
+ const cookie=signup.headers.get('set-cookie');
+ assert.ok(cookie&&cookie.includes('session='));
+ const me=await fetch(base+'/api/auth/me',{headers:{cookie}});
+ assert.equal(me.status,200);
+ assert.equal((await me.json()).user.role,'user');
+ const adminApi=await fetch(base+'/api/admin/plans',{headers:{cookie}});
+ assert.equal(adminApi.status,401);
+ for(let i=0;i<2;i++)assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'wrong-password'})).status,401);
+ assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'wrong-password'})).status,423);
+ assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'strong-customer-password-123'})).status,423);
 });
