@@ -23,7 +23,7 @@ Set these in the hosting provider's secret manager. Never commit real values to 
 - `FREE_DAILY_MESSAGES` to the staging quota.
 - One or more of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_GEMINI_API_KEY`.
 
-Do not set `PGSSL=disable` for a public managed database. Do not expose provider keys or `DATABASE_URL) to browser code.
+Do not set `PGSSL=disable` for a public managed database. Do not expose provider keys or `DATABASE_URL` to browser code.
 
 ## 3. Prepare and migrate data
 
@@ -47,7 +47,7 @@ For a fresh database, apply `migrations/001_initial_schema.sql` using the databa
 Before inviting users, verify all of the following:
 
 - `GET /healthz` returns HTTP 200.
-- `GET /readyz` returns HTTP 200 and reports `database: postgres).
+- `GET /readyz` returns HTTP 200 and reports `database: postgres`.
 - Sign-up, login, logout and session restoration work over HTTPS.
 - A user can create a private bot; another account cannot read or edit it.
 - A public bot can be opened by another signed-in account without exposing private instructions.
