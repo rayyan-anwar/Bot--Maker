@@ -97,3 +97,8 @@ Billing, opt-in automatic memory and optional embedding-based hybrid retrieval a
 ## 8. Owner-only AI Engineer CI diagnosis
 
 The admin panel includes a read-only AI diagnosis action. To enable it, set `BOTFORGE_GITHUB_TOKEN` to a fine-grained token with Actions: read permission for the single repository, set `BOTFORGE_GITHUB_REPO=owner/repository`, and choose a configured `BOTFORGE_ENGINEER_PROVIDER` (`openai`, `anthropic` or `gemini`). The service reads recent workflow and failed-step metadata only, then asks the configured provider for a diagnosis. It does not fetch source code, workflow logs, create branches, edit files, open PRs, merge or deploy. Treat the result as a hypothesis and verify it against actual logs. Never grant this token write permissions for this read-only feature.
+
+
+## 9. Password recovery email
+
+To enable self-service customer password recovery, configure `RESEND_API_KEY`, `BOTFORGE_EMAIL_FROM` with a verified sender domain, and `PUBLIC_BASE_URL` with the HTTPS production origin. The app sends one-time reset links that expire after 20 minutes; only a SHA-256 token hash is stored, and a successful reset clears the failed-login lockout. Without these settings, the forgot-password endpoint deliberately returns a generic response and sends no email. Test delivery and expired/replayed links in staging before launch.
