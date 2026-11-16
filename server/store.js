@@ -2,7 +2,7 @@
 const fs=require('fs');
 const path=require('path');
 const DB_PATH=path.join(__dirname,'..','data','db.json');
-function emptyDB(){return {users:[],bots:[],documents:[],messages:[],usage:[]};}
+function emptyDB(){return {users:[],bots:[],documents:[],messages:[],usage:[],memory:[]};}
 let cache=null;
 function load(){
  if(cache)return cache;
