@@ -16,9 +16,11 @@ test('billing endpoints enforce authentication and fail closed when providers ar
  const base='http://127.0.0.1:'+server.address().port;
  const unauth=await fetch(base+'/api/billing/plans');
  assert.equal(unauth.status,401);
- const signup=await fetch(base+'/api/auth/signup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'billing-test@example.com',password:'a-secure-test-password-123',name:'Billing Test'})});
- assert.equal(signup.status,201);
- const cookie=(signup.headers.get('set-cookie')||'').split(';')[0];
+ const bcrypt=require('bcryptjs'),{v4:uuidv4}=require('uuid'),store=require('../server/store');
+ await store.insertAsync('users',{id:uuidv4(),email:'billing-test@example.com',name:'Billing Test',passwordHash:await bcrypt.hash('a-secure-test-password-123',12),createdAt:new Date().toISOString()});
+ const login=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'billing-test@example.com',password:'a-secure-test-password-123'})});
+ assert.equal(login.status,200);
+ const cookie=(login.headers.get('set-cookie')||'').split(';')[0];
  assert.ok(cookie.startsWith('session='));
  const plans=await fetch(base+'/api/billing/plans',{headers:{cookie}});
  assert.equal(plans.status,200);
