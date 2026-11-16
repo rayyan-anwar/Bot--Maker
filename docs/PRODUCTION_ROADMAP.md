@@ -102,3 +102,9 @@ Economics: provider cost per conversation, gross margin by plan, quota exhaustio
 ## Release discipline
 
 Every release must have a migration plan, automated tests, a staging smoke test, backup confirmation, rollback path and release notes. No secrets, production customer data or API keys belong in Git.
+
+## Implementation snapshot (upgrade branch)
+
+Implemented as an initial foundation: provider adapter layer (Anthropic/OpenAI/Gemini), configurable default model IDs, basic daily quota and token usage ledger in the development store, manual user-managed bot memory, provider selection at bot creation, initial UI quota meter, upload bounds, and security middleware.
+
+Not yet implemented: PostgreSQL runtime repository/migrations, pgvector embeddings and semantic/hybrid retrieval, automated memory extraction, billing/webhooks, configurable Free/Plus/Pro admin plans, workspaces/RBAC, integrations, production deployment/monitoring and tested backup/restore.
