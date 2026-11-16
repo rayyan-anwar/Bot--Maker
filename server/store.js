@@ -17,7 +17,7 @@ function emptyDB() {
     users: [],       // { id, email, passwordHash, name, createdAt }
     bots: [],         // { id, ownerId, name, instructions, isPublic, createdAt }
     documents: [],     // { id, botId, filename, chunks: [{id, text}], createdAt }
-    messages: []        // { id, botId, userId, role, content, createdAt }
+    messages: [],       // { id, botId, userId, role, content, createdAt }\n    usage: []           // { id, userId, botId, provider, model, day, createdAt }
   };
 }
 
@@ -42,7 +42,7 @@ function load() {
 
 function persist() {
   fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-  fs.writeFileSync(DB_PATH, JSON.stringify(cache, null, 2));
+  const tempPath = DB_PATH + '.tmp';\n  fs.writeFileSync(tempPath, JSON.stringify(cache, null, 2), { mode: 0o600 });\n  fs.renameSync(tempPath, DB_PATH);
 }
 
 // ---- Generic helpers -------------------------------------------------
