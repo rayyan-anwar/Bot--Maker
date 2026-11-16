@@ -30,3 +30,11 @@ test('chunkText rejects invalid sizes instead of looping forever',()=>{
  assert.throws(()=>chunkText('some text',10,10),RangeError);
  assert.throws(()=>chunkText('some text',10,-1),RangeError);
 });
+
+
+test('topChunks includes stable document and chunk references for citations',()=>{
+ const docs=[{id:'doc-123',filename:'policy.pdf',chunks:[{id:'chunk-456',text:'refund policy and returns'}]}];
+ const result=topChunks(docs,'refund returns',1);
+ assert.equal(result[0].documentId,'doc-123');
+ assert.equal(result[0].chunkId,'chunk-456');
+});
