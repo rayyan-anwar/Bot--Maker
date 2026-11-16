@@ -1,6 +1,6 @@
 -- BotForge PostgreSQL baseline schema.
 -- Apply with a migration tool in production; do not run ad-hoc against live data.
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;\nCREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE IF NOT EXISTS users (
   id uuid PRIMARY KEY,
   email text NOT NULL UNIQUE,
@@ -68,3 +68,11 @@ CREATE TABLE IF NOT EXISTS usage_events (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS usage_user_created_idx ON usage_events(user_id,created_at DESC);
+\nCREATE TABLE IF NOT EXISTS memory_notes (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  bot_id uuid NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content varchar(500) NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS memory_user_bot_idx ON memory_notes(user_id,bot_id,created_at);
