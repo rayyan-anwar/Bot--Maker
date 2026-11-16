@@ -1,7 +1,7 @@
 const PROVIDERS = {
   anthropic: {
     keyEnv: 'ANTHROPIC_API_KEY',
-    defaultModel: process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022',
+    defaultModel: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5',
     async generate({ model, system, messages, maxTokens, signal }) {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST', signal,
@@ -15,21 +15,23 @@ const PROVIDERS = {
   },
   openai: {
     keyEnv: 'OPENAI_API_KEY',
-    defaultModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    defaultModel: process.env.OPENAI_MODEL || 'gpt-5.5',
     async generate({ model, system, messages, maxTokens, signal }) {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const input=[{role:'system',content:[{type:'input_text',text:system}]},...messages.map(m=>({role:m.role,content:[{type:'input_text',text:m.content}]}))];
+      const response = await fetch('https://api.openai.com/v1/responses', {
         method:'POST', signal,
         headers:{'content-type':'application/json', authorization:'Bearer '+process.env.OPENAI_API_KEY},
-        body:JSON.stringify({model, max_tokens:maxTokens, messages:[{role:'system',content:system},...messages]})
+        body:JSON.stringify({model, max_output_tokens:maxTokens, input})
       });
       const data=await safeJson(response);
       if(!response.ok) throw providerError('OpenAI',response.status,data);
-      return {text:data.choices?.[0]?.message?.content || '', inputTokens:data.usage?.prompt_tokens || 0, outputTokens:data.usage?.completion_tokens || 0};
+      const text=data.output_text || (data.output||[]).flatMap(item=>item.content||[]).filter(item=>item.type==='output_text').map(item=>item.text).join('');
+      return {text, inputTokens:data.usage?.input_tokens || 0, outputTokens:data.usage?.output_tokens || 0};
     }
   },
   gemini: {
     keyEnv:'GOOGLE_GEMINI_API_KEY',
-    defaultModel:process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+    defaultModel:process.env.GEMINI_MODEL || 'gemini-3.8-flash',
     async generate({model,system,messages,maxTokens,signal}) {
       const url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent?key='+encodeURIComponent(process.env.GOOGLE_GEMINI_API_KEY);
       const contents=messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
