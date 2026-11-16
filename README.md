@@ -197,3 +197,14 @@ The `botforge-production-upgrade` branch now also includes:
 - Anthropic model overview: https://platform.claude.com/docs/en/models/overview
 - OpenAI model guidance: https://developers.openai.com/api/docs/guides/model-selection
 - Gemini model catalog: https://ai.google.dev/gemini-api/docs/models
+
+
+## Public accounts, admin separation and advertising
+
+- The public login page supports email/password signup and login. New accounts receive the Free plan.
+- The configured `BOTFORGE_ADMIN_EMAIL` is reserved and cannot be claimed through public signup. Bootstrap the administrator separately with `npm run admin:create`.
+- Public users can access their own workspace and public bots. The administrator dashboard and APIs remain protected by server-side administrator identity checks.
+- Accounts are locked after three incorrect password attempts. Unlock/reset is a server-side administrator operation.
+- Login/signup advert and workspace/chat ad slots are placeholders only. No advertising network is active and no revenue is generated until an ad provider account is approved and its publisher code is configured.
+- Google and GitHub OAuth buttons are displayed as pending integration and do not authenticate yet. Configure OAuth applications, callback URLs, verified email handling and secrets before enabling them. Instagram is not a general-purpose consumer login provider for arbitrary third-party apps; do not promise Instagram sign-in unless Meta offers an eligible supported product for the intended account type.
+- Do not place ads inside private chat content or use private prompts, files, memories or conversations for ad targeting. Keep placements clearly labelled and respect consent and applicable advertising/privacy rules.
