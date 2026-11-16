@@ -38,4 +38,17 @@ test('bot deletion atomically removes dependent records in JSON storage',async()
  assert.equal(await store.deleteBotAndData(bot),false);
 });
 
+
+test('expired or missing reservations cannot commit chat turns or usage',async()=>{
+ const user='99999999-9999-4999-8999-999999999999',bot='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+ const beforeMessages=(await store.allAsync('messages')).length,beforeUsage=(await store.allAsync('usage')).length;
+ const userMessage={id:require('node:crypto').randomUUID(),userId:user,botId:bot,role:'user',content:'hello'};
+ const assistantMessage={id:require('node:crypto').randomUUID(),userId:user,botId:bot,role:'assistant',content:'hi'};
+ const usageRecord={id:require('node:crypto').randomUUID(),userId:user,botId:bot,provider:'test',model:'test',inputTokens:1,outputTokens:1,day:new Date().toISOString().slice(0,10)};
+ await assert.rejects(()=>store.commitChatTurn({userMessage,assistantMessage,usageRecord},require('node:crypto').randomUUID()),/reservation expired/);
+ await assert.rejects(()=>usage.recordUsage({userId:user,botId:bot,provider:'test',model:'test',reservationId:require('node:crypto').randomUUID()}),/reservation expired/);
+ assert.equal((await store.allAsync('messages')).length,beforeMessages);
+ assert.equal((await store.allAsync('usage')).length,beforeUsage);
+});
+
 test.after(async()=>{await store.close();fs.rmSync(tempDir,{recursive:true,force:true});});
