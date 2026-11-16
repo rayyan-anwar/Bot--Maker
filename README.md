@@ -113,7 +113,7 @@ For anything beyond testing with friends, either:
 
 ## Database migration preparation
 
-The repository includes a PostgreSQL baseline schema and an import script for moving an existing JSON dataset into PostgreSQL. This is a migration aid only: the application still reads and writes the JSON store. The script does not switch runtime persistence.
+The repository includes a PostgreSQL baseline schema and a transactional importer. The importer seeds both normalized reporting tables and the JSONB runtime repository. After a successful import, configure the same `DATABASE_URL` for the application and it will use PostgreSQL automatically. Without `DATABASE_URL`, it uses the local JSON development adapter.
 
 Before running an import, create a PostgreSQL database with the `pgcrypto` and `vector` extensions available, take a separate backup of `data/db.json`, and configure `DATABASE_URL`. Then run:
 
@@ -124,11 +124,11 @@ cp .env.example .env
 npm run migrate:postgres
 ```
 
-The import runs in a database transaction and records a one-time migration marker. Re-running it after success exits without importing again. Keep the JSON backup unchanged until row counts and application-level behavior have been independently verified. The importer does not copy uploaded originals, does not provide dual-write, and does not change the app runtime.
+The import runs in a database transaction and records a one-time migration marker. Re-running it after success exits without importing again. Keep the JSON backup unchanged until row counts and application-level behavior have been independently verified. The importer does not copy uploaded originals or provide dual-write. Keep the original JSON backup until database row counts and app behavior have been verified.
 
 ## Growing past this
 
-This is an MVP foundation, not a finished commercial service. The next critical engineering step is a tested PostgreSQL repository implementation that replaces JSON persistence across every route, followed by tenant-isolation tests and a staged migration/rollback procedure. Other required work includes embeddings and vector retrieval, configurable plan enforcement, billing, email verification/password recovery, production secrets, monitoring, backups and security/load testing.
+This is an MVP foundation, not a finished commercial service. The PostgreSQL JSONB repository is now wired into application routes. The next critical engineering step is multi-instance-safe quota enforcement, tenant-isolation integration tests, and a staged migration/rollback procedure. Other required work includes embeddings and vector retrieval, configurable plan enforcement, billing, email verification/password recovery, production secrets, monitoring, backups and security/load testing.
 
 ## Project structure
 
@@ -185,7 +185,7 @@ The `botforge-production-upgrade` branch now also includes:
 - PostgreSQL/pgvector schema and a transactional one-time JSON import utility (not runtime integration).
 - Basic retrieval unit tests and CI syntax-check workflow.
 
-**Still not production-ready:** the active application persistence remains JSON-file-based; the SQL schema/import utility does not switch runtime persistence; retrieval remains keyword-based (no embedding generation/vector search yet); there is no billing/payment system, plan admin console, workspace/role system, streaming, deployment configuration or completed security/load test. Provider credentials must be configured by the operator in environment variables before each provider can be used.
+**Still not production-ready:** PostgreSQL runtime support is implemented but has not yet been tested against a live managed PostgreSQL database; retrieval remains keyword-based (no embedding generation/vector search yet); there is no billing/payment system, plan admin console, workspace/role system, streaming, deployment configuration or completed security/load test. Provider credentials must be configured by the operator in environment variables before each provider can be used.
 
 ### Current model references
 - Anthropic model overview: https://platform.claude.com/docs/en/models/overview
