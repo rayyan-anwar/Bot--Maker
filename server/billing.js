@@ -15,7 +15,7 @@ function signatureValid(raw,header,secret){
 }
 router.get('/plans',requireAuth,async(req,res,next)=>{try{const user=await store.findByIdAsync('users',req.user.id);res.json({plans:plans.getPlans(),currentPlan:plans.getPlanName(user)});}catch(e){next(e);}});
 router.post('/checkout',requireAuth,async(req,res,next)=>{try{
- const {plan}=req.body||{},available=plans.getPlans();
+ const {plan}=req.body||{},available=plans.getPlans();if(req.user.stripeSubscriptionId)return res.status(409).json({error:'This account already has an active subscription. Contact support to change or cancel it.'});
  if(typeof plan!=='string'||!['plus','pro'].includes(plan)||!available[plan])return res.status(400).json({error:'Choose a paid plan.'});
  const priceId=process.env[plan==='plus'?'STRIPE_PRICE_PLUS':'STRIPE_PRICE_PRO'];
  if(!process.env.STRIPE_SECRET_KEY||!priceId||!process.env.STRIPE_SUCCESS_URL||!process.env.STRIPE_CANCEL_URL)return res.status(503).json({error:'Online billing is not configured by the service operator.'});
@@ -32,7 +32,7 @@ webhookRouter.post('/',express.raw({type:'application/json',limit:'256kb'}),asyn
  try{
   if(event.type==='checkout.session.completed'){
    const session=event.data&&event.data.object,userId=session?.metadata?.userId,plan=session?.metadata?.plan;
-   if(userId&&plans.getPlans()[plan]){const user=await store.findByIdAsync('users',userId);if(user)await store.updateByIdAsync('users',userId,{plan,stripeCustomerId:session.customer||null,stripeSubscriptionId:session.subscription||null});}
+   if(userId&&plans.getPlans()[plan]&&session.mode==='subscription'&&session.status==='complete'&&['paid','no_payment_required'].includes(session.payment_status)){const user=await store.findByIdAsync('users',userId);if(user)await store.updateByIdAsync('users',userId,{plan,stripeCustomerId:session.customer||null,stripeSubscriptionId:session.subscription||null});}
   }else if(event.type==='customer.subscription.deleted'){
    const subscription=event.data&&event.data.object,userId=subscription?.metadata?.userId;
    if(userId){const user=await store.findByIdAsync('users',userId);if(user)await store.updateByIdAsync('users',userId,{plan:'free',stripeSubscriptionId:null});}
