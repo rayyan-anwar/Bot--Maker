@@ -24,4 +24,18 @@ test('chat turn persistence stores both messages and usage as one unit',async()=
 
 test('readiness health reports the active JSON development adapter',async()=>{const result=await store.health();assert.deepEqual(result,{ok:true,database:'json-development'});});
 
+
+test('bot deletion atomically removes dependent records in JSON storage',async()=>{
+ const user='77777777-7777-4777-8777-777777777777',bot='88888888-8888-4888-8888-888888888888';
+ await store.insertAsync('bots',{id:bot,ownerId:user,name:'Temporary',instructions:'Test'});
+ await store.insertAsync('documents',{id:require('node:crypto').randomUUID(),botId:bot,filename:'x.txt',chunks:[]});
+ await store.insertAsync('messages',{id:require('node:crypto').randomUUID(),botId:bot,userId:user,role:'user',content:'x'});
+ await store.insertAsync('memory',{id:require('node:crypto').randomUUID(),botId:bot,userId:user,content:'x'});
+ await store.insertAsync('usage',{id:require('node:crypto').randomUUID(),botId:bot,userId:user,provider:'test',day:new Date().toISOString().slice(0,10)});
+ assert.equal(await store.deleteBotAndData(bot),true);
+ assert.equal(await store.findByIdAsync('bots',bot),null);
+ for(const collection of ['documents','messages','memory','usage'])assert.equal((await store.allAsync(collection)).some(x=>x.botId===bot),false);
+ assert.equal(await store.deleteBotAndData(bot),false);
+});
+
 test.after(async()=>{await store.close();fs.rmSync(tempDir,{recursive:true,force:true});});
