@@ -1,11 +1,12 @@
-// Async persistence abstraction. JSON remains the zero-config development adapter;
+// Async persistence abstraction. JSON is the zero-config development adapter;
 // DATABASE_URL selects PostgreSQL for deployed environments.
 const fs=require('node:fs');
 const path=require('node:path');
 const {Pool}=require('pg');
 const DB_PATH=process.env.BOTFORGE_DATA_FILE||path.join(__dirname,'..','data','db.json');
 const COLLECTIONS=['users','bots','documents','messages','usage','memory'];
-let cache=null,pool=null,initialized=false;const localReservations=new Map();
+let cache=null,pool=null,initialized=false;
+const localReservations=new Map();
 function emptyDB(){return Object.fromEntries(COLLECTIONS.map(k=>[k,[]]));}
 function load(){
  if(cache)return cache;
@@ -23,7 +24,7 @@ async function initialize(){
   await pool.query("CREATE TABLE IF NOT EXISTS botforge_records (collection text NOT NULL CHECK(collection IN ('users','bots','documents','messages','usage','memory')), id uuid NOT NULL, data jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(collection,id))");
   await pool.query('CREATE INDEX IF NOT EXISTS botforge_records_collection_idx ON botforge_records(collection)');
   await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS botforge_records_user_email_uidx ON botforge_records((lower(data->>'email'))) WHERE collection='users'");
-  await pool.query(`CREATE TABLE IF NOT EXISTS botforge_quota_reservations (id uuid PRIMARY KEY, user_id uuid NOT NULL, usage_day date NOT NULL, expires_at timestamptz NOT NULL)`);
+  await pool.query('CREATE TABLE IF NOT EXISTS botforge_quota_reservations (id uuid PRIMARY KEY, user_id uuid NOT NULL, usage_day date NOT NULL, expires_at timestamptz NOT NULL)');
   await pool.query('CREATE INDEX IF NOT EXISTS botforge_quota_user_day_idx ON botforge_quota_reservations(user_id,usage_day,expires_at)');
  } else load();
  initialized=true;
@@ -36,13 +37,24 @@ function deleteById(collection,id){const db=load(),before=db[collection].length;
 function assertCollection(c){if(!COLLECTIONS.includes(c))throw new Error('Unknown data collection: '+c);}
 function isUuid(id){return typeof id==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);}
 async function allAsync(c){assertCollection(c);if(!isPostgres())return all(c);await initialize();const r=await pool.query('SELECT data FROM botforge_records WHERE collection=$1 ORDER BY updated_at,id',[c]);return r.rows.map(x=>x.data);}
-async function findManyAsync(c,filters={}){assertCollection(c);const allowed=new Set(['ownerId','botId','userId','isPublic','email']);const entries=Object.entries(filters);if(entries.some(([key,value])=>!allowed.has(key)||value===undefined||value===null))throw new Error('Unsupported data filter.');if(!isPostgres())return all(c).filter(row=>entries.every(([key,value])=>row[key]===value));await initialize();if(!entries.length)return allAsync(c);const clauses=entries.map((_,i)=>`data->>${i*2+3}=${i*2+2}`);const values=[c,...entries.flatMap(([key,value])=>[String(value),key])];const result=await pool.query(`SELECT data FROM botforge_records WHERE collection=$1 AND ${clauses.join(' AND ')} ORDER BY updated_at,id`,values);return result.rows.map(row=>row.data);}
+async function findManyAsync(c,filters={}){assertCollection(c);const allowed=new Set(['ownerId','botId','userId','isPublic','email']);const entries=Object.entries(filters);if(entries.some(([key,value])=>!allowed.has(key)||value===undefined||value===null))throw new Error('Unsupported data filter.');if(!isPostgres())return all(c).filter(row=>entries.every(([key,value])=>row[key]===value));await initialize();if(!entries.length)return allAsync(c);const clauses=entries.map((_,i)=>`data->>$${i*2+3}=$${i*2+2}`);const values=[c,...entries.flatMap(([key,value])=>[String(value),key])];const result=await pool.query(`SELECT data FROM botforge_records WHERE collection=$1 AND ${clauses.join(' AND ')} ORDER BY updated_at,id`,values);return result.rows.map(row=>row.data);}
 async function findByIdAsync(c,id){assertCollection(c);if(!isUuid(id))return null;if(!isPostgres())return findById(c,id);await initialize();const r=await pool.query('SELECT data FROM botforge_records WHERE collection=$1 AND id=$2',[c,id]);return r.rowCount?r.rows[0].data:null;}
 async function insertAsync(c,record){assertCollection(c);if(!isPostgres()){if(c==='users'&&all('users').some(u=>String(u.email).toLowerCase()===String(record.email).toLowerCase())){const e=new Error('Duplicate user email.');e.code='23505';throw e;}return insert(c,record);}await initialize();await pool.query('INSERT INTO botforge_records(collection,id,data) VALUES($1,$2,$3::jsonb)',[c,record.id,JSON.stringify(record)]);return record;}
 async function updateByIdAsync(c,id,patch){assertCollection(c);if(!isUuid(id))return null;if(!isPostgres())return updateById(c,id,patch);await initialize();const r=await pool.query("UPDATE botforge_records SET data=data || $3::jsonb,updated_at=now() WHERE collection=$1 AND id=$2 RETURNING data",[c,id,JSON.stringify(patch)]);return r.rowCount?r.rows[0].data:null;}
 async function deleteByIdAsync(c,id){assertCollection(c);if(!isUuid(id))return false;if(!isPostgres())return deleteById(c,id);await initialize();const r=await pool.query('DELETE FROM botforge_records WHERE collection=$1 AND id=$2',[c,id]);return r.rowCount>0;}
-async function deleteBotAndData(botId){if(!isUuid(botId))return false;if(!isPostgres()){const db=load(),exists=db.bots.some(x=>x.id===botId);if(!exists)return false;db.bots=db.bots.filter(x=>x.id!==botId);for(const c of ['documents','messages','memory','usage'])db[c]=db[c].filter(x=>x.botId!==botId);persist();return true;}await initialize();const client=await pool.connect();try{await client.query('BEGIN');const removed=await client.query("DELETE FROM botforge_records WHERE collection='bots' AND id=$1",[botId]);if(!removed.rowCount){await client.query('ROLLBACK');return false;}for(const c of ['documents','messages','memory','usage'])await client.query("DELETE FROM botforge_records WHERE collection=$1 AND data->>'botId'=$2",[c,botId]);// BotForge uses botforge_records as the runtime source of truth; no legacy bots table is required.await client.query('COMMIT');return true;}catch(e){try{await client.query('ROLLBACK');}catch(_){}throw e;}finally{client.release();}}
-
+async function deleteBotAndData(botId){
+ if(!isUuid(botId))return false;
+ if(!isPostgres()){const db=load(),exists=db.bots.some(x=>x.id===botId);if(!exists)return false;db.bots=db.bots.filter(x=>x.id!==botId);for(const c of ['documents','messages','memory','usage'])db[c]=db[c].filter(x=>x.botId!==botId);persist();return true;}
+ await initialize();const client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+  const removed=await client.query("DELETE FROM botforge_records WHERE collection='bots' AND id=$1",[botId]);
+  if(!removed.rowCount){await client.query('ROLLBACK');return false;}
+  for(const c of ['documents','messages','memory','usage'])await client.query("DELETE FROM botforge_records WHERE collection=$1 AND data->>'botId'=$2",[c,botId]);
+  await client.query('COMMIT');return true;
+ }catch(e){try{await client.query('ROLLBACK');}catch(_){}throw e;}
+ finally{client.release();}
+}
 async function reserveUsageSlot(userId,limit,day){
  if(!isUuid(userId))throw new Error('Invalid user identifier.');
  const reservationId=require('node:crypto').randomUUID();
@@ -56,47 +68,29 @@ async function reserveUsageSlot(userId,limit,day){
  }
  await initialize();const client=await pool.connect();
  try{
-  await client.query('BEGIN');
-  await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',[userId+':'+day]);
-  await client.query('DELETE FROM botforge_quota_reservations WHERE expires_at<=now()');
+  await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',[userId+':'+day]);await client.query('DELETE FROM botforge_quota_reservations WHERE expires_at<=now()');
   const usedResult=await client.query("SELECT count(*)::int AS count FROM botforge_records WHERE collection='usage' AND data->>'userId'=$1 AND data->>'day'=$2",[userId,day]);
   const pendingResult=await client.query('SELECT count(*)::int AS count FROM botforge_quota_reservations WHERE user_id=$1 AND usage_day=$2',[userId,day]);
   const used=usedResult.rows[0].count,pending=pendingResult.rows[0].count;
   if(used+pending>=limit){await client.query('ROLLBACK');const e=new Error('Daily message limit reached. Try again after the daily reset.');e.status=429;throw e;}
-  await client.query('INSERT INTO botforge_quota_reservations(id,user_id,usage_day,expires_at) VALUES($1,$2,$3,now()+interval \'15 minutes\')',[reservationId,userId,day]);
+  await client.query("INSERT INTO botforge_quota_reservations(id,user_id,usage_day,expires_at) VALUES($1,$2,$3,now()+interval '15 minutes')",[reservationId,userId,day]);
   await client.query('COMMIT');return {reservationId,used,pending:pending+1,remaining:Math.max(0,limit-used-pending-1)};
  }catch(e){try{await client.query('ROLLBACK');}catch(_){}throw e;}finally{client.release();}
 }
-async function releaseUsageSlot(reservationId){
- if(!reservationId)return;
- if(!isPostgres()){localReservations.delete(reservationId);return;}
- await initialize();await pool.query('DELETE FROM botforge_quota_reservations WHERE id=$1',[reservationId]);
-}
+async function releaseUsageSlot(reservationId){if(!reservationId)return;if(!isPostgres()){localReservations.delete(reservationId);return;}await initialize();await pool.query('DELETE FROM botforge_quota_reservations WHERE id=$1',[reservationId]);}
 async function commitUsageRecord(record,reservationId){
  if(!isPostgres()){if(reservationId&&!localReservations.has(reservationId))throw new Error('Usage reservation expired before the usage record could be committed.');insert('usage',record);releaseUsageSlot(reservationId);return record;}
  await initialize();const client=await pool.connect();
- try{await client.query('BEGIN');await client.query('INSERT INTO botforge_records(collection,id,data) VALUES(\'usage\',$1,$2::jsonb)',[record.id,JSON.stringify(record)]);if(reservationId){const removed=await client.query('DELETE FROM botforge_quota_reservations WHERE id=$1',[reservationId]);if(removed.rowCount!==1)throw new Error('Usage reservation expired before the usage record could be committed.');}await client.query('COMMIT');return record;}
+ try{await client.query('BEGIN');await client.query("INSERT INTO botforge_records(collection,id,data) VALUES('usage',$1,$2::jsonb)",[record.id,JSON.stringify(record)]);if(reservationId){const removed=await client.query('DELETE FROM botforge_quota_reservations WHERE id=$1',[reservationId]);if(removed.rowCount!==1)throw new Error('Usage reservation expired before the usage record could be committed.');}await client.query('COMMIT');return record;}
  catch(e){try{await client.query('ROLLBACK');}catch(_){}throw e;}finally{client.release();}
 }
 async function commitChatTurn({userMessage,assistantMessage,usageRecord},reservationId){
  const records=[['messages',userMessage],['messages',assistantMessage],['usage',usageRecord]];
  if(records.some(([collection,record])=>!record||!isUuid(record.id)))throw new Error('Invalid chat turn record.');
- if(!isPostgres()){
-  if(reservationId&&!localReservations.has(reservationId))throw new Error('Usage reservation expired before the chat turn could be committed.');
-  const db=load();
-  for(const [collection,record] of records){assertCollection(collection);db[collection].push(record);}
-  persist();
-  if(reservationId)localReservations.delete(reservationId);
-  return {userMessage,assistantMessage,usageRecord};
- }
+ if(!isPostgres()){if(reservationId&&!localReservations.has(reservationId))throw new Error('Usage reservation expired before the chat turn could be committed.');const db=load();for(const [collection,record] of records){assertCollection(collection);db[collection].push(record);}persist();if(reservationId)localReservations.delete(reservationId);return {userMessage,assistantMessage,usageRecord};}
  await initialize();const client=await pool.connect();
- try{
-  await client.query('BEGIN');
-  for(const [collection,record] of records)await client.query('INSERT INTO botforge_records(collection,id,data) VALUES($1,$2,$3::jsonb)',[collection,record.id,JSON.stringify(record)]);
-  if(reservationId){const removed=await client.query('DELETE FROM botforge_quota_reservations WHERE id=$1',[reservationId]);if(removed.rowCount!==1)throw new Error('Usage reservation expired before the chat turn could be committed.');}
-  await client.query('COMMIT');
-  return {userMessage,assistantMessage,usageRecord};
- }catch(e){try{await client.query('ROLLBACK');}catch(_){}throw e;}finally{client.release();}
+ try{await client.query('BEGIN');for(const [collection,record] of records)await client.query('INSERT INTO botforge_records(collection,id,data) VALUES($1,$2,$3::jsonb)',[collection,record.id,JSON.stringify(record)]);if(reservationId){const removed=await client.query('DELETE FROM botforge_quota_reservations WHERE id=$1',[reservationId]);if(removed.rowCount!==1)throw new Error('Usage reservation expired before the chat turn could be committed.');}await client.query('COMMIT');return {userMessage,assistantMessage,usageRecord};}
+ catch(e){try{await client.query('ROLLBACK');}catch(_){}throw e;}finally{client.release();}
 }
 async function usageStats(userId,day){
  if(!isPostgres()){const used=load().usage.filter(x=>x.userId===userId&&x.day===day).length;const now=Date.now();for(const [id,r] of localReservations)if(r.expiresAt<=now)localReservations.delete(id);const pending=[...localReservations.values()].filter(x=>x.userId===userId&&x.day===day).length;return {used,pending};}
