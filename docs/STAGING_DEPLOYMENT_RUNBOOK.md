@@ -23,6 +23,7 @@ Set these in the hosting provider's secret manager. Never commit real values to 
 - `METRICS_TOKEN` to a random bearer token if Prometheus scraping is enabled; `/metrics` is disabled when unset.
 - `FREE_DAILY_MESSAGES` to the staging quota.
 - One or more of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_GEMINI_API_KEY`.
+- For Google/GitHub social sign-in, configure the matching client ID, client secret and exact callback URI from `.env.example`. Google requires OpenID email/profile scopes. GitHub requires `read:user` and `user:email`; the application accepts only a verified primary email. Existing email/password accounts are not silently linked. The reserved admin email is never accepted through public OAuth.
 
 Do not set `PGSSL=disable` for a public managed database. Do not expose provider keys or `DATABASE_URL` to browser code.
 
@@ -91,3 +92,8 @@ Billing, opt-in automatic memory and optional embedding-based hybrid retrieval a
 - Configure `BOTFORGE_PLANS_JSON` to override daily message quotas for Free, Plus and Pro. The defaults are intended for development and must be reviewed before commercial use.
 - For Stripe subscriptions, configure `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PLUS`, `STRIPE_PRICE_PRO`, `STRIPE_SUCCESS_URL`, `STRIPE_CANCEL_URL` and `STRIPE_PORTAL_RETURN_URL`. Register `POST /api/billing/webhook` and subscribe to `checkout.session.completed`, `customer.subscription.updated` and `customer.subscription.deleted`. Test in Stripe test mode first.\n- For India-focused Razorpay subscriptions, create recurring subscription plans in the Razorpay Dashboard and configure `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `RAZORPAY_PLAN_PLUS`, `RAZORPAY_PLAN_PRO` and optionally `RAZORPAY_SUBSCRIPTION_TOTAL_COUNT`. Register `POST /api/billing/razorpay/webhook` in Razorpay and subscribe to subscription lifecycle events (at minimum activated, charged, updated, cancelled and completed). Verify test-mode UPI/card/netbanking checkout and webhook delivery before enabling live payments. Razorpay checkout uses hosted subscription links; actual payment methods depend on merchant account activation and Razorpay configuration.
 - Users can manage opt-in automatic memory from the bot chat memory panel. It triggers an additional provider request after a chat turn; review provider cost and retention policies before enabling it broadly.
+
+
+## 8. Owner-only AI Engineer CI diagnosis
+
+The admin panel includes a read-only AI diagnosis action. To enable it, set `BOTFORGE_GITHUB_TOKEN` to a fine-grained token with Actions: read permission for the single repository, set `BOTFORGE_GITHUB_REPO=owner/repository`, and choose a configured `BOTFORGE_ENGINEER_PROVIDER` (`openai`, `anthropic` or `gemini`). The service reads recent workflow and failed-step metadata only, then asks the configured provider for a diagnosis. It does not fetch source code, workflow logs, create branches, edit files, open PRs, merge or deploy. Treat the result as a hypothesis and verify it against actual logs. Never grant this token write permissions for this read-only feature.
