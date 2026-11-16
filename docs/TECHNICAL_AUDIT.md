@@ -53,3 +53,9 @@ The largest blockers are the JSON-file database, missing request throttling and 
 ## Verification status
 
 The GitHub source tree was inspected. This review does not claim that the application was installed, run, load-tested, penetration-tested or deployed. Do not describe the current code as production-secure until those checks have been completed.
+
+## Remediation added on the upgrade branch
+
+The branch now includes initial mitigations for several findings: asynchronous password hashing and stricter input checks; public bot payloads no longer include private instructions; basic API/auth rate limiting, security headers, request-body limits and Origin checks; file-size/signature/extracted-text checks; safe provider error responses; provider adapters for Anthropic/OpenAI/Gemini; server-side daily message caps and token usage records; and user-managed per-bot memory notes.
+
+These are **initial controls**, not a security certification. The JSON store remains unsuitable for multi-instance production, keyword retrieval is not vector RAG, and the new CI workflow must run successfully before merge. Upload parsing still needs isolated worker execution and malware scanning. Rate limiting is in-memory and must move to a shared store before horizontal scaling.
