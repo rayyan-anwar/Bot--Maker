@@ -31,7 +31,7 @@ For an existing JSON installation:
 
 1. Stop writes to the old instance and take a timestamped backup of `data/db.json`.
 2. Keep the backup read-only and store a separate copy outside the application host.
-3. Configure `DATABASE_URL) in a protected staging environment.
+3. Configure `DATABASE_URL` in a protected staging environment.
 4. Run `npm ci`, then `npm run migrate:postgres -- --dry-run`.
 5. Review preflight counts and errors. Do not proceed if any record fails validation.
 6. Run `npm run migrate:postgres` once.
