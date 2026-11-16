@@ -77,6 +77,33 @@ async function getUserFromRequest(req){const token=req.cookies&&req.cookies[COOK
 function requireAuth(req,res,next){getUserFromRequest(req).then(user=>{if(!user)return res.status(401).json({error:'Sign in to continue.'});req.user=user;next();}).catch(next);}
 router.post('/signup',async(req,res,next)=>{try{const {name,email,password}=req.body||{};const normalized=String(email||'').trim().toLowerCase();if(typeof name!=='string'||!name.trim()||name.trim().length>80||!isValidEmail(normalized)||typeof password!=='string'||password.length<10||password.length>128)return res.status(400).json({error:'Enter a valid name and email, and a password of 10–128 characters.'});if(isAdminEmail(normalized))return res.status(409).json({error:'This email is reserved for the platform administrator.'});if((await store.findManyAsync('users',{email:normalized}))[0])return res.status(409).json({error:'An account with this email already exists.'});const user={id:uuidv4(),name:name.trim(),email:normalized,passwordHash:await bcrypt.hash(password,12),plan:'free',failedLoginAttempts:0,lockedAt:null,createdAt:new Date().toISOString()};await store.insertAsync('users',user);res.cookie(COOKIE_NAME,jwt.sign({userId:user.id},JWT_SECRET,{expiresIn:TOKEN_TTL}),cookieOptions());res.status(201).json({user:publicUser(user)});}catch(e){if(e.code==='23505')return res.status(409).json({error:'An account with this email already exists.'});next(e);}});
 router.post('/login',async(req,res,next)=>{try{const {email,password}=req.body||{};if(!isValidEmail(email)||typeof password!=='string'||password.length>128)return res.status(401).json({error:'Incorrect email or password.'});const normalized=email.trim().toLowerCase(),user=(await store.findManyAsync('users',{email:normalized}))[0];if(!user)return res.status(401).json({error:'Incorrect email or password.'});if(user.lockedAt)return res.status(423).json({error:'Account locked after 3 failed attempts. Contact support or the administrator for a password reset.'});if(!user.passwordHash||!await bcrypt.compare(password,user.passwordHash)){const attempts=Math.min(MAX_FAILED_LOGINS,Number(user.failedLoginAttempts||0)+1),patch={failedLoginAttempts:attempts,...(attempts>=MAX_FAILED_LOGINS?{lockedAt:new Date().toISOString()}: {})};await store.updateByIdAsync('users',user.id,patch);return res.status(attempts>=MAX_FAILED_LOGINS?423:401).json({error:attempts>=MAX_FAILED_LOGINS?'Account locked after 3 failed attempts. Contact support or the administrator for a password reset.':'Incorrect email or password. '+(MAX_FAILED_LOGINS-attempts)+' attempts remaining.'});}await store.updateByIdAsync('users',user.id,{failedLoginAttempts:0,lockedAt:null,lastLoginAt:new Date().toISOString()});res.cookie(COOKIE_NAME,jwt.sign({userId:user.id},JWT_SECRET,{expiresIn:TOKEN_TTL}),cookieOptions());res.json({user:publicUser(user)});}catch(e){next(e);}});
+
+router.post('/password/forgot',async(req,res,next)=>{
+ try{
+  const email=String(req.body?.email||'').trim().toLowerCase();
+  if(!isValidEmail(email))return res.status(202).json({message:'If an eligible account exists, password reset instructions will be sent.'});
+  const from=String(process.env.BOTFORGE_EMAIL_FROM||''),base=String(process.env.PUBLIC_BASE_URL||'').replace(/\/$/,'');
+  if(!process.env.RESEND_API_KEY||!from||!/^https:\/\//i.test(base))return res.status(202).json({message:'If an eligible account exists, password reset instructions will be sent.'});
+  const user=(await store.findManyAsync('users',{email}))[0];
+  if(!user)return res.status(202).json({message:'If an eligible account exists, password reset instructions will be sent.'});
+  const token=crypto.randomBytes(32).toString('hex'),tokenHash=crypto.createHash('sha256').update(token).digest('hex'),expires=new Date(Date.now()+20*60*1000).toISOString();
+  await store.updateByIdAsync('users',user.id,{passwordResetTokenHash:tokenHash,passwordResetExpiresAt:expires});
+  const link=base+'/reset-password.html?token='+token;
+  const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{authorization:'Bearer '+process.env.RESEND_API_KEY,'content-type':'application/json'},body:JSON.stringify({from,to:[user.email],subject:'Reset your BotForge password',text:'Use this one-time link within 20 minutes to reset your BotForge password: '+link+'\nIf you did not request this, ignore this email.'}),signal:AbortSignal.timeout(10000)});
+  if(!response.ok)await store.updateByIdAsync('users',user.id,{passwordResetTokenHash:null,passwordResetExpiresAt:null});
+  return res.status(202).json({message:'If an eligible account exists, password reset instructions will be sent.'});
+ }catch(e){next(e);}
+});
+router.post('/password/reset',async(req,res,next)=>{
+ try{
+  const token=String(req.body?.token||''),password=req.body?.password;
+  if(!/^[a-f0-9]{64}$/.test(token)||typeof password!=='string'||password.length<10||password.length>128)return res.status(400).json({error:'Enter a valid reset link and a password of 10–128 characters.'});
+  const hash=crypto.createHash('sha256').update(token).digest('hex'),users=await store.allAsync('users'),user=users.find(u=>u.passwordResetTokenHash===hash&&u.passwordResetExpiresAt&&Date.parse(u.passwordResetExpiresAt)>Date.now());
+  if(!user)return res.status(400).json({error:'This password reset link is invalid or expired. Request a new one.'});
+  await store.updateByIdAsync('users',user.id,{passwordHash:await bcrypt.hash(password,12),failedLoginAttempts:0,lockedAt:null,passwordResetTokenHash:null,passwordResetExpiresAt:null,passwordChangedAt:new Date().toISOString()});
+  return res.json({ok:true,message:'Password reset successful. You can now sign in.'});
+ }catch(e){next(e);}
+});
 router.post('/logout',(req,res)=>{res.clearCookie(COOKIE_NAME,cookieOptions());res.json({ok:true});});
 router.get('/me',async(req,res,next)=>{try{const user=await getUserFromRequest(req);if(!user)return res.status(401).json({error:'Not signed in.'});res.json({user:publicUser(user)});}catch(e){next(e);}});
 module.exports={router,requireAuth,getUserFromRequest,publicUser,isAdminEmail,MAX_FAILED_LOGINS};
