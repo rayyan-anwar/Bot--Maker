@@ -25,6 +25,7 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.equal((await me.json()).user.role,'user');
  const adminApi=await fetch(base+'/api/admin/plans',{headers:{cookie}});
  assert.equal(adminApi.status,403);
+ assert.equal((await fetch(base+'/admin.html',{headers:{cookie}})).status,403);
  for(let i=0;i<2;i++)assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'wrong-password'})).status,401);
  assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'wrong-password'})).status,423);
  assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'strong-customer-password-123'})).status,423);
@@ -38,6 +39,7 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.equal((await adminLogin.json()).user.role,'admin');
  const adminCookie=adminLogin.headers.get('set-cookie');
  assert.equal((await fetch(base+'/api/admin/plans',{headers:{cookie:adminCookie}})).status,200);
+ assert.equal((await fetch(base+'/admin.html',{headers:{cookie:adminCookie}})).status,200);
  for(let i=0;i<2;i++)assert.equal((await post('/api/auth/login',{email:'owner@example.com',password:'incorrect-admin-password'})).status,401);
  assert.equal((await post('/api/auth/login',{email:'owner@example.com',password:'incorrect-admin-password'})).status,423);
  assert.equal((await post('/api/auth/login',{email:'owner@example.com',password:'strong-admin-password-123'})).status,423);
