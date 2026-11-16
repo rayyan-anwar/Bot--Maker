@@ -42,6 +42,6 @@ router.put('/:id',requireAuth,(req,res)=>{
 router.delete('/:id',requireAuth,(req,res)=>{
  const bot=store.findById('bots',req.params.id);if(!bot)return res.status(404).json({error:'Bot not found.'});
  if(bot.ownerId!==req.user.id)return res.status(403).json({error:'Only the owner can delete this bot.'});
- store.deleteById('bots',bot.id);const db=store.load();db.documents=db.documents.filter(d=>d.botId!==bot.id);db.messages=db.messages.filter(m=>m.botId!==bot.id);db.usage=db.usage.filter(u=>u.botId!==bot.id);store.persist();res.json({ok:true});
+ store.deleteById('bots',bot.id);const db=store.load();db.documents=db.documents.filter(d=>d.botId!==bot.id);db.messages=db.messages.filter(m=>m.botId!==bot.id);db.memory=db.memory.filter(m=>m.botId!==bot.id);db.usage=db.usage.filter(u=>u.botId!==bot.id);store.persist();res.json({ok:true});
 });
 module.exports={router,publicBot};
