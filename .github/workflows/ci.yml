@@ -15,3 +15,5 @@ jobs:
       - run: npm install
       - run: npm test
       - run: node scripts/check-syntax.js
+
+      - run: bash -n scripts/backup-postgres.sh scripts/restore-postgres.sh
