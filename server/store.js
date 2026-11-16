@@ -101,4 +101,4 @@ async function usageStats(userId,day){
  await initialize();const r=await pool.query("SELECT (SELECT count(*)::int FROM botforge_records WHERE collection='usage' AND data->>'userId'=$1 AND data->>'day'=$2) AS used,(SELECT count(*)::int FROM botforge_quota_reservations WHERE user_id=$1 AND usage_day=$2 AND expires_at>now()) AS pending",[userId,day]);return r.rows[0];
 }
 async function close(){if(pool){await pool.end();pool=null;}initialized=false;}
-module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotData,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,usageStats,load,persist};
+module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotData,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,load,persist};
