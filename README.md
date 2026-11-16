@@ -156,7 +156,7 @@ uploads/              — temp folder used while processing an upload (files
 
 ## BotForge product direction
 
-The current repository remains an early MVP. The planned commercial product direction, technical audit, security gates, interface specification and phased roadmap are documented in:
+The current repository is an evolving MVP with implemented account, bot-building, multi-provider, memory, usage, PostgreSQL and subscription foundations. The technical audit, security gates, interface specification and phased roadmap are documented in:
 
 - [Technical audit](docs/TECHNICAL_AUDIT.md)
 - [Production roadmap](docs/PRODUCTION_ROADMAP.md)
@@ -167,9 +167,9 @@ The current repository remains an early MVP. The planned commercial product dire
 - Admin dashboard: `/admin.html` (requires `BOTFORGE_ADMIN_EMAILS`)
 - PostgreSQL staging stack: `docker-compose.staging.yml`
 - PostgreSQL backup/restore: `npm run backup:postgres` and `npm run restore:postgres` (restore requires explicit confirmation)
-- Plan and checkout page: `/billing.html` (requires Stripe configuration)
+- Plan and checkout page: `/billing.html` (Stripe and optional Razorpay configuration; Razorpay subscription plans must be created in the Razorpay Dashboard)
 
-**Important:** these documents describe findings and planned capabilities. They do not mean that PostgreSQL, multi-provider inference, vector RAG, billing, production monitoring or enterprise security are already implemented. The working app supports PostgreSQL persistence when `DATABASE_URL` is configured (JSON remains the local default); provider adapters are available but require server-side credentials.
+**Important:** implemented code is not the same as a verified production service. PostgreSQL runtime support, provider adapters, retrieval embeddings and Stripe/Razorpay subscription integrations require operator credentials and live staging tests. JSON remains the local development default.
 
 ### Competitor references
 
@@ -184,14 +184,14 @@ The `botforge-production-upgrade` branch now also includes:
 - Server-side daily message quota and token usage event recording (MVP JSON store).
 - Account-wide personal AI memory profile shared across the user's bots/providers, plus per-bot editable notes and opt-in automatic extraction.
 - Configurable Free/Plus/Pro daily message quotas and allowlisted admin endpoints to assign plans.
-- Stripe subscription checkout and signed webhook handling (requires operator Stripe credentials and price IDs).
+- Stripe and Razorpay subscription checkout/webhook integrations (require operator credentials, configured provider plans/prices and live webhook testing).
 - Provider choice during bot creation.
 - Private bot instructions excluded from public bot responses.
 - Request size/rate controls, security headers, origin checks, safer auth validation and upload bounds.
 - PostgreSQL JSONB runtime repository, PostgreSQL baseline schema and transactional JSON importer (live managed-database verification still pending).
 - Basic retrieval unit tests and CI syntax-check workflow.
 
-**Still not production-ready:** PostgreSQL runtime support is implemented but has not yet been tested against a live managed PostgreSQL database; retrieval supports optional OpenAI embedding generation and hybrid semantic/keyword ranking when `BOTFORGE_EMBEDDINGS_ENABLED=true` and an OpenAI API key is configured; no pgvector index or large-scale vector infrastructure is implemented; there is no admin web console, workspace/role system, streaming or completed live database/security/load test. Stripe checkout/webhook code is implemented but cannot be live-verified until the operator configures Stripe credentials, price IDs and webhook secrets. Provider credentials must be configured by the operator in environment variables before each provider can be used.
+**Still not production-ready:** PostgreSQL runtime support is implemented but has not yet been tested against a live managed PostgreSQL database; retrieval supports optional OpenAI embedding generation and hybrid semantic/keyword ranking when `BOTFORGE_EMBEDDINGS_ENABLED=true` and an OpenAI API key is configured; no pgvector index or large-scale vector infrastructure is implemented; there is no admin web console, workspace/role system, streaming or completed live database/security/load test. Stripe and Razorpay checkout/webhook code is implemented but cannot be live-verified until the operator configures provider credentials, plan/price IDs and webhook secrets. Razorpay webhook endpoint: `POST /api/billing/razorpay/webhook`. Provider credentials must be configured by the operator in environment variables before each provider can be used.
 
 ### Current model references
 - Anthropic model overview: https://platform.claude.com/docs/en/models/overview
