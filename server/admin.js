@@ -1,0 +1,10 @@
+const express=require('express');
+const store=require('./store');
+const plans=require('./plans');
+const {requireAuth}=require('./auth');
+const router=express.Router();
+const allowedAdmins=new Set((process.env.BOTFORGE_ADMIN_EMAILS||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean));
+router.use(requireAuth,(req,res,next)=>{if(!allowedAdmins.has(String(req.user.email||'').toLowerCase()))return res.status(403).json({error:'Administrator access is not enabled for this account.'});next();});
+router.get('/plans',(req,res)=>res.json({plans:plans.getPlans()}));
+router.put('/users/:userId/plan',async(req,res,next)=>{try{const {plan}=req.body||{},available=plans.getPlans();if(typeof plan!=='string'||!Object.prototype.hasOwnProperty.call(available,plan))return res.status(400).json({error:'Select a configured plan.'});const user=await store.findByIdAsync('users',req.params.userId);if(!user)return res.status(404).json({error:'User not found.'});const updated=await store.updateByIdAsync('users',user.id,{plan});res.json({user:{id:updated.id,email:updated.email,plan:plans.getPlanName(updated),dailyMessageLimit:plans.getDailyLimit(updated)}});}catch(e){next(e);}});
+module.exports={router};
