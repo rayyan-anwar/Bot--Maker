@@ -77,7 +77,7 @@ Do not call the service production-ready until:
 - Browser end-to-end, load and independent security testing have passed.
 - Monitoring and an incident contact/process are in place.
 
-Billing, automated memory, semantic/vector RAG, workspaces/RBAC and enterprise controls are not included in this deployment runbook's current application capabilities.
+Billing, opt-in automatic memory and optional embedding-based hybrid retrieval are implemented but require operator credentials/configuration and live staging verification. Workspaces/RBAC and enterprise controls remain outside the current release scope.
 
 ## 7. Optional product configuration
 
