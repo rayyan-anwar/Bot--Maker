@@ -115,7 +115,7 @@ For anything beyond testing with friends, either:
 
 The repository includes a PostgreSQL baseline schema and a transactional importer. The importer seeds both normalized reporting tables and the JSONB runtime repository. After a successful import, configure the same `DATABASE_URL` for the application and it will use PostgreSQL automatically. Without `DATABASE_URL`, it uses the local JSON development adapter.
 
-Before running an import, create a PostgreSQL database with the `pgcrypto` and `vector` extensions available, take a separate backup of `data/db.json`, and configure `DATABASE_URL`. Then run:
+Before running an import, create a PostgreSQL database with the `pgcrypto` extension available, take a separate backup of `data/db.json`, and configure `DATABASE_URL`. Then run:
 
 ```bash
 npm install
@@ -128,7 +128,7 @@ The import runs in a database transaction and records a one-time migration marke
 
 ## Growing past this
 
-This is an MVP foundation, not a finished commercial service. The PostgreSQL JSONB repository is now wired into application routes. The next critical engineering step is multi-instance-safe quota enforcement, tenant-isolation integration tests, and a staged migration/rollback procedure. Other required work includes embeddings and vector retrieval, configurable plan enforcement, billing, email verification/password recovery, production secrets, monitoring, backups and security/load testing.
+This is an MVP foundation, not a finished commercial service. The PostgreSQL JSONB repository is now wired into application routes. The application exposes `/healthz` for liveness and `/readyz` for database readiness. The next critical engineering step is tenant-isolation integration tests and a staged migration/rollback procedure. Other required work includes embeddings and vector retrieval, configurable plan enforcement, billing, email verification/password recovery, production secrets, monitoring, backups and security/load testing.
 
 ## Project structure
 
