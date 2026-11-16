@@ -77,6 +77,25 @@ async function commitUsageRecord(record,reservationId){
  try{await client.query('BEGIN');await client.query('INSERT INTO botforge_records(collection,id,data) VALUES(\'usage\',$1,$2::jsonb)',[record.id,JSON.stringify(record)]);if(reservationId)await client.query('DELETE FROM botforge_quota_reservations WHERE id=$1',[reservationId]);await client.query('COMMIT');return record;}
  catch(e){try{await client.query('ROLLBACK');}catch(_){}throw e;}finally{client.release();}
 }
+async function commitChatTurn({userMessage,assistantMessage,usageRecord},reservationId){
+ const records=[['messages',userMessage],['messages',assistantMessage],['usage',usageRecord]];
+ if(records.some(([collection,record])=>!record||!isUuid(record.id)))throw new Error('Invalid chat turn record.');
+ if(!isPostgres()){
+  const db=load();
+  for(const [collection,record] of records){assertCollection(collection);db[collection].push(record);}
+  persist();
+  if(reservationId)localReservations.delete(reservationId);
+  return {userMessage,assistantMessage,usageRecord};
+ }
+ await initialize();const client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+  for(const [collection,record] of records)await client.query('INSERT INTO botforge_records(collection,id,data) VALUES($1,$2,$3::jsonb)',[collection,record.id,JSON.stringify(record)]);
+  if(reservationId){const removed=await client.query('DELETE FROM botforge_quota_reservations WHERE id=$1',[reservationId]);if(removed.rowCount!==1)throw new Error('Usage reservation expired before the chat turn could be committed.');}
+  await client.query('COMMIT');
+  return {userMessage,assistantMessage,usageRecord};
+ }catch(e){try{await client.query('ROLLBACK');}catch(_){}throw e;}finally{client.release();}
+}
 async function usageStats(userId,day){
  if(!isPostgres()){const used=load().usage.filter(x=>x.userId===userId&&x.day===day).length;const now=Date.now();for(const [id,r] of localReservations)if(r.expiresAt<=now)localReservations.delete(id);const pending=[...localReservations.values()].filter(x=>x.userId===userId&&x.day===day).length;return {used,pending};}
  await initialize();const r=await pool.query("SELECT (SELECT count(*)::int FROM botforge_records WHERE collection='usage' AND data->>'userId'=$1 AND data->>'day'=$2) AS used,(SELECT count(*)::int FROM botforge_quota_reservations WHERE user_id=$1 AND usage_day=$2 AND expires_at>now()) AS pending",[userId,day]);return r.rows[0];
