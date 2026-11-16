@@ -34,6 +34,7 @@ services:
       FREE_DAILY_MESSAGES: ${FREE_DAILY_MESSAGES:-30}
       BOTFORGE_EMBEDDINGS_ENABLED: ${BOTFORGE_EMBEDDINGS_ENABLED:-false}
       BOTFORGE_ADMIN_EMAILS: ${BOTFORGE_ADMIN_EMAILS:-}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
       BOTFORGE_PLANS_JSON: ${BOTFORGE_PLANS_JSON:-}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
@@ -41,6 +42,7 @@ services:
       STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
       STRIPE_SUCCESS_URL: ${STRIPE_SUCCESS_URL:-}
       STRIPE_CANCEL_URL: ${STRIPE_CANCEL_URL:-}
+      STRIPE_PORTAL_RETURN_URL: ${STRIPE_PORTAL_RETURN_URL:-}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 15s
