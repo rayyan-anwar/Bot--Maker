@@ -39,6 +39,8 @@ app.get(/^(?!\/api\/).*/,(req,res)=>res.sendFile(path.join(__dirname,'..','publi
 app.use((err,req,res,next)=>{
  if(err instanceof SyntaxError&&'body' in err)return res.status(400).json({error:'Invalid JSON body.'});
  if(err&&err.code==='LIMIT_FILE_SIZE')return res.status(413).json({error:'File exceeds the 5 MB upload limit.'});
+ if(err&&err.message==='Only .txt, .md, and .pdf files are supported.')return res.status(415).json({error:err.message});
+ if(err&&err.code==='LIMIT_FILE_COUNT')return res.status(400).json({error:'Upload one file at a time.'});
  console.error('Unhandled request error:',{message:err.message,requestId:res.getHeader('X-Request-Id')});
  res.status(500).json({error:'An unexpected server error occurred.'});
 });
