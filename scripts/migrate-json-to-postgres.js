@@ -75,16 +75,16 @@ async function migrate({dryRun=false}={}){
   await client.query(schema);
   await client.query("CREATE TABLE IF NOT EXISTS botforge_records (collection text NOT NULL CHECK(collection IN ('users','bots','documents','messages','usage','memory')), id uuid NOT NULL, data jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(collection,id))");
   await client.query('CREATE INDEX IF NOT EXISTS botforge_records_collection_idx ON botforge_records(collection)');
-  // The running application reads these JSON-shaped records. Keep the normalized
-  // schema populated as a reporting/analytics foundation, but seed runtime records too.
+  await client.query('CREATE TABLE IF NOT EXISTS botforge_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
+  const done=await client.query('SELECT name FROM botforge_migrations WHERE name=$1',['json_to_postgres_v1']);
+  if(done.rowCount){await client.query('ROLLBACK');console.log('Migration already applied; no rows changed.');return {alreadyApplied:true,counts};}
+  // Seed the JSONB repository consumed by the app and normalized reporting tables
+  // within the same transaction. The migration marker prevents duplicate imports.
   for(const collection of collections){
    for(const record of data[collection]){
     await client.query('INSERT INTO botforge_records(collection,id,data) VALUES($1,$2,$3::jsonb)',[collection,record.id,JSON.stringify(record)]);
    }
   }
-  await client.query('CREATE TABLE IF NOT EXISTS botforge_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
-  const done=await client.query('SELECT name FROM botforge_migrations WHERE name=$1',['json_to_postgres_v1']);
-  if(done.rowCount){await client.query('ROLLBACK');console.log('Migration already applied; no rows changed.');return {alreadyApplied:true,counts};}
   for(const u of data.users)await client.query('INSERT INTO users(id,email,name,password_hash,created_at) VALUES($1,$2,$3,$4,$5)',[u.id,u.email.trim().toLowerCase(),u.name,u.passwordHash,validDate(u.createdAt,'user.createdAt')]);
   for(const b of data.bots)await client.query('INSERT INTO bots(id,owner_id,name,description,instructions,provider,model,is_public,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[b.id,b.ownerId,b.name,b.description||'',b.instructions,b.provider||'anthropic',b.model||null,!!b.isPublic,validDate(b.createdAt,'bot.createdAt')]);
   const conversationIds=new Map();
