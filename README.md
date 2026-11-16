@@ -165,7 +165,7 @@ The current repository remains an early MVP. The planned commercial product dire
 - [UI/UX specification](docs/UX_UI_SPEC.md)
 - [Security and release checklist](docs/SECURITY_AND_RELEASE_CHECKLIST.md)
 
-**Important:** these documents describe findings and planned capabilities. They do not mean that PostgreSQL, multi-provider inference, vector RAG, billing, production monitoring or enterprise security are already implemented. The working app still uses JSON-file persistence and a Claude-only chat path until the roadmap phases are completed and tested.
+**Important:** these documents describe findings and planned capabilities. They do not mean that PostgreSQL, multi-provider inference, vector RAG, billing, production monitoring or enterprise security are already implemented. The working app supports PostgreSQL persistence when `DATABASE_URL` is configured (JSON remains the local default); provider adapters are available but require server-side credentials.
 
 ### Competitor references
 
@@ -182,7 +182,7 @@ The `botforge-production-upgrade` branch now also includes:
 - Provider choice during bot creation.
 - Private bot instructions excluded from public bot responses.
 - Request size/rate controls, security headers, origin checks, safer auth validation and upload bounds.
-- PostgreSQL/pgvector schema and a transactional one-time JSON import utility (not runtime integration).
+- PostgreSQL JSONB runtime repository, PostgreSQL baseline schema and transactional JSON importer (live managed-database verification still pending).
 - Basic retrieval unit tests and CI syntax-check workflow.
 
 **Still not production-ready:** PostgreSQL runtime support is implemented but has not yet been tested against a live managed PostgreSQL database; retrieval remains keyword-based (no embedding generation/vector search yet); there is no billing/payment system, plan admin console, workspace/role system, streaming, deployment configuration or completed security/load test. Provider credentials must be configured by the operator in environment variables before each provider can be used.
