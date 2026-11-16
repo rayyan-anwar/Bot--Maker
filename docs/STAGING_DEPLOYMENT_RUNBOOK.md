@@ -20,6 +20,7 @@ Set these in the hosting provider's secret manager. Never commit real values to 
 - `DATABASE_URL` to the managed PostgreSQL connection string.
 - `PGSSL_REJECT_UNAUTHORIZED=true` when the provider supplies a trusted TLS certificate.
 - `PG_POOL_MAX` to a conservative connection count within the database plan.
+- `METRICS_TOKEN` to a random bearer token if Prometheus scraping is enabled; `/metrics` is disabled when unset.
 - `FREE_DAILY_MESSAGES` to the staging quota.
 - One or more of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_GEMINI_API_KEY`.
 
