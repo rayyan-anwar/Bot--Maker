@@ -31,7 +31,7 @@ async function extractText(filePath,originalName){
  if(buffer.includes(0))throw new Error('Binary files are not supported.');
  return buffer.toString('utf8');
 }
-router.get('/:botId',requireAuth,requireBotOwner,(req,res)=>res.json({documents:store.all('documents').filter(d=>d.botId===req.botId).map(publicDoc)}));
+router.get('/:botId',requireAuth,requireBotOwner,(req,res)=>res.json({documents:store.all('documents').filter(d=>d.botId===req.bot.id).map(publicDoc)}));
 router.post('/:botId',requireAuth,requireBotOwner,upload.single('file'),async(req,res)=>{
  if(!req.file)return res.status(400).json({error:'No file received.'});
  try{
