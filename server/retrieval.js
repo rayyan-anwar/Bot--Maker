@@ -96,4 +96,5 @@ async function topChunksHybrid(documents,query,k=4){
   return candidates.slice(0,k);
  }catch(error){return keyword.slice(0,k);}
 }
-\nmodule.exports = { chunkText, topChunks, topChunksHybrid, cosineSimilarity };
+
+module.exports = { chunkText, topChunks, topChunksHybrid, cosineSimilarity };
