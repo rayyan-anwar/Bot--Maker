@@ -49,9 +49,9 @@ router.get('/:botId/messages',requireAuth,requireBotAccess,(req,res)=>{
 router.post('/:botId/messages',requireAuth,requireBotAccess,async(req,res)=>{
  const {content}=req.body||{};
  if(typeof content!=='string'||!content.trim()||content.length>MAX_MESSAGE_CHARS)return res.status(400).json({error:'Message must contain 1 to '+MAX_MESSAGE_CHARS+' characters.'});
- try{usage.assertCanSend(req.user.id);}catch(e){return res.status(e.status||429).json({error:e.message});}
  const provider=req.bot.provider||'anthropic';
  if(!providers.isProviderConfigured(provider))return res.status(503).json({error:'The selected AI provider is not configured on this server.'});
+ try{usage.assertCanSend(req.user.id);}catch(e){return res.status(e.status||429).json({error:e.message});}
  try{
   const history=store.all('messages').filter(m=>m.botId===req.bot.id&&m.userId===req.user.id).sort((a,b)=>a.createdAt.localeCompare(b.createdAt)).slice(-(MAX_HISTORY_MESSAGES-1));
   const docs=store.all('documents').filter(d=>d.botId===req.bot.id);
@@ -74,6 +74,7 @@ router.post('/:botId/messages',requireAuth,requireBotAccess,async(req,res)=>{
   usage.recordUsage({userId:req.user.id,botId:req.bot.id,provider,model:req.bot.model||providers.getDefaultModel(provider),inputTokens:result.inputTokens,outputTokens:result.outputTokens});
   res.json({message:publicMessage(assistant),usage:usage.usageSummary(req.user.id)});
  }catch(err){
+  usage.releaseReservation(req.user.id);
   console.error('Chat request failed:',{provider,status:err.status||null,message:err.message});
   res.status(502).json({error:'The AI provider could not complete this request. Check provider configuration or try again.'});
  }
