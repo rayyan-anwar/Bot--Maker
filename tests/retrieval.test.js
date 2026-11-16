@@ -38,3 +38,16 @@ test('topChunks includes stable document and chunk references for citations',()=
  assert.equal(result[0].documentId,'doc-123');
  assert.equal(result[0].chunkId,'chunk-456');
 });
+
+
+const {cosineSimilarity,topChunksHybrid}=require('../server/retrieval');
+test('cosine similarity validates vector dimensions and computes similarity',()=>{
+ assert.equal(cosineSimilarity([1,0],[1,0]),1);
+ assert.equal(cosineSimilarity([1,0],[0,1]),0);
+ assert.equal(cosineSimilarity([1],[1,2]),0);
+});
+test('hybrid retrieval safely falls back to keyword search when embeddings are disabled',async()=>{
+ const docs=[{id:'d1',filename:'source.txt',chunks:[{id:'c1',text:'refund policy returns within thirty days'}]}];
+ const rows=await topChunksHybrid(docs,'refund returns',2);
+ assert.equal(rows.length,1);assert.equal(rows[0].documentId,'d1');
+});
