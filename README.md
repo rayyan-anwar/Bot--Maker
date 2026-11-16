@@ -182,7 +182,7 @@ The current repository remains an early MVP. The planned commercial product dire
 The `botforge-production-upgrade` branch now also includes:
 - Anthropic, OpenAI Responses API and Google Gemini provider adapters, with current default model IDs configurable through environment variables.
 - Server-side daily message quota and token usage event recording (MVP JSON store).
-- Per-user, per-bot editable memory notes plus opt-in automatic memory extraction (users can enable/disable it per bot).
+- Account-wide personal AI memory profile shared across the user's bots/providers, plus per-bot editable notes and opt-in automatic extraction.
 - Configurable Free/Plus/Pro daily message quotas and allowlisted admin endpoints to assign plans.
 - Stripe subscription checkout and signed webhook handling (requires operator Stripe credentials and price IDs).
 - Provider choice during bot creation.
