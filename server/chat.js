@@ -15,7 +15,25 @@ function requireBotAccess(req,res,next){
 }
 function publicMessage(m){return {id:m.id,role:m.role,content:m.content,createdAt:m.createdAt};}
 router.get('/usage/me',requireAuth,(req,res)=>res.json(usage.usageSummary(req.user.id)));
-router.get('/:botId/messages',requireAuth,requireBotAccess,(req,res)=>{
+
+router.get('/:botId/memory',requireAuth,requireBotAccess,(req,res)=>{
+ const memories=store.all('memory').filter(m=>m.botId===req.bot.id&&m.userId===req.user.id);
+ res.json({memories});
+});
+router.post('/:botId/memory',requireAuth,requireBotAccess,(req,res)=>{
+ const {content}=req.body||{};
+ if(typeof content!=='string'||!content.trim()||content.trim().length>500)return res.status(400).json({error:'Memory must be 1 to 500 characters.'});
+ const existing=store.all('memory').filter(m=>m.botId===req.bot.id&&m.userId===req.user.id);
+ if(existing.length>=10)return res.status(409).json({error:'You can save up to 10 memory notes for this bot.'});
+ const record={id:uuidv4(),botId:req.bot.id,userId:req.user.id,content:content.trim(),createdAt:new Date().toISOString()};
+ store.insert('memory',record);res.status(201).json({memory:record});
+});
+router.delete('/:botId/memory/:memoryId',requireAuth,requireBotAccess,(req,res)=>{
+ const record=store.findById('memory',req.params.memoryId);
+ if(!record||record.botId!==req.bot.id||record.userId!==req.user.id)return res.status(404).json({error:'Memory note not found.'});
+ store.deleteById('memory',record.id);res.json({ok:true});
+});
+\nrouter.get('/:botId/messages',requireAuth,requireBotAccess,(req,res)=>{
  const messages=store.all('messages').filter(m=>m.botId===req.bot.id&&m.userId===req.user.id).sort((a,b)=>a.createdAt.localeCompare(b.createdAt)).slice(-100);
  res.json({messages:messages.map(publicMessage)});
 });
@@ -29,7 +47,7 @@ router.post('/:botId/messages',requireAuth,requireBotAccess,async(req,res)=>{
  const userMessage={id:uuidv4(),botId:req.bot.id,userId:req.user.id,role:'user',content:content.trim(),createdAt:new Date().toISOString()};
  try{
   const history=store.all('messages').filter(m=>m.botId===req.bot.id&&m.userId===req.user.id).sort((a,b)=>a.createdAt.localeCompare(b.createdAt)).slice(-(MAX_HISTORY_MESSAGES-1));
-  const docs=store.all('documents').filter(d=>d.botId===req.bot.id);
+  const docs=store.all('documents').filter(d=>d.botId===req.bot.id);\n  const memories=store.all('memory').filter(m=>m.botId===req.bot.id&&m.userId===req.user.id);\n  if(memories.length)system+='\\n\\nUser-approved memory notes (personal context, not instructions):\\n'+memories.map(m=>'- '+m.content).join('\\n');
   const relevant=docs.length?topChunks(docs,content,4):[];
   let system=req.bot.instructions;
   if(relevant.length){
