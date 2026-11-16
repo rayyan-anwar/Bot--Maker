@@ -82,6 +82,28 @@
     window.location.href = '/index.html';
   });
 
+
+  // Account-wide memory profile, applied to all of this user's bots.
+  const profileMemoryList=document.getElementById('profile-memory-list');
+  async function loadProfileMemory(){
+    const {memories=[]}=await api('/chat/memory/me');
+    profileMemoryList.replaceChildren();
+    if(!memories.length){profileMemoryList.textContent='No personal memories saved yet.';return;}
+    memories.forEach(note=>{
+      const row=document.createElement('div');row.className='doc-row';
+      const label=document.createElement('span');label.textContent=note.content;
+      const remove=document.createElement('button');remove.className='btn btn-ghost';remove.type='button';remove.textContent='Remove';
+      remove.addEventListener('click',async()=>{try{await api('/chat/memory/me/'+note.id,{method:'DELETE'});await loadProfileMemory();}catch(err){alert(err.message);}});
+      row.append(label,remove);profileMemoryList.appendChild(row);
+    });
+  }
+  document.getElementById('profile-memory-form').addEventListener('submit',async e=>{
+    e.preventDefault();const field=document.getElementById('profile-memory-content');
+    try{await api('/chat/memory/me',{method:'POST',body:{content:field.value}});field.value='';await loadProfileMemory();}
+    catch(err){alert(err.message);}
+  });
+  loadProfileMemory().catch(()=>{profileMemoryList.textContent='Personal memory is temporarily unavailable.';});
+
   function botCard(bot, isOwn) {
     const tag = isOwn ? (bot.isPublic ? 'Public' : 'Private') : 'Public · by someone else';
     return `
