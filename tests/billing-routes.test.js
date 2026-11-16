@@ -1,0 +1,33 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const os=require('node:os');
+const path=require('node:path');
+
+test('billing endpoints enforce authentication and fail closed when providers are not configured',async(t)=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-billing-'));
+ process.env.JWT_SECRET='test-only-secret-with-at-least-thirty-two-characters';
+ process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
+ for(const key of ['STRIPE_SECRET_KEY','STRIPE_WEBHOOK_SECRET','STRIPE_PRICE_PLUS','STRIPE_PRICE_PRO','STRIPE_SUCCESS_URL','STRIPE_CANCEL_URL','RAZORPAY_KEY_ID','RAZORPAY_KEY_SECRET','RAZORPAY_WEBHOOK_SECRET','RAZORPAY_PLAN_PLUS','RAZORPAY_PLAN_PRO'])delete process.env[key];
+ const {start,shutdown}=require('../server/index');
+ const server=await start(0,'127.0.0.1');
+ t.after(async()=>{await shutdown();fs.rmSync(dir,{recursive:true,force:true});});
+ const base='http://127.0.0.1:'+server.address().port;
+ const unauth=await fetch(base+'/api/billing/plans');
+ assert.equal(unauth.status,401);
+ const signup=await fetch(base+'/api/auth/signup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'billing-test@example.com',password:'a-secure-test-password-123',name:'Billing Test'})});
+ assert.equal(signup.status,201);
+ const cookie=(signup.headers.get('set-cookie')||'').split(';')[0];
+ assert.ok(cookie.startsWith('session='));
+ const plans=await fetch(base+'/api/billing/plans',{headers:{cookie}});
+ assert.equal(plans.status,200);
+ const planData=await plans.json();
+ assert.equal(planData.providers.stripe,false);
+ assert.equal(planData.providers.razorpay,false);
+ const stripe=await fetch(base+'/api/billing/checkout',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({plan:'plus'})});
+ assert.equal(stripe.status,503);
+ const razorpay=await fetch(base+'/api/billing/razorpay/checkout',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({plan:'plus'})});
+ assert.equal(razorpay.status,503);
+ const webhook=await fetch(base+'/api/billing/razorpay/webhook',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({event:'subscription.activated'})});
+ assert.equal(webhook.status,400);
+});
