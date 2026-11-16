@@ -1,7 +1,7 @@
 // JSON-file persistence for local development only. Production must use PostgreSQL.
 const fs=require('fs');
 const path=require('path');
-const DB_PATH=path.join(__dirname,'..','data','db.json');
+const DB_PATH=process.env.BOTFORGE_DATA_FILE || path.join(__dirname,'..','data','db.json');
 function emptyDB(){return {users:[],bots:[],documents:[],messages:[],usage:[],memory:[]};}
 let cache=null;
 function load(){
