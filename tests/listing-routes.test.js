@@ -4,15 +4,16 @@ const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 
-test('bot and document listing routes return collections after async store reads',async(t)=>{
+test('administrator-only bot and document listing routes require the configured admin account',async(t)=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-listing-'));
  process.env.JWT_SECRET='test-only-secret-with-at-least-thirty-two-characters';
+ process.env.BOTFORGE_ADMIN_EMAIL='listing-test@example.com';
  process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
  const {start,shutdown}=require('../server/index');
  const server=await start(0,'127.0.0.1');
  t.after(async()=>{await shutdown();fs.rmSync(dir,{recursive:true,force:true});});
  const base='http://127.0.0.1:'+server.address().port;
- const signup=await fetch(base+'/api/auth/signup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'listing-test@example.com',password:'a-secure-test-password-123',name:'Listing Test'})});
+ const signup=await fetch(base+'/api/auth/signup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'listing-test@example.com',password:'a-secure-admin-password-123',name:'Admin'})});
  assert.equal(signup.status,201);
  const cookie=(signup.headers.get('set-cookie')||'').split(';')[0];
  const created=await fetch(base+'/api/bots',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({name:'Test bot',instructions:'Answer clearly.',isPublic:true})});
