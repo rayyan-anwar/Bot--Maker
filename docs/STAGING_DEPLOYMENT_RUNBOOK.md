@@ -37,7 +37,7 @@ For an existing JSON installation:
 5. Review preflight counts and errors. Do not proceed if any record fails validation.
 6. Run `npm run migrate:postgres` once.
 7. Verify imported collection counts and the migration marker directly in PostgreSQL.
-8. Start the app with the same `DATABASE_URL). Startup creates the runtime repository and quota reservation table if absent.
+8. Start the app with the same `DATABASE_URL`. Startup creates the runtime repository and quota reservation table if absent.
 
 The importer runs in one transaction and records a one-time marker. It does not copy original uploaded files. Do not delete or overwrite the JSON backup after migration.
 
@@ -87,7 +87,7 @@ Billing, opt-in automatic memory and optional embedding-based hybrid retrieval a
 ## 7. Optional product configuration
 
 - For semantic/hybrid document retrieval, set `BOTFORGE_EMBEDDINGS_ENABLED=true` and configure `OPENAI_API_KEY`. This sends document chunks and chat queries to the OpenAI embeddings API and may incur usage charges. Leave it disabled to use keyword retrieval only.
-- Configure `BOTFORGE_ADMIN_EMAILS` with comma-separated administrator account emails to unlock `/admin.html` and the `/api/admin` endpoints. Keep this allowlist short and controlled.
+- Configure `BOTFORGE_ADMIN_EMAIL` with the single reserved administrator email. Public signup cannot claim this address; provision the administrator using `npm run admin:create`. Only that configured email can access `/admin.html` and the `/api/admin` endpoints.
 - Configure `BOTFORGE_PLANS_JSON` to override daily message quotas for Free, Plus and Pro. The defaults are intended for development and must be reviewed before commercial use.
 - For Stripe subscriptions, configure `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PLUS`, `STRIPE_PRICE_PRO`, `STRIPE_SUCCESS_URL`, `STRIPE_CANCEL_URL` and `STRIPE_PORTAL_RETURN_URL`. Register `POST /api/billing/webhook` and subscribe to `checkout.session.completed`, `customer.subscription.updated` and `customer.subscription.deleted`. Test in Stripe test mode first.\n- For India-focused Razorpay subscriptions, create recurring subscription plans in the Razorpay Dashboard and configure `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `RAZORPAY_PLAN_PLUS`, `RAZORPAY_PLAN_PRO` and optionally `RAZORPAY_SUBSCRIPTION_TOTAL_COUNT`. Register `POST /api/billing/razorpay/webhook` in Razorpay and subscribe to subscription lifecycle events (at minimum activated, charged, updated, cancelled and completed). Verify test-mode UPI/card/netbanking checkout and webhook delivery before enabling live payments. Razorpay checkout uses hosted subscription links; actual payment methods depend on merchant account activation and Razorpay configuration.
 - Users can manage opt-in automatic memory from the bot chat memory panel. It triggers an additional provider request after a chat turn; review provider cost and retention policies before enabling it broadly.
