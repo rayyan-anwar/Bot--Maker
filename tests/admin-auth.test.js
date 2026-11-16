@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 
-test('only configured administrator can register and three wrong passwords lock account until server reset',async(t)=>{
+test('public registration is disabled and three wrong passwords lock the configured administrator until server reset',async(t)=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-admin-auth-'));
  process.env.JWT_SECRET='admin-auth-test-secret-with-at-least-thirty-two-characters';
  process.env.BOTFORGE_ADMIN_EMAIL='owner@example.com';
@@ -13,9 +13,9 @@ test('only configured administrator can register and three wrong passwords lock 
  const server=await start(0,'127.0.0.1');
  t.after(async()=>{await shutdown();fs.rmSync(dir,{recursive:true,force:true});});
  const base='http://127.0.0.1:'+server.address().port;
- const signup=async(email)=>fetch(base+'/api/auth/signup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email,password:'strong-admin-password-123',name:'Owner'})});
- assert.equal((await signup('intruder@example.com')).status,403);
- assert.equal((await signup('owner@example.com')).status,201);
+ const bcrypt=require('bcryptjs'),{v4:uuidv4}=require('uuid'),store=require('../server/store');
+ assert.equal((await fetch(base+'/api/auth/signup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'owner@example.com',password:'strong-admin-password-123',name:'Owner'})})).status,403);
+ await store.insertAsync('users',{id:uuidv4(),email:'owner@example.com',name:'Owner',passwordHash:await bcrypt.hash('strong-admin-password-123',12),failedLoginAttempts:0,createdAt:new Date().toISOString()});
  for(let i=0;i<2;i++){const response=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'owner@example.com',password:'wrong-password'})});assert.equal(response.status,401);}
  const third=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'owner@example.com',password:'wrong-password'})});
  assert.equal(third.status,423);
