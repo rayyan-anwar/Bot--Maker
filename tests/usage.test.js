@@ -21,4 +21,7 @@ test('chat turn persistence stores both messages and usage as one unit',async()=
  assert.equal((await usage.usageSummary(user)).pending,0);
 });
 
+
+test('readiness health reports the active JSON development adapter',async()=>{const result=await store.health();assert.deepEqual(result,{ok:true,database:'json-development'});});
+
 test.after(async()=>{await store.close();fs.rmSync(tempDir,{recursive:true,force:true});});
