@@ -18,11 +18,13 @@ const STOPWORDS = new Set([
 ]);
 
 function tokenize(text) {
-  return (text.toLowerCase().match(/[a-z0-9']+/g) || []).filter((w) => w.length > 1 && !STOPWORDS.has(w));
+  return (String(text).toLocaleLowerCase().match(/[\\p{L}\\p{N}']+/gu) || []).filter((w) => w.length > 1 && !STOPWORDS.has(w));
 }
 
 /** Split a long text into overlapping chunks of roughly `size` words. */
 function chunkText(text, size = 220, overlap = 40) {
+  if (!Number.isInteger(size) || size < 1) throw new RangeError('Chunk size must be a positive integer.');
+  if (!Number.isInteger(overlap) || overlap < 0 || overlap >= size) throw new RangeError('Chunk overlap must be a non-negative integer smaller than chunk size.');
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length === 0) return [];
   const chunks = [];
