@@ -18,7 +18,7 @@ const STOPWORDS = new Set([
 ]);
 
 function tokenize(text) {
-  return (String(text).toLocaleLowerCase().match(/[\p{L}\p{N}']+/gu) || []).filter((w) => w.length > 1 && !STOPWORDS.has(w));
+  return (String(text).toLocaleLowerCase().match(/[\p{L}\p{M}\p{N}']+/gu) || []).filter((w) => w.length > 1 && !STOPWORDS.has(w));
 }
 
 /** Split a long text into overlapping chunks of roughly `size` words. */
