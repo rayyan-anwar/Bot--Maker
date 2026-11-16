@@ -28,4 +28,17 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  for(let i=0;i<2;i++)assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'wrong-password'})).status,401);
  assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'wrong-password'})).status,423);
  assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'strong-customer-password-123'})).status,423);
+
+ // The reserved administrator is provisioned out-of-band, can access admin APIs,
+ // and is subject to the same three-failure lockout policy.
+ const bcrypt=require('bcryptjs'),{v4:uuidv4}=require('uuid'),store=require('../server/store');
+ await store.insertAsync('users',{id:uuidv4(),email:'owner@example.com',name:'Owner',passwordHash:await bcrypt.hash('strong-admin-password-123',12),failedLoginAttempts:0,createdAt:new Date().toISOString()});
+ const adminLogin=await post('/api/auth/login',{email:'owner@example.com',password:'strong-admin-password-123'});
+ assert.equal(adminLogin.status,200);
+ assert.equal((await adminLogin.json()).user.role,'admin');
+ const adminCookie=adminLogin.headers.get('set-cookie');
+ assert.equal((await fetch(base+'/api/admin/plans',{headers:{cookie:adminCookie}})).status,200);
+ for(let i=0;i<2;i++)assert.equal((await post('/api/auth/login',{email:'owner@example.com',password:'incorrect-admin-password'})).status,401);
+ assert.equal((await post('/api/auth/login',{email:'owner@example.com',password:'incorrect-admin-password'})).status,423);
+ assert.equal((await post('/api/auth/login',{email:'owner@example.com',password:'strong-admin-password-123'})).status,423);
 });
