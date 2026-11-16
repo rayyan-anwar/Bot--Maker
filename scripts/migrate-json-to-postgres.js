@@ -73,6 +73,15 @@ async function migrate({dryRun=false}={}){
  try{
   await client.query('BEGIN');
   await client.query(schema);
+  await client.query("CREATE TABLE IF NOT EXISTS botforge_records (collection text NOT NULL CHECK(collection IN ('users','bots','documents','messages','usage','memory')), id uuid NOT NULL, data jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(collection,id))");
+  await client.query('CREATE INDEX IF NOT EXISTS botforge_records_collection_idx ON botforge_records(collection)');
+  // The running application reads these JSON-shaped records. Keep the normalized
+  // schema populated as a reporting/analytics foundation, but seed runtime records too.
+  for(const collection of collections){
+   for(const record of data[collection]){
+    await client.query('INSERT INTO botforge_records(collection,id,data) VALUES($1,$2,$3::jsonb)',[collection,record.id,JSON.stringify(record)]);
+   }
+  }
   await client.query('CREATE TABLE IF NOT EXISTS botforge_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
   const done=await client.query('SELECT name FROM botforge_migrations WHERE name=$1',['json_to_postgres_v1']);
   if(done.rowCount){await client.query('ROLLBACK');console.log('Migration already applied; no rows changed.');return {alreadyApplied:true,counts};}
