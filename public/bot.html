@@ -31,6 +31,8 @@
   <details class="memory-panel" style="margin:10px 24px 0;padding:10px 14px;border:1px solid var(--border);border-radius:12px">
     <summary style="cursor:pointer">My memory for this bot</summary>
     <p class="muted" style="margin:8px 0">Save up to 10 short notes this assistant may use in future chats. You can remove them anytime.</p>
+    <label style="display:flex;gap:8px;align-items:center;margin:10px 0"><input id="memory-auto-toggle" type="checkbox"> Automatically remember useful details I explicitly share</label>
+    <p class="muted" style="margin:4px 0 10px">Optional. This uses an additional AI request after each chat. Sensitive details are excluded by the extraction instructions.</p>
     <form id="memory-form" style="display:flex;gap:8px;flex-wrap:wrap">
       <input id="memory-content" type="text" maxlength="500" placeholder="e.g. I prefer concise answers" required style="flex:1;min-width:180px">
       <button class="btn btn-ghost" type="submit">Save note</button>
@@ -135,16 +137,18 @@
   // Personal, user-controlled memory for this bot.
   const memoryList=document.getElementById('memory-list');
   async function loadMemory(){
-    const {memories}=await api('/chat/'+botId+'/memory');
+    const {memories,automaticEnabled}=await api('/chat/'+botId+'/memory');
+    document.getElementById('memory-auto-toggle').checked=!!automaticEnabled;
     memoryList.replaceChildren();
     memories.forEach(note=>{
       const row=document.createElement('div');row.className='doc-row';
-      const text=document.createElement('span');text.textContent=note.content;
+      const text=document.createElement('span');text.textContent=(note.kind==='automatic'?'Auto: ':'')+note.content;
       const remove=document.createElement('button');remove.className='btn btn-ghost';remove.type='button';remove.textContent='Remove';
       remove.addEventListener('click',async()=>{await api('/chat/'+botId+'/memory/'+note.id,{method:'DELETE'});loadMemory();});
       row.append(text,remove);memoryList.appendChild(row);
     });
   }
+  document.getElementById('memory-auto-toggle').addEventListener('change',async e=>{try{await api('/chat/'+botId+'/memory/automatic',{method:'POST',body:{enabled:e.target.checked}});}catch(err){e.target.checked=!e.target.checked;alert(err.message);}});
   document.getElementById('memory-form').addEventListener('submit',async e=>{
     e.preventDefault();const field=document.getElementById('memory-content');
     if(!field.value.trim())return;
