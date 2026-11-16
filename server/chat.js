@@ -18,6 +18,10 @@ function requireBotAccess(req,res,next){
 function publicMessage(m){return {id:m.id,role:m.role,content:m.content,createdAt:m.createdAt};}
 
 router.get('/usage/me',requireAuth,(req,res)=>res.json(usage.usageSummary(req.user.id)));
+router.get('/providers',requireAuth,(req,res)=>{
+ const names=['anthropic','openai','gemini'];
+ res.json({providers:names.map(name=>({id:name,configured:providers.isProviderConfigured(name),defaultModel:providers.getDefaultModel(name)}))});
+});
 
 router.get('/:botId/memory',requireAuth,requireBotAccess,(req,res)=>{
  const memories=store.all('memory').filter(m=>m.botId===req.bot.id&&m.userId===req.user.id);
