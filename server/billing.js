@@ -34,6 +34,9 @@ webhookRouter.post('/',express.raw({type:'application/json',limit:'256kb'}),asyn
   if(event.type==='checkout.session.completed'){
    const session=event.data&&event.data.object,userId=session?.metadata?.userId,plan=session?.metadata?.plan;
    if(userId&&plans.getPlans()[plan]&&session.mode==='subscription'&&session.status==='complete'&&['paid','no_payment_required'].includes(session.payment_status)){const user=await store.findByIdAsync('users',userId);if(user)await store.updateByIdAsync('users',userId,{plan,stripeCustomerId:session.customer||null,stripeSubscriptionId:session.subscription||null});}
+  }else if(event.type==='customer.subscription.updated'){
+   const subscription=event.data&&event.data.object,userId=subscription?.metadata?.userId,plan=subscription?.metadata?.plan;
+   if(userId){const user=await store.findByIdAsync('users',userId);if(user){const active=['active','trialing'].includes(subscription.status),nextPlan=active&&plans.getPlans()[plan]?plan:'free';await store.updateByIdAsync('users',userId,{plan:nextPlan,stripeSubscriptionId:active?subscription.id:null});}}
   }else if(event.type==='customer.subscription.deleted'){
    const subscription=event.data&&event.data.object,userId=subscription?.metadata?.userId;
    if(userId){const user=await store.findByIdAsync('users',userId);if(user)await store.updateByIdAsync('users',userId,{plan:'free',stripeSubscriptionId:null});}
