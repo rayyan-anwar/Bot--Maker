@@ -63,3 +63,5 @@ test('scoped collection queries return only records matching every requested ten
 });
 
 test.after(async()=>{await store.close();fs.rmSync(tempDir,{recursive:true,force:true});});
+
+test('plan defaults expose Free Plus and Pro daily quotas',()=>{const plans=require('../server/plans').getPlans();assert.ok(plans.free.dailyMessages>0);assert.ok(plans.plus.dailyMessages>=plans.free.dailyMessages);assert.ok(plans.pro.dailyMessages>=plans.plus.dailyMessages);});
