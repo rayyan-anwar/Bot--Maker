@@ -1,5 +1,4 @@
-# Local container smoke-test only. The application still uses JSON persistence.
-# Do not use this compose file as a production deployment configuration.
+# Local container smoke-test only. Use managed PostgreSQL and a managed secret store for production.
 services:
   botforge:
     build: .
