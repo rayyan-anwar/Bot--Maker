@@ -8,7 +8,7 @@ const crypto=require('node:crypto');
 const {Client}=require('pg');
 
 const dataPath=process.env.BOTFORGE_DATA_FILE||path.join(__dirname,'..','data','db.json');
-const schemaPath=path.join(__dirname,'..','migrations','001_initial_schema.sql');
+const schemaPaths=['001_initial_schema.sql','003_oauth_and_profile_memory.sql'].map(name=>path.join(__dirname,'..','migrations',name));
 const collections=['users','bots','documents','messages','usage','memory'];
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function readData(file=dataPath){
@@ -67,7 +67,7 @@ function validateData(data){
 }
 async function migrate({dryRun=false}={}){
  if(!process.env.DATABASE_URL)throw new Error('DATABASE_URL is required.');
- const data=readData();const counts=validateData(data);const schema=fs.readFileSync(schemaPath,'utf8');
+ const data=readData();const counts=validateData(data);const schema=schemaPaths.map(file=>fs.readFileSync(file,'utf8')).join('\n');
  const client=new Client({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSL==='disable'?false:{rejectUnauthorized:process.env.PGSSL_REJECT_UNAUTHORIZED!=='false'}});
  await client.connect();
  try{
