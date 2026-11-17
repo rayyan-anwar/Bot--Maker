@@ -33,7 +33,8 @@ test('concurrent failed logins increment the lockout counter atomically',async()
  assert.equal(user.failedLoginAttempts,3);
  assert.ok(user.lockedAt);
 });
-\ntest('readiness health reports the active JSON development adapter',async()=>{const result=await store.health();assert.deepEqual(result,{ok:true,database:'json-development'});});
+
+test('readiness health reports the active JSON development adapter',async()=>{const result=await store.health();assert.deepEqual(result,{ok:true,database:'json-development'});});
 
 
 test('bot deletion atomically removes dependent records in JSON storage',async()=>{
