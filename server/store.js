@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {Pool}=require('pg');
 const DB_PATH=process.env.BOTFORGE_DATA_FILE||path.join(__dirname,'..','data','db.json');
-const COLLECTIONS=['users','bots','documents','messages','usage','memory'];
+const COLLECTIONS=['users','bots','documents','messages','usage','memory','webhookEvents'];
 let cache=null,pool=null,initialized=false;
 const localReservations=new Map();
 function emptyDB(){return Object.fromEntries(COLLECTIONS.map(k=>[k,[]]));}
@@ -23,6 +23,7 @@ async function initialize(){
   await pool.query('SELECT 1');
   await pool.query("CREATE TABLE IF NOT EXISTS botforge_records (collection text NOT NULL CHECK(collection IN ('users','bots','documents','messages','usage','memory')), id uuid NOT NULL, data jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(collection,id))");
   await pool.query('CREATE INDEX IF NOT EXISTS botforge_records_collection_idx ON botforge_records(collection)');
+  await pool.query('CREATE TABLE IF NOT EXISTS botforge_webhook_events (provider text NOT NULL, event_id text NOT NULL, received_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(provider,event_id))');
   await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS botforge_records_user_email_uidx ON botforge_records((lower(data->>'email'))) WHERE collection='users'");
   await pool.query('CREATE TABLE IF NOT EXISTS botforge_quota_reservations (id uuid PRIMARY KEY, user_id uuid NOT NULL, usage_day date NOT NULL, expires_at timestamptz NOT NULL)');
   await pool.query('CREATE INDEX IF NOT EXISTS botforge_quota_user_day_idx ON botforge_quota_reservations(user_id,usage_day,expires_at)');
@@ -96,6 +97,16 @@ async function usageStats(userId,day){
  if(!isPostgres()){const used=load().usage.filter(x=>x.userId===userId&&x.day===day).length;const now=Date.now();for(const [id,r] of localReservations)if(r.expiresAt<=now)localReservations.delete(id);const pending=[...localReservations.values()].filter(x=>x.userId===userId&&x.day===day).length;return {used,pending};}
  await initialize();const r=await pool.query("SELECT (SELECT count(*)::int FROM botforge_records WHERE collection='usage' AND data->>'userId'=$1 AND data->>'day'=$2) AS used,(SELECT count(*)::int FROM botforge_quota_reservations WHERE user_id=$1 AND usage_day=$2 AND expires_at>now()) AS pending",[userId,day]);return r.rows[0];
 }
+async function claimWebhookEvent(provider,eventId){
+ if(!['stripe','razorpay'].includes(provider)||typeof eventId!=='string'||!eventId.trim()||eventId.length>255)throw new Error('Invalid webhook event identity.');
+ if(!isPostgres()){const events=all('webhookEvents');if(events.some(x=>x.provider===provider&&x.eventId===eventId))return false;insert('webhookEvents',{id:require('node:crypto').randomUUID(),provider,eventId,receivedAt:new Date().toISOString()});return true;}
+ await initialize();const r=await pool.query('INSERT INTO botforge_webhook_events(provider,event_id) VALUES($1,$2) ON CONFLICT(provider,event_id) DO NOTHING',[provider,eventId]);return r.rowCount===1;
+}
+async function releaseWebhookEvent(provider,eventId){
+ if(!['stripe','razorpay'].includes(provider)||typeof eventId!=='string'||!eventId)return;
+ if(!isPostgres()){const db=load();db.webhookEvents=db.webhookEvents.filter(x=>!(x.provider===provider&&x.eventId===eventId));persist();return;}
+ await initialize();await pool.query('DELETE FROM botforge_webhook_events WHERE provider=$1 AND event_id=$2',[provider,eventId]);
+}
 async function health(){if(!isPostgres())return {ok:true,database:'json-development'};try{await initialize();await pool.query('SELECT 1');return {ok:true,database:'postgres'};}catch(_){return {ok:false,database:'postgres'};}}
 async function close(){if(pool){await pool.end();pool=null;}initialized=false;}
-module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotAndData,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,health,load,persist};
+module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotAndData,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,releaseWebhookEvent,health,load,persist};
