@@ -1,8 +1,21 @@
 name: BotForge AI Patch Validation
 
 on:
+  push:
+    branches:
+      - botforge-production-upgrade
+      - "botforge-ai-fix/**"
+    paths:
+      - "server/**"
+      - "tests/**"
+      - "scripts/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/**"
   pull_request:
-    branches: [botforge-production-upgrade]
+    branches:
+      - main
+      - botforge-production-upgrade
     paths:
       - "server/**"
       - "tests/**"
@@ -21,11 +34,11 @@ concurrency:
 
 jobs:
   validate:
-    name: Validate AI-generated patch in isolated runner
+    name: Validate proposed patch in isolated runner
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Check out proposed branch
+      - name: Check out proposed revision without persisted credentials
         uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -33,11 +46,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install dependencies
+      - name: Install dependencies without lifecycle scripts
         run: npm install --ignore-scripts
       - name: Run repository test suite
         run: npm test
       - name: Check JavaScript syntax
         run: node scripts/check-syntax.js
-      - name: Check PostgreSQL backup and restore scripts
+      - name: Check PostgreSQL backup and restore shell syntax
         run: bash -n scripts/backup-postgres.sh scripts/restore-postgres.sh
