@@ -28,8 +28,8 @@ This checklist is a launch gate. A checked item means evidence exists, not merel
 - [ ] Retention, export and deletion workflows tested.
 
 ## File ingestion
-- [ ] Signature/MIME validation, malware scanning and file size/page/text limits.
-- [ ] Parser runs with resource/time limits.
+- [x] PDF signature, UTF-8, content/extension mismatch and control-character validation; ClamAV scanning fails closed in production; upload and extracted-text/page limits are enforced. ClamAV staging runtime still requires operator verification.
+- [x] PDF parser runs in a resource-limited worker thread with timeout, page and extracted-text caps. OS/container-level parser sandboxing remains pending.
 - [ ] Uploads stored privately; public URLs are short-lived if used.
 - [ ] Async ingestion, retries and dead-letter handling.
 - [ ] File deletion removes source objects, extracted text and vector records.
