@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+const EXCLUDED_DIRS = new Set(['node_modules', '.git', 'coverage', 'dist', '.next', 'vendor']);
 const RULES = [
   { id: 'private-key', severity: 'critical', pattern: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g, message: 'Private key material appears in source.' },
   { id: 'github-token', severity: 'critical', pattern: /\bgh[pousr]_[A-Za-z0-9_]{20,}\b/g, message: 'A GitHub token-like value appears in source.' },
@@ -40,7 +41,7 @@ function scanPaths(paths) {
     try { stat = fs.statSync(file); } catch { return; }
     if (stat.isDirectory()) {
       for (const name of fs.readdirSync(file)) {
-        if (['node_modules', '.git', 'coverage', 'dist'].includes(name)) continue;
+        if (EXCLUDED_DIRS.has(name)) continue;
         visit(path.join(file, name));
       }
       return;
