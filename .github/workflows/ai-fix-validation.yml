@@ -1,17 +1,6 @@
 name: BotForge AI Patch Validation
 
 on:
-  push:
-    branches:
-      - botforge-production-upgrade
-      - "botforge-ai-fix/**"
-    paths:
-      - "server/**"
-      - "tests/**"
-      - "scripts/**"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/**"
   pull_request:
     branches:
       - main
