@@ -71,7 +71,7 @@ webhookRouter.post('/',express.raw({type:'application/json',limit:'256kb'}),asyn
 razorpayWebhookRouter.post('/',express.raw({type:'application/json',limit:'256kb'}),async(req,res)=>{
  if(!razorpaySignatureValid(req.body,req.get('x-razorpay-signature'),process.env.RAZORPAY_WEBHOOK_SECRET))return res.status(400).json({error:'Invalid Razorpay webhook signature.'});
  let event;try{event=JSON.parse(req.body.toString('utf8'));}catch(_){return res.status(400).json({error:'Invalid webhook payload.'});}
- const eventId=event.id;if(typeof eventId!=='string'||!eventId)return res.status(400).json({error:'Webhook event ID is required.'});
+ const eventId=req.get('x-razorpay-event-id');if(typeof eventId!=='string'||!eventId.trim()||eventId.length>255)return res.status(400).json({error:'Razorpay event ID header is required.'});
  let claimed=false;
  try{
   claimed=await store.claimWebhookEvent('razorpay',eventId);if(!claimed)return res.json({received:true,duplicate:true});
