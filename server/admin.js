@@ -50,16 +50,16 @@ router.post('/engineer/propose-fix',async(req,res,next)=>{
 });
 router.post('/engineer/create-draft-pr',async(req,res,next)=>{
  try{
-  const token=process.env.BOTFORGE_GITHUB_TOKEN,repository=String(process.env.BOTFORGE_GITHUB_REPO||'').trim(),baseBranch=String(process.env.BOTFORGE_GITHUB_BRANCH||'botforge-production-upgrade').trim();
+  const readToken=process.env.BOTFORGE_GITHUB_TOKEN,writeToken=process.env.BOTFORGE_GITHUB_WRITE_TOKEN,repository=String(process.env.BOTFORGE_GITHUB_REPO||'').trim(),baseBranch=String(process.env.BOTFORGE_GITHUB_BRANCH||'botforge-production-upgrade').trim();
   const filePath=String(req.body?.path||'').trim(),task=String(req.body?.task||'').trim(),content=req.body?.proposedContent,baseSha=String(req.body?.baseSha||'').trim();
-  if(!token||!/^[A-Za-z0-9_.-]+[/][A-Za-z0-9_.-]+$/.test(repository))return res.status(503).json({error:'Configure GitHub token, repository and branch to create draft pull requests.'});
+  if(!readToken||!writeToken||!/^[A-Za-z0-9_.-]+[/][A-Za-z0-9_.-]+$/.test(repository))return res.status(503).json({error:'Configure a read-only GitHub token and a separate write token for draft PR creation.'});
   if(req.body?.confirm!==true)return res.status(400).json({error:'Explicit administrator confirmation is required.'});
   if(!/^(server|tests)[/][A-Za-z0-9_./-]+[.](js|json)$/.test(filePath)||filePath.includes('..'))return res.status(400).json({error:'Only JavaScript and JSON files under server/ or tests/ can be proposed for editing.'});
   if(typeof content!=='string'||!content||content.length>40000||!task||task.length>2000||!/^[a-f0-9]{40}$/i.test(baseSha))return res.status(400).json({error:'Invalid patch content, task or base file SHA.'});
   try{if(filePath.endsWith('.json'))JSON.parse(content);else new (require('node:vm').Script)(content,{filename:filePath});}catch(_){return res.status(422).json({error:'The proposed file failed syntax validation.'});}
-  const headers={accept:'application/vnd.github+json',authorization:'Bearer '+token,'x-github-api-version':'2022-11-28','content-type':'application/json'};
+  const readHeaders={accept:'application/vnd.github+json',authorization:'Bearer '+readToken,'x-github-api-version':'2022-11-28'};\n  const writeHeaders={...readHeaders,authorization:'Bearer '+writeToken,'content-type':'application/json'};
   const api='https://api.github.com/repos/'+repository;
-  const read=await fetch(api+'/contents/'+filePath.split('/').map(encodeURIComponent).join('/')+'?ref='+encodeURIComponent(baseBranch),{headers,signal:AbortSignal.timeout(12000)});
+  const read=await fetch(api+'/contents/'+filePath.split('/').map(encodeURIComponent).join('/')+'?ref='+encodeURIComponent(baseBranch),{headers:readHeaders,signal:AbortSignal.timeout(12000)});
   if(!read.ok)return res.status(503).json({error:'Could not verify the base file. No pull request was created.'});
   const current=await read.json();if(current.sha!==baseSha)return res.status(409).json({error:'The source file changed after the proposal was generated. Generate a fresh proposal before creating a draft PR.'});
   const refResponse=await fetch(api+'/git/ref/heads/'+encodeURIComponent(baseBranch),{headers,signal:AbortSignal.timeout(12000)});
@@ -67,9 +67,9 @@ router.post('/engineer/create-draft-pr',async(req,res,next)=>{
   const refData=await refResponse.json(),headSha=refData.object?.sha;
   if(!/^[a-f0-9]{40}$/i.test(String(headSha||'')))return res.status(502).json({error:'GitHub returned an invalid base commit.'});
   const suffix=require('node:crypto').randomBytes(4).toString('hex'),newBranch='botforge-ai-fix/'+Date.now()+'-'+suffix;
-  const createRef=await fetch(api+'/git/refs',{method:'POST',headers,body:JSON.stringify({ref:'refs/heads/'+newBranch,sha:headSha}),signal:AbortSignal.timeout(12000)});
+  const createRef=await fetch(api+'/git/refs',{method:'POST',headers:writeHeaders,body:JSON.stringify({ref:'refs/heads/'+newBranch,sha:headSha}),signal:AbortSignal.timeout(12000)});
   if(!createRef.ok)return res.status(502).json({error:'Could not create an isolated fix branch. Check GitHub Contents: write permission.'});
-  const commit=await fetch(api+'/contents/'+filePath.split('/').map(encodeURIComponent).join('/'),{method:'PUT',headers,body:JSON.stringify({message:'ai: propose '+filePath,content:Buffer.from(content,'utf8').toString('base64'),branch:newBranch,sha:current.sha}),signal:AbortSignal.timeout(12000)});
+  const commit=await fetch(api+'/contents/'+filePath.split('/').map(encodeURIComponent).join('/'),{method:'PUT',headers:writeHeaders,body:JSON.stringify({message:'ai: propose '+filePath,content:Buffer.from(content,'utf8').toString('base64'),branch:newBranch,sha:current.sha}),signal:AbortSignal.timeout(12000)});
   if(!commit.ok)return res.status(502).json({error:'Could not commit the proposed file to its isolated branch. No pull request was created.'});
   const pr=await fetch(api+'/pulls',{method:'POST',headers,body:JSON.stringify({title:'[BotForge AI] '+task.slice(0,160),head:newBranch,base:baseBranch,body:'## AI-generated patch proposal\\n\\n'+task+'\\n\\n**File:** `'+filePath+'`\\n**Base file SHA:** `'+baseSha+'`\\n\\nThis is an AI-generated draft for human review. CI and maintainer approval are required. No automatic merge or deployment is performed.',draft:true}),signal:AbortSignal.timeout(12000)});
   if(!pr.ok)return res.status(502).json({error:'The isolated branch and commit were created, but GitHub could not create the draft PR. Check Pull requests: write permission.'});
