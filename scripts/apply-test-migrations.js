@@ -6,7 +6,7 @@ async function main(){
  const client=new Client({connectionString:process.env.BOTFORGE_TEST_DATABASE_URL});
  await client.connect();
  try{
-  for(const name of ['001_initial_schema.sql','002_runtime_records.sql']){
+  for(const name of ['001_initial_schema.sql','002_runtime_records.sql','003_oauth_and_profile_memory.sql']){
    const sql=fs.readFileSync(path.join(__dirname,'..','migrations',name),'utf8');
    await client.query(sql);
   }
