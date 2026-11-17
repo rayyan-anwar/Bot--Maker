@@ -68,7 +68,7 @@ router.post('/engineer/create-draft-pr',engineerWriteLimiter,async(req,res,next)
   const read=await fetch(api+'/contents/'+filePath.split('/').map(encodeURIComponent).join('/')+'?ref='+encodeURIComponent(baseBranch),{headers:readHeaders,signal:AbortSignal.timeout(12000)});
   if(!read.ok)return res.status(503).json({error:'Could not verify the base file. No pull request was created.'});
   const current=await read.json();if(current.sha!==baseSha)return res.status(409).json({error:'The source file changed after the proposal was generated. Generate a fresh proposal before creating a draft PR.'});
-  const original=Buffer.from(String(current.content||'').replace(/\\s/g,''),'base64').toString('utf8');
+  const original=Buffer.from(String(current.content||'').replace(/\s/g,''),'base64').toString('utf8');
   if(content===original)return res.status(400).json({error:'The proposed content is unchanged. No draft PR is needed.'});
   const refResponse=await fetch(api+'/git/ref/heads/'+encodeURIComponent(baseBranch),{headers:readHeaders,signal:AbortSignal.timeout(12000)});
   if(!refResponse.ok)return res.status(503).json({error:'Could not read the base branch reference.'});
