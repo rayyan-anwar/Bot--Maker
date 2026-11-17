@@ -7,6 +7,7 @@ This document tracks assistant-side implementation and verification. A part is c
 - [x] Add regression coverage for invalid and valid owner email formats.
 - [ ] Obtain a completed CI run for the current branch head (Node 18/20/22, PostgreSQL 16, Docker).
 - [x] Remove duplicate branch-push and pull-request CI triggers; add concurrency cancellation for superseded CI runs.
+- [x] Keep isolated AI patch validation as a manual workflow; standard pull-request verification remains in BotForge CI.
 - [ ] Resolve any failures and rerun affected checks.
 - Status: In progress. CI trigger cleanup is committed; the latest run must still complete successfully before this part can be closed.
 
