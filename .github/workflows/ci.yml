@@ -78,3 +78,17 @@ jobs:
           persist-credentials: false
       - name: Build production container image
         run: docker build --tag botforge:ci .
+      - name: Smoke test container startup and readiness
+        run: |
+          docker run -d --rm --name botforge-ci -p 3000:3000 \
+            -e JWT_SECRET=ci-only-dummy-secret-value-that-is-long-enough-12345 \
+            -e BOTFORGE_ADMIN_EMAIL=admin@example.test botforge:ci
+          trap 'docker stop botforge-ci >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent http://127.0.0.1:3000/readyz; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs botforge-ci
+          exit 1
