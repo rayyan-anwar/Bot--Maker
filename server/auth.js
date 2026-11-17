@@ -45,7 +45,7 @@ router.get('/oauth/:provider',async(req,res,next)=>{
 router.get('/oauth/:provider/callback',async(req,res,next)=>{
  const provider=String(req.params.provider||'').toLowerCase(),cfg=oauthConfig(provider),cookieName='oauth_'+provider+'_state';
  try{
-  const stateCookie=req.cookies&&req.cookies[cookieName];res.clearCookie(cookieName,oauthCookieOptions());
+  const stateCookie=req.cookies&&req.cookies[cookieName];const {maxAge: _cookieMaxAge,...clearOptions}=oauthCookieOptions();res.clearCookie(cookieName,clearOptions);
   if(!cfg||!cfg.clientId||!cfg.clientSecret||!cfg.redirectUri)return oauthFailure(res,'provider_not_configured');
   if(req.query.error||typeof req.query.code!=='string'||typeof req.query.state!=='string'||!stateCookie)return oauthFailure(res,'oauth_cancelled_or_invalid');
   let statePayload;try{statePayload=jwt.verify(stateCookie,JWT_SECRET);}catch(_){return oauthFailure(res,'state_expired');}
