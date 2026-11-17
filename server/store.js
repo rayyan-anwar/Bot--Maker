@@ -51,6 +51,16 @@ async function findByIdAsync(c,id){assertCollection(c);if(!isUuid(id))return nul
 async function insertAsync(c,record){assertCollection(c);if(!isPostgres()){if(c==='users'&&all('users').some(u=>String(u.email).toLowerCase()===String(record.email).toLowerCase())){const e=new Error('Duplicate user email.');e.code='23505';throw e;}return insert(c,record);}await initialize();await pool.query('INSERT INTO botforge_records(collection,id,data) VALUES($1,$2,$3::jsonb)',[c,record.id,JSON.stringify(record)]);return record;}
 async function updateByIdAsync(c,id,patch){assertCollection(c);if(!isUuid(id))return null;if(!isPostgres())return updateById(c,id,patch);await initialize();const r=await pool.query("UPDATE botforge_records SET data=data || $3::jsonb,updated_at=now() WHERE collection=$1 AND id=$2 RETURNING data",[c,id,JSON.stringify(patch)]);return r.rowCount?r.rows[0].data:null;}
 async function deleteByIdAsync(c,id){assertCollection(c);if(!isUuid(id))return false;if(!isPostgres())return deleteById(c,id);await initialize();const r=await pool.query('DELETE FROM botforge_records WHERE collection=$1 AND id=$2',[c,id]);return r.rowCount>0;}
+async function consumePasswordResetToken(tokenHash,patch){
+ if(typeof tokenHash!=='string'||!tokenHash) return null;
+ if(!isPostgres()){
+  const user=all('users').find(row=>row.passwordResetTokenHash===tokenHash&&row.passwordResetExpiresAt&&Date.parse(row.passwordResetExpiresAt)>Date.now());
+  return user?updateById('users',user.id,patch):null;
+ }
+ await initialize();
+ const result=await pool.query("UPDATE botforge_records SET data=data || $2::jsonb,updated_at=now() WHERE collection='users' AND data->>'passwordResetTokenHash'=$1 AND NULLIF(data->>'passwordResetExpiresAt','') IS NOT NULL AND (data->>'passwordResetExpiresAt')::timestamptz>now() RETURNING data",[tokenHash,JSON.stringify(patch)]);
+ return result.rowCount?result.rows[0].data:null;
+}
 async function deleteBotAndData(botId){
  if(!isUuid(botId))return false;
  if(!isPostgres()){const db=load(),exists=db.bots.some(x=>x.id===botId);if(!exists)return false;db.bots=db.bots.filter(x=>x.id!==botId);for(const c of ['documents','messages','memory','usage'])db[c]=db[c].filter(x=>x.botId!==botId);persist();return true;}
