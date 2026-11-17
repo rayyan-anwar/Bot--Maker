@@ -9,6 +9,7 @@ This runbook prepares a controlled staging deployment. It does not claim that a 
 - A private persistent volume or S3-compatible object store if original uploads will be retained in a future release. The current app extracts text and deletes temporary upload files.
 - At least one server-side AI provider API key with billing enabled.
 - A trusted reverse proxy/load balancer. Set `TRUST_PROXY=1` only when the app is behind exactly one trusted proxy.
+- A private ClamAV daemon reachable from the application. Production document uploads fail closed when malware scanning is unavailable or not configured.
 
 ## 2. Configure secrets
 
@@ -18,6 +19,7 @@ Set these in the hosting provider's secret manager. Never commit real values to 
 - `PORT` to the port supplied by the host.
 - `JWT_SECRET` to a cryptographically random value of at least 32 characters.
 - `DATABASE_URL` to the managed PostgreSQL connection string.
+- `CLAMAV_HOST` and `CLAMAV_PORT` for a private ClamAV daemon; set `CLAMAV_TIMEOUT_MS` to a bounded scan timeout. Never expose the scanner port publicly.
 - `PGSSL_REJECT_UNAUTHORIZED=true` when the provider supplies a trusted TLS certificate.
 - `PG_POOL_MAX` to a conservative connection count within the database plan.
 - `METRICS_TOKEN` to a random bearer token if Prometheus scraping is enabled; `/metrics` is disabled when unset.
@@ -45,7 +47,7 @@ The importer runs in one transaction and records a one-time marker. It does not 
 
 For a fresh database, apply `migrations/001_initial_schema.sql` followed by `migrations/003_oauth_and_profile_memory.sql` using the database migration process, then start the app. The app creates the JSONB runtime repository, quota reservations, shared rate limits and webhook idempotency table during startup. `003` is required so OAuth-only accounts and account-wide memory notes can be represented in the normalized reporting tables.
 
-For a reproducible local PostgreSQL staging rehearsal, copy `.env.example` to `.env`, set `POSTGRES_PASSWORD` and `JWT_SECRET`, then run `docker compose -f docker-compose.staging.yml up --build -d`. Wait for the `botforge` service healthcheck, then run the staging smoke tests below. This stack is for staging only, not public production hosting.
+For a reproducible local PostgreSQL staging rehearsal, copy `.env.example` to `.env`, set `POSTGRES_PASSWORD` and `JWT_SECRET`, then run `docker compose -f docker-compose.staging.yml up --build -d`. Wait for the `botforge` service healthcheck, then run the staging smoke tests below. This stack is for staging only, not public production hosting. The staging compose stack includes a private ClamAV service; the first signature database update can delay readiness for scanning, so verify ClamAV is accepting connections before testing document uploads. The application rejects uploads with HTTP 503 if the scanner is unavailable and HTTP 422 if malware is detected.
 
 ## 4. Staging smoke tests
 
