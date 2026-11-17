@@ -81,6 +81,8 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  const adminResetToken='b'.repeat(64);
  await store.updateByIdAsync('users',owner.id,{passwordResetTokenHash:crypto.createHash('sha256').update(adminResetToken).digest('hex'),passwordResetExpiresAt:new Date(Date.now()+60000).toISOString()});
  assert.equal((await post('/api/auth/password/reset',{token:adminResetToken,password:'attacker-chosen-password-123'})).status,400);
+ const legacyCustomerResetToken='d'.repeat(64);
+ await store.updateByIdAsync('users',customer.id,{passwordResetTokenHash:crypto.createHash('sha256').update(legacyCustomerResetToken).digest('hex'),passwordResetExpiresAt:new Date(Date.now()+60000).toISOString()});
 
  // Production cookie-authenticated mutation requests must carry a same-host Origin.
  const previousNodeEnv=process.env.NODE_ENV;
@@ -92,6 +94,7 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
   assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'new-customer-password-456'})).status,401);
   assert.equal((await fetch(base+'/api/auth/oauth/google')).status,404);
   assert.equal((await post('/api/auth/password/forgot',{email:'owner@example.com'})).status,202);
+  assert.equal((await post('/api/auth/password/reset',{token:legacyCustomerResetToken,password:'legacy-token-must-not-work-123'})).status,400);
   assert.equal((await fetch(base+'/api/auth/me',{headers:{cookie:customerCookie}})).status,401);
   const ownerLogin=await post('/api/auth/login',{email:'owner@example.com',password:'strong-admin-password-123'});
   assert.equal(ownerLogin.status,200);
