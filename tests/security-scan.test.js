@@ -27,3 +27,7 @@ test('reports plain HTTP external endpoints as review findings', () => {
   assert.equal(findings[0].ruleId, 'insecure-http');
   assert.equal(findings[0].severity, 'medium');
 });
+
+test('does not flag secure HTTPS provider endpoints', () => {
+  assert.deepEqual(scanText('const endpoint = "https://api.example.com";'), []);
+});
