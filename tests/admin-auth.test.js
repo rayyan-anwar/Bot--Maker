@@ -30,7 +30,7 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.equal((await me.json()).user.role,'user');
  const logout=await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie}});
  assert.equal(logout.status,200);
- assert.equal((await fetch(base+'/api/auth/me',{headers:{cookie:customerCookie}})).status,401);
+ assert.equal((await fetch(base+'/api/auth/me',{headers:{cookie}})).status,401);
  const customerLogin=await post('/api/auth/login',{email:'customer@example.com',password:'strong-customer-password-123'});
  assert.equal(customerLogin.status,200);
  const customerCookie=customerLogin.headers.get('set-cookie');
