@@ -119,3 +119,14 @@ At commit `9623c926b4c642e8d3a754a837c8ecff4b76336f`, the Node.js 18/20/22 CI ma
 
 - Worker memory and timeout bounds reduce PDF parser blast radius but do not replace malware scanning, MIME/signature validation beyond the PDF magic header, parser sandboxing at the OS/container level or a broader upload threat review.
 - The PostgreSQL rate-limit store has automated adapter tests, but must still be exercised against a live PostgreSQL instance with concurrent workers and failover. Rate limiting remains process-local in JSON development mode by design.
+
+
+## PostgreSQL integration hardening follow-up
+
+- Added a PostgreSQL 16 service to the CI workflow. CI applies both SQL migrations through the Node PostgreSQL client and runs an opt-in real-database integration suite.
+- Integration coverage exercises concurrent store initialization, concurrent shared rate-limit increments, atomic failed-login lockout updates and concurrent daily quota reservations.
+- Serialized runtime store initialization through a shared promise so simultaneous first requests do not create and overwrite multiple connection pools.
+- Rate-limit expiry cleanup now runs as a separate statement before the atomic upsert. This avoids relying on a data-modifying CTE and keeps the upsert's uniqueness handling straightforward.
+- Added the webhook idempotency table to the runtime SQL migration.
+
+The PostgreSQL integration workflow is now part of CI. Its result must be green on the current PR head before claiming database concurrency verification. CI uses an ephemeral PostgreSQL 16 service and does not provision a production database.
