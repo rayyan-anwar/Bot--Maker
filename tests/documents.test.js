@@ -42,3 +42,29 @@ test('document extraction enforces upload byte limits before reading content',as
  try{await assert.rejects(()=>extractText(file,'large.txt'),/5 MB upload limit/);}
  finally{fs.rmSync(file,{force:true});}
 });
+
+
+test('document upload route rate-limits repeated uploads for an authenticated bot owner',async(t)=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-upload-limit-'));
+ process.env.NODE_ENV='test';
+ process.env.JWT_SECRET='upload-limit-test-secret-with-at-least-thirty-two-characters';
+ process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
+ const {start,shutdown}=require('../server/index');
+ const server=await start(0,'127.0.0.1');
+ t.after(async()=>{await shutdown();fs.rmSync(dir,{recursive:true,force:true});});
+ const base='http://127.0.0.1:'+server.address().port;
+ const bcrypt=require('bcryptjs'),{v4:uuidv4}=require('uuid'),store=require('../server/store');
+ await store.insertAsync('users',{id:uuidv4(),email:'upload-limit@example.test',name:'Upload Limit',passwordHash:await bcrypt.hash('upload-limit-password-123',10),createdAt:new Date().toISOString()});
+ const login=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'upload-limit@example.test',password:'upload-limit-password-123'})});
+ assert.equal(login.status,200);
+ const cookie=(login.headers.get('set-cookie')||'').split(';')[0];
+ const created=await fetch(base+'/api/bots',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({name:'Upload limit bot',instructions:'Test uploads safely.'})});
+ assert.equal(created.status,201);
+ const bot=(await created.json()).bot;
+ for(let i=0;i<10;i++){
+  const response=await fetch(base+'/api/documents/'+bot.id,{method:'POST',headers:{cookie}});
+  assert.equal(response.status,400);
+ }
+ const limited=await fetch(base+'/api/documents/'+bot.id,{method:'POST',headers:{cookie}});
+ assert.equal(limited.status,429);
+});
