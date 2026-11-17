@@ -32,6 +32,7 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.equal((await fetch(base+'/api/admin/engineer/diagnose-ci',{method:'POST',headers:{cookie,'content-type':'application/json'},body:'{}'})).status,403);
  assert.equal((await fetch(base+'/api/admin/engineer/propose-fix',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({path:'server/auth.js',task:'Review session handling'})})).status,403);
  assert.equal((await fetch(base+'/api/admin/engineer/create-draft-pr',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({path:'server/auth.js',task:'Review session handling',proposedContent:'module.exports={};',baseSha:'a'.repeat(40),confirm:true})})).status,403);
+ assert.equal((await fetch(base+'/api/admin/engineer/security-scan',{headers:{cookie}})).status,403);
  assert.equal(adminApi.status,403);
  assert.equal((await fetch(base+'/admin.html',{headers:{cookie}})).status,403);
  for(let i=0;i<2;i++)assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'wrong-password'})).status,401);
@@ -66,6 +67,11 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.equal((await fetch(base+'/api/admin/engineer/diagnose-ci',{method:'POST',headers:{cookie:adminCookie,'content-type':'application/json'},body:'{}'})).status,503);
  assert.equal((await fetch(base+'/api/admin/engineer/propose-fix',{method:'POST',headers:{cookie:adminCookie,'content-type':'application/json'},body:JSON.stringify({path:'server/auth.js',task:'Review session handling'})})).status,503);
  assert.equal((await fetch(base+'/api/admin/engineer/create-draft-pr',{method:'POST',headers:{cookie:adminCookie,'content-type':'application/json'},body:JSON.stringify({path:'server/auth.js',task:'Review session handling',proposedContent:'module.exports={};',baseSha:'a'.repeat(40),confirm:true})})).status,503);
+ const scanResponse=await fetch(base+'/api/admin/engineer/security-scan',{headers:{cookie:adminCookie}});
+ assert.equal(scanResponse.status,200);
+ const scanResult=await scanResponse.json();
+ assert.equal(scanResult.ok,true);
+ assert.ok(scanResult.filesScanned>0);
  assert.equal((await fetch(base+'/api/admin/plans',{headers:{cookie:adminCookie}})).status,200);
  assert.equal((await fetch(base+'/admin.html',{headers:{cookie:adminCookie}})).status,200);
  await store.updateByIdAsync('users',owner.id,{sessionVersion:Number(owner.sessionVersion||0)+1});
