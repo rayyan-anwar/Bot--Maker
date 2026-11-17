@@ -31,7 +31,7 @@ function validateData(data){
  const ids={users:new Set(),bots:new Set(),documents:new Set(),messages:new Set(),usage:new Set(),memory:new Set()};
  const emailSet=new Set();
  for(const u of data.users){
-  requireUuid(u.id,'user.id');requireText(u.email,'user.email',254);requireText(u.name,'user.name',80);requireText(u.passwordHash,'user.passwordHash',200);
+  requireUuid(u.id,'user.id');requireText(u.email,'user.email',254);requireText(u.name,'user.name',80);if(u.passwordHash!==null&&u.passwordHash!==undefined)requireText(u.passwordHash,'user.passwordHash',200);else if(!u.oauthProviders||!Object.values(u.oauthProviders).some(value=>typeof value==='string'&&value.length>0))throw new Error('Preflight failed: user must have a password hash or a linked OAuth identity ('+u.id+').');
   const email=u.email.trim().toLowerCase();if(emailSet.has(email))throw new Error('Preflight failed: duplicate user email '+email+'.');emailSet.add(email);
   if(ids.users.has(u.id))throw new Error('Preflight failed: duplicate user id '+u.id+'.');ids.users.add(u.id);validDate(u.createdAt,'user.createdAt');
  }
@@ -59,8 +59,8 @@ function validateData(data){
   requireText(u.provider,'usage.provider',32);if(ids.usage.has(u.id))throw new Error('Preflight failed: duplicate usage id '+u.id+'.');ids.usage.add(u.id);validDate(u.createdAt,'usage.createdAt');
  }
  for(const m of data.memory){
-  requireUuid(m.id,'memory.id');requireUuid(m.botId,'memory.botId');requireUuid(m.userId,'memory.userId');
-  if(!ids.bots.has(m.botId)||!ids.users.has(m.userId))throw new Error('Preflight failed: memory references a missing user or bot ('+m.id+').');
+  requireUuid(m.id,'memory.id');requireUuid(m.userId,'memory.userId');if(m.botId!==null&&m.botId!==undefined){requireUuid(m.botId,'memory.botId');if(!ids.bots.has(m.botId))throw new Error('Preflight failed: memory references a missing bot ('+m.id+').');}
+  if(!ids.users.has(m.userId))throw new Error('Preflight failed: memory references a missing user ('+m.id+').');
   requireText(m.content,'memory.content',500);if(ids.memory.has(m.id))throw new Error('Preflight failed: duplicate memory id '+m.id+'.');ids.memory.add(m.id);validDate(m.createdAt,'memory.createdAt');
  }
  return Object.fromEntries(collections.map(key=>[key,data[key].length]));
