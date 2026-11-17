@@ -34,7 +34,7 @@ For an existing JSON installation:
 1. Stop writes to the old instance and take a timestamped backup of `data/db.json`.
 2. Keep the backup read-only and store a separate copy outside the application host.
 3. Configure `DATABASE_URL` in a protected staging environment.
-4. Run `npm ci`, then `npm run migrate:postgres -- --dry-run`.
+4. Run `npm install --ignore-scripts`, then `npm run migrate:postgres -- --dry-run`. The repository currently has no committed `package-lock.json`; create and review a lockfile before a production release, then switch the install command to `npm ci`.
 5. Review preflight counts and errors. Do not proceed if any record fails validation.
 6. Run `npm run migrate:postgres` once.
 7. Verify imported collection counts and the migration marker directly in PostgreSQL.
