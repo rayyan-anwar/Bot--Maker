@@ -103,7 +103,7 @@ async function commitChatTurn({userMessage,assistantMessage,usageRecord},reserva
 }
 async function usageStats(userId,day){
  if(!isPostgres()){const used=load().usage.filter(x=>x.userId===userId&&x.day===day).length;const now=Date.now();for(const [id,r] of localReservations)if(r.expiresAt<=now)localReservations.delete(id);const pending=[...localReservations.values()].filter(x=>x.userId===userId&&x.day===day).length;return {used,pending};}
- await initialize();const r=await pool.query("SELECT (SELECT count(*)::int FROM botforge_records WHERE collection='usage' AND data->>'userId'=$1 AND data->>'day'=$2) AS used,(SELECT count(*)::int FROM botforge_quota_reservations WHERE user_id=$1 AND usage_day=$2 AND expires_at>now()) AS pending",[userId,day]);return r.rows[0];
+ await initialize();const r=await pool.query("SELECT (SELECT count(*)::int FROM botforge_records WHERE collection='usage' AND data->>'userId'=$1 AND data->>'day'=$3) AS used,(SELECT count(*)::int FROM botforge_quota_reservations WHERE user_id=$2::uuid AND usage_day=$4::date AND expires_at>now()) AS pending",[String(userId),userId,String(day),day]);return r.rows[0];
 }
 async function claimWebhookEvent(provider,eventId){
  if(!['stripe','razorpay'].includes(provider)||typeof eventId!=='string'||!eventId.trim()||eventId.length>255)throw new Error('Invalid webhook event identity.');
