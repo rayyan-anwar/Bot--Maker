@@ -259,9 +259,9 @@
       return;
     }
     list.innerHTML = documents.map((d) => `
-      <div class="doc-row" data-id="${d.id}">
-        <span>${escapeHtml(d.filename)} <span class="muted">(${d.chunkCount} chunks)</span></span>
-        <button class="btn btn-ghost doc-delete" data-id="${d.id}">Remove</button>
+      <div class="doc-row" data-id="${escapeHtml(d.id)}">
+        <span>${escapeHtml(d.filename)} <span class="muted">(${Number(d.chunkCount)||0} chunks)</span></span>
+        <button class="btn btn-ghost doc-delete" data-id="${escapeHtml(d.id)}">Remove</button>
       </div>`).join('');
 
     list.querySelectorAll('.doc-delete').forEach((btn) => {
