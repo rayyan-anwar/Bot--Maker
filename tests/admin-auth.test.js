@@ -1,4 +1,19 @@
-test('single-administrator startup requires a valid owner email',()=>{\n const previousEnv=process.env.NODE_ENV,previousFlag=process.env.BOTFORGE_SINGLE_ADMIN,previousEmail=process.env.BOTFORGE_ADMIN_EMAIL,previousJwt=process.env.JWT_SECRET;\n process.env.JWT_SECRET='single-admin-config-test-secret-with-at-least-thirty-two-characters';\n const {validateSingleAdminConfig}=require('../server/index');\n try{\n  process.env.NODE_ENV='production';\n  process.env.BOTFORGE_ADMIN_EMAIL='';\n  assert.throws(()=>validateSingleAdminConfig(),/BOTFORGE_ADMIN_EMAIL must be set/);\n  process.env.BOTFORGE_ADMIN_EMAIL='not-an-email';\n  assert.throws(()=>validateSingleAdminConfig(),/BOTFORGE_ADMIN_EMAIL must be set/);\n  process.env.BOTFORGE_ADMIN_EMAIL='owner@example.com';\n  assert.equal(validateSingleAdminConfig(),true);\n }finally{if(previousEnv===undefined)delete process.env.NODE_ENV;else process.env.NODE_ENV=previousEnv;if(previousFlag===undefined)delete process.env.BOTFORGE_SINGLE_ADMIN;else process.env.BOTFORGE_SINGLE_ADMIN=previousFlag;if(previousEmail===undefined)delete process.env.BOTFORGE_ADMIN_EMAIL;else process.env.BOTFORGE_ADMIN_EMAIL=previousEmail;if(previousJwt===undefined)delete process.env.JWT_SECRET;else process.env.JWT_SECRET=previousJwt;}\n});\n\nconst test=require('node:test');
+test('single-administrator startup requires a valid owner email',()=>{
+ const previousEnv=process.env.NODE_ENV,previousFlag=process.env.BOTFORGE_SINGLE_ADMIN,previousEmail=process.env.BOTFORGE_ADMIN_EMAIL,previousJwt=process.env.JWT_SECRET;
+ process.env.JWT_SECRET='single-admin-config-test-secret-with-at-least-thirty-two-characters';
+ const {validateSingleAdminConfig}=require('../server/index');
+ try{
+  process.env.NODE_ENV='production';
+  process.env.BOTFORGE_ADMIN_EMAIL='';
+  assert.throws(()=>validateSingleAdminConfig(),/BOTFORGE_ADMIN_EMAIL must be set/);
+  process.env.BOTFORGE_ADMIN_EMAIL='not-an-email';
+  assert.throws(()=>validateSingleAdminConfig(),/BOTFORGE_ADMIN_EMAIL must be set/);
+  process.env.BOTFORGE_ADMIN_EMAIL='owner@example.com';
+  assert.equal(validateSingleAdminConfig(),true);
+ }finally{if(previousEnv===undefined)delete process.env.NODE_ENV;else process.env.NODE_ENV=previousEnv;if(previousFlag===undefined)delete process.env.BOTFORGE_SINGLE_ADMIN;else process.env.BOTFORGE_SINGLE_ADMIN=previousFlag;if(previousEmail===undefined)delete process.env.BOTFORGE_ADMIN_EMAIL;else process.env.BOTFORGE_ADMIN_EMAIL=previousEmail;if(previousJwt===undefined)delete process.env.JWT_SECRET;else process.env.JWT_SECRET=previousJwt;}
+});
+
+const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const os=require('node:os');
