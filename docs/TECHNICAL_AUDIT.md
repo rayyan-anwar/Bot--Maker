@@ -59,3 +59,43 @@ The GitHub source tree was inspected. This review does not claim that the applic
 The branch now includes initial mitigations for several findings: asynchronous password hashing and stricter input checks; public bot payloads no longer include private instructions; basic API/auth rate limiting, security headers, request-body limits and Origin checks; file-size/signature/extracted-text checks; safe provider error responses; provider adapters for Anthropic/OpenAI/Gemini; server-side daily message caps and token usage records; and user-managed per-bot memory notes.
 
 These are **initial controls**, not a security certification. The JSON store remains unsuitable for multi-instance production, keyword retrieval is not vector RAG, and the new CI workflow must run successfully before merge. Upload parsing still needs isolated worker execution and malware scanning. Rate limiting is in-memory and must move to a shared store before horizontal scaling.
+
+
+## Current upgrade-branch reassessment (17 November 2026)
+
+This section supersedes the earlier baseline statements where the implementation has changed. The original findings above are retained as a historical audit of `main` at the recorded baseline.
+
+### Controls now present in the upgrade branch
+
+- Express JSON body limit, Helmet security headers, request IDs, API/auth rate limits and same-host Origin checks when an Origin header is supplied.
+- Async password hashing, server-derived administrator role, three-failure account lockout, signed sessions with a per-user session version, logout revocation and one-time password reset tokens.
+- Optional Google/GitHub OAuth with signed state and verified email checks. Provider credentials and live callback verification remain unconfigured.
+- Bot ownership checks and public bot serialization that excludes private instructions.
+- Chat message/history limits, pre-call quota reservation, usage event recording and quota release on failed provider calls.
+- Upload byte limits, extension checks and extracted-text limits. These controls do not replace malware scanning or parser isolation.
+- Provider adapters for Anthropic, OpenAI and Gemini; provider calls still need live credential, timeout and failure-mode testing.
+- User-scoped memory routes, explicit memory deletion and opt-in automatic extraction with sensitive-trait exclusions in the extraction prompt.
+- PostgreSQL runtime adapter, migration tooling, quota reservation storage and webhook idempotency foundations.
+- CI tests, syntax checks, dependency audit and heuristic security scanning.
+- Admin-only AI Engineer with bounded source paths, 30 KB patch limit, syntax validation, stale-file SHA check, explicit confirmation and draft-PR-only GitHub writes.
+
+### Current verification evidence
+
+At commit `de39a0fc579942d678e2b92bd53bda5008740df0`, both GitHub Actions workflows completed successfully:
+- BotForge CI: run `44007284375`
+- BotForge AI Patch Validation: run `44007284311`
+
+This evidence applies to that exact code commit. A later documentation-only commit may trigger another CI run; check the PR's current head checks before treating the branch as fully verified. Passing CI does not establish production readiness.
+
+### Remaining high-priority risks
+
+1. **Persistence and concurrency:** JSON remains the default without `DATABASE_URL`. PostgreSQL needs a live managed-database migration, concurrent quota and tenant-isolation tests, and a successful restore drill.
+2. **Rate limiting:** Express rate limits use in-process memory. Use a shared store before multiple instances or workers.
+3. **Request origin/CSRF:** mutation Origin validation currently rejects a supplied cross-origin Origin, but requests without an Origin header are not rejected. Review cookie-authenticated mutation threat models and enforce an explicit deployment-appropriate CSRF policy.
+4. **Uploads:** add malware scanning, strict MIME/signature verification for each accepted format, PDF page/resource ceilings and isolated parsing.
+5. **AI/RAG:** test prompt-injection boundaries, retrieval quality, multilingual documents, citation correctness, provider spend ceilings and concurrent quota enforcement.
+6. **Authentication:** test lockout and session revocation under concurrent requests and across PostgreSQL instances; complete OAuth and email-reset integration tests.
+7. **Billing:** test Stripe and Razorpay subscription lifecycle transitions, retries, duplicate and out-of-order events in provider sandbox environments.
+8. **Privacy and operations:** complete account export/deletion and retention controls, secret/log redaction review, monitoring/alerts, backup restoration, browser E2E, load testing and independent security review.
+
+The application remains a staging/development foundation. Do not label it production-secure or production-ready until the release gates in `docs/SECURITY_AND_RELEASE_CHECKLIST.md` and `docs/STAGING_DEPLOYMENT_RUNBOOK.md` have evidence attached.
