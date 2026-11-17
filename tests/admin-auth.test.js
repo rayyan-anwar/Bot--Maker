@@ -55,6 +55,15 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.equal((await post('/api/auth/password/reset',{token:resetToken,password:'another-password-789'})).status,400);
  assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'new-customer-password-456'})).status,200);
 
+ // Two concurrent requests cannot consume the same reset token twice.
+ const replayToken='c'.repeat(64),replayHash=crypto.createHash('sha256').update(replayToken).digest('hex');
+ await store.updateByIdAsync('users',customer.id,{passwordResetTokenHash:replayHash,passwordResetExpiresAt:new Date(Date.now()+60000).toISOString()});
+ const replayResults=await Promise.all([
+  post('/api/auth/password/reset',{token:replayToken,password:'parallel-reset-password-111'}),
+  post('/api/auth/password/reset',{token:replayToken,password:'parallel-reset-password-222'})
+ ]);
+ assert.deepEqual(replayResults.map(response=>response.status).sort(),[200,400]);
+
  // The reserved administrator is provisioned out-of-band, can access admin APIs,
  // and is subject to the same three-failure lockout policy.
  const bcrypt=require('bcryptjs'),{v4:uuidv4}=require('uuid');
