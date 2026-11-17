@@ -52,5 +52,7 @@ jobs:
         run: npm test
       - name: Check JavaScript syntax
         run: node scripts/check-syntax.js
+      - name: Run heuristic source security scan
+        run: npm run security:scan
       - name: Check PostgreSQL backup and restore shell syntax
         run: bash -n scripts/backup-postgres.sh scripts/restore-postgres.sh
