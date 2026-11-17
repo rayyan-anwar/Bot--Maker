@@ -14,6 +14,16 @@ test('PostgreSQL integration: shared rate limits, atomic login lockout and quota
  const limiter=new PostgresRateLimitStore('integration-'+userId,store.query);
  const reservationIds=[];
  try{
+  await t.test('normalized schema supports OAuth-only accounts and account-wide memory',async()=>{
+   await store.query('INSERT INTO users(id,email,name,password_hash) VALUES($1,$2,$3,$4)',[userId,email,'OAuth integration user',null]);
+   const memoryId=crypto.randomUUID();
+   await store.query('INSERT INTO memory_notes(id,bot_id,user_id,content) VALUES($1,NULL,$2,$3)',[memoryId,userId,'Account-wide profile note']);
+   const result=await store.query('SELECT bot_id,content FROM memory_notes WHERE id=$1',[memoryId]);
+   assert.equal(result.rowCount,1);
+   assert.equal(result.rows[0].bot_id,null);
+   assert.equal(result.rows[0].content,'Account-wide profile note');
+   await store.query('DELETE FROM users WHERE id=$1',[userId]);
+  });
   await t.test('shared rate limit increments are atomic across concurrent requests',async()=>{
    await limiter.init({windowMs:60000});
    const hits=await Promise.all(Array.from({length:40},()=>limiter.increment('client')));
