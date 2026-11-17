@@ -4,6 +4,8 @@ const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 const suiteDir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-doc-suite-'));
+process.env.NODE_ENV='test';
+process.env.JWT_SECRET='upload-limit-test-secret-with-at-least-thirty-two-characters';
 process.env.BOTFORGE_DATA_FILE=path.join(suiteDir,'db.json');
 const {extractText}=require('../server/documents');
 
