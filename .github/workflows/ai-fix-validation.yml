@@ -1,17 +1,8 @@
 name: BotForge AI Patch Validation
 
 on:
-  pull_request:
-    branches:
-      - main
-      - botforge-production-upgrade
-    paths:
-      - "server/**"
-      - "tests/**"
-      - "scripts/**"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/**"
+  # Full PR verification is handled by BotForge CI. Keep this isolated patch
+  # validator available for deliberate manual runs to avoid duplicate CI queues.
   workflow_dispatch:
 
 permissions:
