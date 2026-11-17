@@ -52,3 +52,17 @@ test('migration preflight rejects malformed document chunks',()=>{
  const data=fixture();data.documents[0].chunks='not-an-array';
  assert.throws(()=>validateData(data),/document chunks must be an array/);
 });
+
+
+test('migration preflight accepts OAuth-only accounts and account-wide profile memory',()=>{
+ const data=fixture();
+ data.users[0].passwordHash=null;
+ data.users[0].oauthProviders={google:'google-subject-123'};
+ data.memory.push({id:randomUUID(),botId:null,userId:data.users[0].id,content:'Prefers concise answers',kind:'profile',createdAt:new Date().toISOString()});
+ assert.deepEqual(validateData(data),{users:1,bots:1,documents:1,messages:1,usage:1,memory:2});
+});
+
+test('migration preflight rejects accounts with neither password nor OAuth identity',()=>{
+ const data=fixture();data.users[0].passwordHash=null;
+ assert.throws(()=>validateData(data),/password hash or a linked OAuth identity/);
+});
