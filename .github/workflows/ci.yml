@@ -1,9 +1,16 @@
 name: BotForge CI
 on:
   push:
-    branches: [main, botforge-production-upgrade]
+    branches: [main]
   pull_request:
     branches: [main]
+
+# A branch update already triggers the open pull_request workflow. Avoid a second
+# run for the same commit and cancel stale runs when newer commits arrive.
+concurrency:
+  group: botforge-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
