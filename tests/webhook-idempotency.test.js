@@ -16,5 +16,5 @@ test('webhook event claims are idempotent, provider-scoped, and retryable after 
  assert.equal(await store.claimWebhookEvent('razorpay','evt_duplicate_test'),true);
  await store.releaseWebhookEvent('stripe','evt_duplicate_test');
  assert.equal(await store.claimWebhookEvent('stripe','evt_duplicate_test'),true);
- assert.equal(await store.claimWebhookEvent('stripe',''),false);
+ await assert.rejects(()=>store.claimWebhookEvent('stripe',''),/Invalid webhook event identity/);
 });
