@@ -117,7 +117,7 @@
   function botCard(bot, isOwn) {
     const tag = isOwn ? (bot.isPublic ? 'Public' : 'Private') : 'Public · by someone else';
     return `
-      <a class="bot-card" href="/bot.html?id=${bot.id}">
+      <a class="bot-card" href="/bot.html?id=${encodeURIComponent(bot.id)}">
         <h3>${escapeHtml(bot.name)}</h3>
         <p>${escapeHtml(bot.description || 'No description yet.')}</p>
         <span class="tag">${tag}</span>
