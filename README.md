@@ -1,15 +1,14 @@
 # BotForge
 
-BotForge is a self-hosted platform for creating, configuring and chatting with custom AI bots. Users can attach reference documents, choose a configured AI provider, manage personal memory and use public or private bots.
+BotForge is a self-hosted, single-administrator workspace for creating, configuring and chatting with custom AI bots. The production configuration is owner-only; public account registration, customer login and social sign-in are disabled.
 
 > **Status:** Development / staging foundation. The upgrade branch has automated CI, but BotForge is **not production-certified or publicly deployed**. Real provider, OAuth, email, payment and managed-database integrations still require operator configuration and end-to-end testing.
 
 ## Current capabilities
 
-- Email/password signup, login, logout and session invalidation.
-- One reserved administrator identity configured server-side with `BOTFORGE_ADMIN_EMAIL`; public signup and OAuth cannot claim the admin identity.
+- Single configured administrator identity with server-enforced owner-only access in production.
+- Public signup, non-admin login, OAuth and self-service password recovery are disabled in production; test/development mode can exercise multi-account flows.
 - Account lockout after three failed password attempts. Admin recovery is an out-of-band operator action.
-- Optional Google and GitHub OAuth with signed state validation and verified-email checks.
 - Custom bots with private instructions, owner-only editing and optional public discovery.
 - Document uploads for TXT, Markdown and PDF, with file-size and extracted-text limits.
 - Chat adapters for Anthropic Claude, OpenAI and Google Gemini. A provider must have a server-side API key configured.
@@ -37,15 +36,16 @@ BotForge is a self-hosted platform for creating, configuring and chatting with c
    ```
 3. Copy `.env.example` to `.env`.
 4. Set a unique `JWT_SECRET` of at least 32 characters and configure `BOTFORGE_ADMIN_EMAIL`.
-5. Configure at least one provider key:
+5. Create the administrator once with the secure bootstrap command below. Production login rejects every other account.
+6. Configure at least one provider key:
    - `ANTHROPIC_API_KEY`
    - `OPENAI_API_KEY`
    - `GOOGLE_GEMINI_API_KEY`
-6. Start the app:
+7. Start the app:
    ```bash
    npm start
    ```
-7. Open `http://localhost:3000`.
+8. Open `http://localhost:3000`.
 
 The server refuses to start without a sufficiently long `JWT_SECRET`. Without `DATABASE_URL`, the app uses its JSON development store. Do not use that store for a public multi-instance service.
 
@@ -70,8 +70,7 @@ See [`.env.example`](.env.example) for the complete list. Common settings:
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GEMINI_API_KEY` | Optional provider credentials; configure only providers you will enable |
 | `DATABASE_URL` | Optional PostgreSQL connection; absent means JSON development storage |
 | `FREE_DAILY_MESSAGES`, `BOTFORGE_PLANS_JSON` | Usage quota configuration |
-| `GOOGLE_CLIENT_ID`, `GITHUB_CLIENT_ID` and matching secrets/redirect URIs | Optional social sign-in |
-| `RESEND_API_KEY`, `BOTFORGE_EMAIL_FROM`, `PUBLIC_BASE_URL` | Optional customer password-reset email delivery |
+
 | `STRIPE_* `, `RAZORPAY_* ` | Optional subscription billing configuration |
 | `BOTFORGE_GITHUB_TOKEN`, `BOTFORGE_GITHUB_WRITE_TOKEN` | Optional AI Engineer GitHub integration; separate least-privilege tokens |
 
