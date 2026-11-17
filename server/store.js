@@ -118,7 +118,7 @@ async function recordFailedLoginAttempt(userId,maxAttempts=3){
  }
  await initialize();
  const result=await pool.query(
-  "UPDATE botforge_records SET data=data || jsonb_build_object('failedLoginAttempts',LEAST($2::int,COALESCE((data->>'failedLoginAttempts')::int,0)+1),'lockedAt',CASE WHEN COALESCE((data->>'failedLoginAttempts')::int,0)+1 >= $2::int THEN COALESCE(data->'lockedAt',to_jsonb(now()::text)) ELSE COALESCE(data->'lockedAt','null'::jsonb) END),updated_at=now() WHERE collection='users' AND id=$1 RETURNING (data->>'failedLoginAttempts')::int AS attempts,data->>'lockedAt' AS locked_at",
+  "UPDATE botforge_records SET data=data || jsonb_build_object('failedLoginAttempts',LEAST($2::int,COALESCE((data->>'failedLoginAttempts')::int,0)+1),'lockedAt',CASE WHEN COALESCE((data->>'failedLoginAttempts')::int,0)+1 >= $2::int THEN to_jsonb(COALESCE(NULLIF(data->>'lockedAt',''),now()::text)) ELSE COALESCE(data->'lockedAt','null'::jsonb) END),updated_at=now() WHERE collection='users' AND id=$1 RETURNING (data->>'failedLoginAttempts')::int AS attempts,data->>'lockedAt' AS locked_at",
   [userId,maxAttempts]
  );
  if(!result.rowCount)return null;
