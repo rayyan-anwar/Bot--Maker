@@ -11,7 +11,7 @@ const RULES = [
   { id: 'dynamic-code', severity: 'high', pattern: /\beval\s*\(|\bnew\s+Function\s*\(/g, message: 'Dynamic code execution primitive found; review whether input can be influenced externally.' },
   { id: 'shell-execution', severity: 'high', pattern: /\bexec(?:Sync)?\s*\(|\bspawn(?:Sync)?\s*\([^\n]{0,240}shell\s*:\s*true/g, message: 'Shell/process execution primitive found; verify arguments are never user-controlled.' },
   { id: 'disabled-tls', severity: 'critical', pattern: /rejectUnauthorized\s*:\s*false/g, message: 'TLS certificate verification is disabled.' },
-  { id: 'insecure-http', severity: 'medium', pattern: /https?:\/\/(?!localhost\b|127\.0\.0\.1\b)[A-Za-z0-9.-]+/g, message: 'Plain HTTP URL found; verify this is not a production endpoint.' }
+  { id: 'insecure-http', severity: 'medium', pattern: /http:\/\/(?!localhost\b|127\.0\.0\.1\b)[A-Za-z0-9.-]+/g, message: 'Plain HTTP URL found; verify this is not a production endpoint.' }
 ];
 
 function scanText(source, file = '<memory>') {
