@@ -28,3 +28,42 @@ jobs:
       - run: node scripts/check-syntax.js
       - run: npm run security:scan
       - run: bash -n scripts/backup-postgres.sh scripts/restore-postgres.sh
+
+  postgres-integration:
+    name: PostgreSQL 16 integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: botforge_test
+          POSTGRES_USER: botforge
+          POSTGRES_PASSWORD: botforge_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U botforge -d botforge_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --ignore-scripts
+      - name: Apply baseline and runtime migrations
+        env:
+          PGPASSWORD: botforge_test_password
+        run: |
+          psql -h 127.0.0.1 -U botforge -d botforge_test -v ON_ERROR_STOP=1 -f migrations/001_initial_schema.sql
+          psql -h 127.0.0.1 -U botforge -d botforge_test -v ON_ERROR_STOP=1 -f migrations/002_runtime_records.sql
+      - name: Exercise PostgreSQL concurrency and shared rate limits
+        env:
+          BOTFORGE_TEST_DATABASE_URL: postgres://botforge:botforge_test_password@127.0.0.1:5432/botforge_test
+        run: node --test tests/postgres.integration.test.js
