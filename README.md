@@ -1,210 +1,131 @@
-# BotForge — Build. Train. Deploy. Your AI.
+# BotForge
 
-BotForge is evolving from a small web app where people sign up, create their own custom AI bots (name +
-personality instructions + optional reference documents), and chat with them
-— or make them public so other users can chat with them too.
+BotForge is a self-hosted platform for creating, configuring and chatting with custom AI bots. Users can attach reference documents, choose a configured AI provider, manage personal memory and use public or private bots.
 
-## What's inside
+> **Status:** Development / staging foundation. The upgrade branch has automated CI, but BotForge is **not production-certified or publicly deployed**. Real provider, OAuth, email, payment and managed-database integrations still require operator configuration and end-to-end testing.
 
-- **Accounts** — signup/login with hashed passwords, session cookies
-- **Bot builder** — each user creates bots with a name, description, and
-  instructions (a system prompt)
-- **Document upload** — attach `.txt`, `.md`, or `.pdf` files to a bot; the
-  bot searches them with keyword retrieval by default; optional OpenAI embeddings enable hybrid semantic + keyword retrieval
-- **Chat** — talks to the bot using the Claude API, with the bot's
-  instructions + relevant document snippets + conversation history
-- **Public/private bots** — keep a bot to yourself, or let other signed-up
-  users find and chat with it
+## Current capabilities
 
-It's built with plain Node.js + Express on the backend, and plain HTML/CSS/JS
-on the frontend — no build step, no framework to install.
+- Email/password signup, login, logout and session invalidation.
+- One reserved administrator identity configured server-side with `BOTFORGE_ADMIN_EMAIL`; public signup and OAuth cannot claim the admin identity.
+- Account lockout after three failed password attempts. Admin recovery is an out-of-band operator action.
+- Optional Google and GitHub OAuth with signed state validation and verified-email checks.
+- Custom bots with private instructions, owner-only editing and optional public discovery.
+- Document uploads for TXT, Markdown and PDF, with file-size and extracted-text limits.
+- Chat adapters for Anthropic Claude, OpenAI and Google Gemini. A provider must have a server-side API key configured.
+- User-managed account-wide memory, per-bot memory notes and opt-in automatic memory extraction.
+- Daily usage limits, usage records and configurable Free / Plus / Pro plans.
+- PostgreSQL runtime storage and JSON-to-PostgreSQL import tooling; JSON storage remains the local development default.
+- Stripe and Razorpay subscription foundations with signature verification and webhook event idempotency.
+- Admin dashboard, heuristic source security scanner, AI Engineer proposal workflow and draft-PR creation.
+- Docker staging configuration, health/readiness endpoints, backup/restore scripts and deployment documentation.
+- Responsive interface with dark/light theme support.
 
-Data is stored in a single JSON file (`data/db.json`) rather than a real
-database. That's intentional for an MVP: nothing to install or configure,
-and it's easy to swap out later (see "Growing past this" below).
+## Requirements
 
-## 1. Get an Anthropic API key
+- Node.js 18 or newer (Node.js 20 or 22 recommended).
+- npm.
+- An API key for at least one provider to use AI chat.
+- PostgreSQL for persistent multi-instance staging or production-like testing.
 
-Your bots need this to actually think and respond.
+## Run locally
 
-1. Go to **https://console.anthropic.com** and sign up / log in.
-2. Go to **Settings → API Keys** and create a new key.
-3. Add credit to the account (Settings → Billing) — the API is pay-as-you-go,
-   separate from any Claude.ai subscription.
-4. Copy the key (starts with `sk-ant-...`) — you'll need it in step 3 below.
+1. Clone this repository and check out the intended branch.
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Copy `.env.example` to `.env`.
+4. Set a unique `JWT_SECRET` of at least 32 characters and configure `BOTFORGE_ADMIN_EMAIL`.
+5. Configure at least one provider key:
+   - `ANTHROPIC_API_KEY`
+   - `OPENAI_API_KEY`
+   - `GOOGLE_GEMINI_API_KEY`
+6. Start the app:
+   ```bash
+   npm start
+   ```
+7. Open `http://localhost:3000`.
 
-## 2. Install Node.js (if you don't have it)
+The server refuses to start without a sufficiently long `JWT_SECRET`. Without `DATABASE_URL`, the app uses its JSON development store. Do not use that store for a public multi-instance service.
 
-You need Node.js 18 or newer. Check with:
+## Create the administrator
 
-```bash
-node -v
-```
-
-If that fails or shows an older version, install it from **https://nodejs.org**
-(the LTS version).
-
-## 3. Set up and run locally
-
-```bash
-cd ai-bot-platform
-npm install
-cp .env.example .env
-```
-
-Open `.env` in a text editor and fill in:
-
-```
-ANTHROPIC_API_KEY=sk-ant-...        # the key from step 1
-JWT_SECRET=...                       # any long random string
-```
-
-To generate a random `JWT_SECRET`, run:
+Set `BOTFORGE_ADMIN_EMAIL` and a temporary `BOTFORGE_ADMIN_PASSWORD` (16–128 characters) in a protected shell or secret manager, then run:
 
 ```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+npm run admin:create
 ```
 
-and paste the output in.
+Remove the temporary bootstrap password immediately afterwards. The administrator role is derived from the configured email on the server. Do not create admin accounts through public signup. If admin password recovery is needed, use the documented operator reset procedure and a secure shell.
 
-Then start the server:
+## Environment configuration
 
-```bash
-npm start
-```
+See [`.env.example`](.env.example) for the complete list. Common settings:
 
-Open **http://localhost:3000** in your browser. Sign up, create a bot, and
-chat with it.
+| Variable | Purpose |
+| --- | --- |
+| `JWT_SECRET` | Required signing secret, at least 32 characters |
+| `BOTFORGE_ADMIN_EMAIL` | Single reserved administrator identity |
+| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GEMINI_API_KEY` | Optional provider credentials; configure only providers you will enable |
+| `DATABASE_URL` | Optional PostgreSQL connection; absent means JSON development storage |
+| `FREE_DAILY_MESSAGES`, `BOTFORGE_PLANS_JSON` | Usage quota configuration |
+| `GOOGLE_CLIENT_ID`, `GITHUB_CLIENT_ID` and matching secrets/redirect URIs | Optional social sign-in |
+| `RESEND_API_KEY`, `BOTFORGE_EMAIL_FROM`, `PUBLIC_BASE_URL` | Optional customer password-reset email delivery |
+| `STRIPE_* `, `RAZORPAY_* ` | Optional subscription billing configuration |
+| `BOTFORGE_GITHUB_TOKEN`, `BOTFORGE_GITHUB_WRITE_TOKEN` | Optional AI Engineer GitHub integration; separate least-privilege tokens |
 
-## 4. Put it online so other people can use it
+**Never commit secrets or put them in browser code, issue comments or chat.** Use the hosting provider's secret manager or protected environment variables.
 
-Any Node.js hosting service works. Two easy, free-to-start options:
+## PostgreSQL staging
 
-**Render** (https://render.com)
-1. Push this folder to a GitHub repo.
-2. In Render: New → Web Service → connect the repo.
-3. Build command: `npm install`. Start command: `npm start`.
-4. Under Environment, add `ANTHROPIC_API_KEY` and `JWT_SECRET` (same values
-   as your `.env`).
-5. Deploy. Render gives you a public URL.
-
-**Railway** (https://railway.app)
-1. Push this folder to a GitHub repo.
-2. New Project → Deploy from GitHub repo.
-3. Add the same two environment variables under Variables.
-4. Railway builds and deploys automatically, and gives you a public URL.
-
-Either way, people can then go to that URL, sign up, and make their own bots.
-
-### Important: file storage on hosting services
-
-This app saves data to local files (`data/db.json` and nothing persistent
-for uploads, since document text is extracted into that same JSON file).
-Some hosting services wipe the local disk on every deploy or restart
-("ephemeral" storage) — Render's free tier does this. That means your users'
-accounts and bots could vanish on a redeploy.
-
-For anything beyond testing with friends, either:
-- Use a host with a persistent disk (Render's paid "Disk" add-on, Railway's
-  volumes), or
-- Upgrade the storage layer to a real database (see below) and use a free
-  one like Neon or Supabase (Postgres) or MongoDB Atlas.
-
-## Database migration preparation
-
-The repository includes a PostgreSQL baseline schema and a transactional importer. The importer seeds both normalized reporting tables and the JSONB runtime repository. After a successful import, configure the same `DATABASE_URL` for the application and it will use PostgreSQL automatically. Without `DATABASE_URL`, it uses the local JSON development adapter.
-
-Before running an import, create a PostgreSQL database with the `pgcrypto` extension available, take a separate backup of `data/db.json`, and configure `DATABASE_URL`. Then run:
+For an existing JSON dataset, back up `data/db.json` before migration. Configure `DATABASE_URL`, then review the [staging runbook](docs/STAGING_DEPLOYMENT_RUNBOOK.md) before running:
 
 ```bash
-npm install
-cp .env.example .env
-# Set DATABASE_URL in .env, then:
 npm run migrate:postgres
 ```
 
-The import runs in a database transaction and records a one-time migration marker. Re-running it after success exits without importing again. Keep the JSON backup unchanged until row counts and application-level behavior have been independently verified. The importer does not copy uploaded originals or provide dual-write. Keep the original JSON backup until database row counts and app behavior have been verified.
+The importer records a migration marker. Keep the original backup until row counts, application behavior and a restore drill have been verified. The migration does not transfer original uploaded files.
 
-## Growing past this
+For local PostgreSQL staging, see `docker-compose.staging.yml` and the staging runbook. Do not treat the staging compose stack as a production deployment recipe.
 
-This is an MVP foundation, not a finished commercial service. The PostgreSQL JSONB repository is now wired into application routes. The application exposes `/healthz` for liveness and `/readyz` for database readiness. Tenant-scoped repository queries now filter at the storage layer rather than loading every tenant's records into route handlers. Optional hybrid retrieval is implemented with OpenAI embeddings and a keyword fallback; it is opt-in and stores vectors with document chunks. Remaining work includes automatic memory, configurable plan enforcement, billing, email verification/password recovery, live PostgreSQL staging, production secrets, monitoring, backups and security/load testing.
+## Tests and verification
 
-## Project structure
-
-```
-server/
-  index.js        — starts the server, wires up routes
-  store.js         — all data reads/writes (swap this for a real DB later)
-  auth.js           — signup/login/logout/session handling
-  bots.js            — create/edit/delete/list bots
-  documents.js         — upload & manage reference documents per bot
-  retrieval.js          — splits documents into chunks, finds relevant ones
-  chat.js                — talks to the Claude API
-
-public/
-  index.html       — login / signup
-  dashboard.html     — list your bots + browse public bots
-  bot.html              — chat with a bot + (if you own it) settings/docs
-  css/style.css           — all styling
-  js/api.js                — small shared fetch helper
-
-data/db.json        — all app data lives here (auto-created on first run)
-uploads/              — temp folder used while processing an upload (files
-                         are deleted right after their text is extracted)
+```bash
+npm test
+node scripts/check-syntax.js
+npm run security:scan
+bash -n scripts/backup-postgres.sh scripts/restore-postgres.sh
 ```
 
+GitHub Actions runs the test suite, syntax checks, heuristic security scan, production dependency audit and backup/restore shell checks. A green workflow only verifies the checks defined in CI; it is not a penetration test or production certification.
 
-## BotForge product direction
+## AI Engineer safety boundary
 
-The current repository is an evolving MVP with implemented account, bot-building, multi-provider, memory, usage, PostgreSQL and subscription foundations. The technical audit, security gates, interface specification and phased roadmap are documented in:
+The AI Engineer is admin-only and proposal-first. It can inspect CI metadata, request a bounded source-file proposal from a configured AI provider, and, after a separate explicit admin confirmation, create an isolated branch and draft pull request. It does **not** merge pull requests, deploy, run generated application code on the server or autonomously modify production. Review [AI Engineer operations](docs/AI_ENGINEER_OPERATIONS.md) and grant only the documented repository permissions.
+
+## Documentation
 
 - [Technical audit](docs/TECHNICAL_AUDIT.md)
 - [Production roadmap](docs/PRODUCTION_ROADMAP.md)
-- [Product and business strategy](docs/PRODUCT_STRATEGY.md)
-- [UI/UX specification](docs/UX_UI_SPEC.md)
 - [Security and release checklist](docs/SECURITY_AND_RELEASE_CHECKLIST.md)
 - [Staging deployment runbook](docs/STAGING_DEPLOYMENT_RUNBOOK.md)
-- Admin dashboard: `/admin.html` (requires `BOTFORGE_ADMIN_EMAILS`)
-- PostgreSQL staging stack: `docker-compose.staging.yml`
-- PostgreSQL backup/restore: `npm run backup:postgres` and `npm run restore:postgres` (restore requires explicit confirmation)
-- Plan and checkout page: `/billing.html` (Stripe and optional Razorpay configuration; Razorpay subscription plans must be created in the Razorpay Dashboard)
+- [AI Engineer specification](docs/AI_ENGINEER_SPEC.md)
+- [AI Engineer operations](docs/AI_ENGINEER_OPERATIONS.md)
+- [Product strategy](docs/PRODUCT_STRATEGY.md)
+- [UI/UX specification](docs/UX_UI_SPEC.md)
 
-**Important:** implemented code is not the same as a verified production service. PostgreSQL runtime support, provider adapters, retrieval embeddings and Stripe/Razorpay subscription integrations require operator credentials and live staging tests. JSON remains the local development default.
+## Known limitations before public launch
 
-### Competitor references
+- No hosting, custom domain, production database, storage service or monitoring has been provisioned by this repository work.
+- OAuth, email delivery, live AI provider calls and billing have not been end-to-end tested with operator credentials.
+- PostgreSQL migration and runtime need a live managed-database rehearsal, concurrency testing and restore drill.
+- Rate limiting is process-local and needs a shared backing store before horizontal scaling.
+- PDF parsing needs stronger resource isolation and malware scanning before accepting untrusted public uploads.
+- The heuristic scanner is not a substitute for a professional security review.
+- Privacy policy, terms, retention/deletion/export workflows, billing disclosures and ad-network integration need completion and review before a commercial launch.
+- The current ad-related UI is placeholder-only; no ad network or revenue is connected.
 
-- [Botpress pricing and plans](https://botpress.com/pricing)
-- [Dify product and open-source platform](https://dify.ai/)
-- [Voiceflow documentation](https://www.voiceflow.com/docs)
+## License
 
-## Current upgrade branch implementation
-
-The `botforge-production-upgrade` branch now also includes:
-- Anthropic, OpenAI Responses API and Google Gemini provider adapters, with current default model IDs configurable through environment variables.
-- Server-side daily message quota and token usage event recording (MVP JSON store).
-- Account-wide personal AI memory profile shared across the user's bots/providers, plus per-bot editable notes and opt-in automatic extraction.
-- Configurable Free/Plus/Pro daily message quotas and allowlisted admin endpoints to assign plans.
-- Stripe and Razorpay subscription checkout/webhook integrations (require operator credentials, configured provider plans/prices and live webhook testing).
-- Provider choice during bot creation.
-- Private bot instructions excluded from public bot responses.
-- Request size/rate controls, security headers, origin checks, safer auth validation and upload bounds.
-- PostgreSQL JSONB runtime repository, PostgreSQL baseline schema and transactional JSON importer (live managed-database verification still pending).
-- Basic retrieval unit tests and CI syntax-check workflow.
-
-**Still not production-ready:** PostgreSQL runtime support is implemented but has not yet been tested against a live managed PostgreSQL database; retrieval supports optional OpenAI embedding generation and hybrid semantic/keyword ranking when `BOTFORGE_EMBEDDINGS_ENABLED=true` and an OpenAI API key is configured; no pgvector index or large-scale vector infrastructure is implemented; there is no admin web console, workspace/role system, streaming or completed live database/security/load test. Stripe and Razorpay checkout/webhook code is implemented but cannot be live-verified until the operator configures provider credentials, plan/price IDs and webhook secrets. Razorpay webhook endpoint: `POST /api/billing/razorpay/webhook`. Provider credentials must be configured by the operator in environment variables before each provider can be used.
-
-### Current model references
-- Anthropic model overview: https://platform.claude.com/docs/en/models/overview
-- OpenAI model guidance: https://developers.openai.com/api/docs/guides/model-selection
-- Gemini model catalog: https://ai.google.dev/gemini-api/docs/models
-
-
-## Public accounts, admin separation and advertising
-
-- The public login page supports email/password signup and login. New accounts receive the Free plan.
-- The configured `BOTFORGE_ADMIN_EMAIL` is reserved and cannot be claimed through public signup. Bootstrap the administrator separately with `npm run admin:create`.
-- Public users can access their own workspace and public bots. The administrator dashboard and APIs remain protected by server-side administrator identity checks.
-- Accounts are locked after three incorrect password attempts. Unlock/reset is a server-side administrator operation.
-- Login/signup advert and workspace/chat ad slots are placeholders only. No advertising network is active and no revenue is generated until an ad provider account is approved and its publisher code is configured.
-- Google and GitHub OAuth buttons are displayed as pending integration and do not authenticate yet. Configure OAuth applications, callback URLs, verified email handling and secrets before enabling them. Instagram is not a general-purpose consumer login provider for arbitrary third-party apps; do not promise Instagram sign-in unless Meta offers an eligible supported product for the intended account type.
-- Do not place ads inside private chat content or use private prompts, files, memories or conversations for ad targeting. Keep placements clearly labelled and respect consent and applicable advertising/privacy rules.
+No license is currently declared. All rights are reserved unless a license is added by the repository owner.
