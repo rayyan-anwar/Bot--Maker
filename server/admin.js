@@ -63,7 +63,7 @@ router.post('/engineer/create-draft-pr',async(req,res,next)=>{
   const read=await fetch(api+'/contents/'+filePath.split('/').map(encodeURIComponent).join('/')+'?ref='+encodeURIComponent(baseBranch),{headers:readHeaders,signal:AbortSignal.timeout(12000)});
   if(!read.ok)return res.status(503).json({error:'Could not verify the base file. No pull request was created.'});
   const current=await read.json();if(current.sha!==baseSha)return res.status(409).json({error:'The source file changed after the proposal was generated. Generate a fresh proposal before creating a draft PR.'});
-  const refResponse=await fetch(api+'/git/ref/heads/'+encodeURIComponent(baseBranch),{headers,signal:AbortSignal.timeout(12000)});
+  const refResponse=await fetch(api+'/git/ref/heads/'+encodeURIComponent(baseBranch),{headers:readHeaders,signal:AbortSignal.timeout(12000)});
   if(!refResponse.ok)return res.status(503).json({error:'Could not read the base branch reference.'});
   const refData=await refResponse.json(),headSha=refData.object?.sha;
   if(!/^[a-f0-9]{40}$/i.test(String(headSha||'')))return res.status(502).json({error:'GitHub returned an invalid base commit.'});
