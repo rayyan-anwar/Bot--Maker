@@ -23,7 +23,17 @@ test('chat turn persistence stores both messages and usage as one unit',async()=
 });
 
 
-test('readiness health reports the active JSON development adapter',async()=>{const result=await store.health();assert.deepEqual(result,{ok:true,database:'json-development'});});
+
+test('concurrent failed logins increment the lockout counter atomically',async()=>{
+ const id='12121212-1212-4212-8212-121212121212';
+ await store.insertAsync('users',{id,email:'parallel-lock@example.test',name:'Parallel',passwordHash:'unused',failedLoginAttempts:0});
+ const outcomes=await Promise.all(Array.from({length:8},()=>store.recordFailedLoginAttempt(id,3)));
+ assert.equal(outcomes.filter(x=>x.locked).length,6);
+ const user=await store.findByIdAsync('users',id);
+ assert.equal(user.failedLoginAttempts,3);
+ assert.ok(user.lockedAt);
+});
+\ntest('readiness health reports the active JSON development adapter',async()=>{const result=await store.health();assert.deepEqual(result,{ok:true,database:'json-development'});});
 
 
 test('bot deletion atomically removes dependent records in JSON storage',async()=>{
