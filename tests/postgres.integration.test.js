@@ -8,7 +8,7 @@ test('PostgreSQL integration: shared rate limits, atomic login lockout and quota
  process.env.PGSSL='disable';
  const store=require('../server/store');
  const {PostgresRateLimitStore}=require('../server/rate-limit-store');
- await store.initialize();
+ await Promise.all(Array.from({length:12},()=>store.initialize()));
  const userId=crypto.randomUUID();
  const email='pg-integration-'+userId+'@example.test';
  const limiter=new PostgresRateLimitStore('integration-'+userId,store.query);
