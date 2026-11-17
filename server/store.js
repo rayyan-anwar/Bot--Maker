@@ -52,6 +52,13 @@ async function findByIdAsync(c,id){assertCollection(c);if(!isUuid(id))return nul
 async function insertAsync(c,record){assertCollection(c);if(!isPostgres()){if(c==='users'&&all('users').some(u=>String(u.email).toLowerCase()===String(record.email).toLowerCase())){const e=new Error('Duplicate user email.');e.code='23505';throw e;}return insert(c,record);}await initialize();await pool.query('INSERT INTO botforge_records(collection,id,data) VALUES($1,$2,$3::jsonb)',[c,record.id,JSON.stringify(record)]);return record;}
 async function updateByIdAsync(c,id,patch){assertCollection(c);if(!isUuid(id))return null;if(!isPostgres())return updateById(c,id,patch);await initialize();const r=await pool.query("UPDATE botforge_records SET data=data || $3::jsonb,updated_at=now() WHERE collection=$1 AND id=$2 RETURNING data",[c,id,JSON.stringify(patch)]);return r.rowCount?r.rows[0].data:null;}
 async function deleteByIdAsync(c,id){assertCollection(c);if(!isUuid(id))return false;if(!isPostgres())return deleteById(c,id);await initialize();const r=await pool.query('DELETE FROM botforge_records WHERE collection=$1 AND id=$2',[c,id]);return r.rowCount>0;}
+async function findUserByPasswordResetTokenHash(tokenHash){
+ if(typeof tokenHash!=='string'||!tokenHash)return null;
+ if(!isPostgres())return all('users').find(row=>row.passwordResetTokenHash===tokenHash)||null;
+ await initialize();
+ const result=await pool.query("SELECT data FROM botforge_records WHERE collection='users' AND data->>'passwordResetTokenHash'=$1 LIMIT 1",[tokenHash]);
+ return result.rowCount?result.rows[0].data:null;
+}
 async function consumePasswordResetToken(tokenHash,patch){
  if(typeof tokenHash!=='string'||!tokenHash) return null;
  if(!isPostgres()){
