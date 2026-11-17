@@ -85,7 +85,7 @@ router.post('/password/forgot',async(req,res,next)=>{
   const from=String(process.env.BOTFORGE_EMAIL_FROM||''),base=String(process.env.PUBLIC_BASE_URL||'').replace(/\/$/,'');
   if(!process.env.RESEND_API_KEY||!from||!/^https:\/\//i.test(base))return res.status(202).json({message:'If an eligible account exists, password reset instructions will be sent.'});
   const user=(await store.findManyAsync('users',{email}))[0];
-  if(!user)return res.status(202).json({message:'If an eligible account exists, password reset instructions will be sent.'});
+  if(!user||isAdminEmail(user.email))return res.status(202).json({message:'If an eligible account exists, password reset instructions will be sent.'});
   const token=crypto.randomBytes(32).toString('hex'),tokenHash=crypto.createHash('sha256').update(token).digest('hex'),expires=new Date(Date.now()+20*60*1000).toISOString();
   await store.updateByIdAsync('users',user.id,{passwordResetTokenHash:tokenHash,passwordResetExpiresAt:expires});
   const link=base+'/reset-password.html?token='+token;
@@ -101,7 +101,7 @@ router.post('/password/reset',async(req,res,next)=>{
   const token=String(req.body?.token||''),password=req.body?.password;
   if(!/^[a-f0-9]{64}$/.test(token)||typeof password!=='string'||password.length<10||password.length>128)return res.status(400).json({error:'Enter a valid reset link and a password of 10–128 characters.'});
   const hash=crypto.createHash('sha256').update(token).digest('hex'),users=await store.allAsync('users'),user=users.find(u=>u.passwordResetTokenHash===hash&&u.passwordResetExpiresAt&&Date.parse(u.passwordResetExpiresAt)>Date.now());
-  if(!user)return res.status(400).json({error:'This password reset link is invalid or expired. Request a new one.'});
+  if(!user||isAdminEmail(user.email))return res.status(400).json({error:'This password reset link is invalid or expired. Request a new one.'});
   await store.updateByIdAsync('users',user.id,{passwordHash:await bcrypt.hash(password,12),failedLoginAttempts:0,lockedAt:null,passwordResetTokenHash:null,passwordResetExpiresAt:null,passwordChangedAt:new Date().toISOString()});
   return res.json({ok:true,message:'Password reset successful. You can now sign in.'});
  }catch(e){next(e);}
