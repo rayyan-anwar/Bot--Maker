@@ -39,6 +39,16 @@ test('PostgreSQL integration: shared rate limits, atomic login lockout and quota
    assert.equal(user.failedLoginAttempts,3);
    assert.ok(user.lockedAt);
   });
+  await t.test('password reset tokens are consumed only once under concurrency',async()=>{
+   const tokenHash=crypto.createHash('sha256').update('one-time-reset-token').digest('hex');
+   await store.updateByIdAsync('users',userId,{passwordResetTokenHash:tokenHash,passwordResetExpiresAt:new Date(Date.now()+60000).toISOString(),sessionVersion:0});
+   const results=await Promise.all([
+    store.consumePasswordResetToken(tokenHash,{passwordResetTokenHash:null,passwordResetExpiresAt:null,sessionVersion:1}),
+    store.consumePasswordResetToken(tokenHash,{passwordResetTokenHash:null,passwordResetExpiresAt:null,sessionVersion:1})
+   ]);
+   assert.equal(results.filter(Boolean).length,1);
+   assert.equal(results.filter(x=>x===null).length,1);
+  });
   await t.test('concurrent quota reservations never exceed the daily limit',async()=>{
    const day=new Date().toISOString().slice(0,10);
    const results=await Promise.all(Array.from({length:8},async()=>{
