@@ -79,7 +79,7 @@ test('text extraction rejects a PDF renamed with a text extension',async()=>{
 });
 
 test('text extraction rejects unsupported control characters',async()=>{
- await withFile('control.md',Buffer.from('safe text\\x01unsafe','utf8'),async file=>{
+ await withFile('control.md',Buffer.from('safe text'+String.fromCharCode(1)+'unsafe','utf8'),async file=>{
   await assert.rejects(()=>extractText(file,'control.md'),/control characters/);
  });
 });
