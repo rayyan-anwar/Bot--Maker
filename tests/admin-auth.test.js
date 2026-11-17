@@ -73,7 +73,7 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.equal(scanResult.ok,true);
  assert.ok(scanResult.filesScanned>0);
  // The endpoint is deliberately rate-limited to protect CPU on repeated scans.
- for(let i=0;i<5;i++) assert.equal((await fetch(base+'/api/admin/engineer/security-scan',{headers:{cookie:adminCookie}})).status,200);
+ for(let i=0;i<4;i++) assert.equal((await fetch(base+'/api/admin/engineer/security-scan',{headers:{cookie:adminCookie}})).status,200);
  const limitedScan=await fetch(base+'/api/admin/engineer/security-scan',{headers:{cookie:adminCookie}});
  assert.equal(limitedScan.status,429);
  assert.equal((await fetch(base+'/api/admin/plans',{headers:{cookie:adminCookie}})).status,200);
