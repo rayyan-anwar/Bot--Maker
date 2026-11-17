@@ -47,7 +47,7 @@ BotForge is a self-hosted, single-administrator workspace for creating, configur
    ```
 8. Open `http://localhost:3000`.
 
-The server refuses to start without a sufficiently long `JWT_SECRET`. Without `DATABASE_URL`, the app uses its JSON development store. Do not use that store for a public multi-instance service.
+The server refuses to start without a sufficiently long `JWT_SECRET`. In production or single-administrator mode, startup also fails unless `BOTFORGE_ADMIN_EMAIL` is a valid email address. This prevents an owner-only deployment from starting with an undefined administrator identity. Without `DATABASE_URL`, the app uses its JSON development store. Do not use that store for a public multi-instance service.
 
 ## Create the administrator
 
