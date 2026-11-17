@@ -1,6 +1,11 @@
 # Local staging rehearsal with a real PostgreSQL service.
 # Copy .env.example to .env and set POSTGRES_PASSWORD, JWT_SECRET and provider keys.
 services:
+  clamav:
+    image: clamav/clamav:stable
+    restart: unless-stopped
+    expose:
+      - "3310"
   postgres:
     image: postgres:16-alpine
     environment:
@@ -20,6 +25,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      clamav:
+        condition: service_started
     ports:
       - "3000:3000"
     environment:
@@ -27,6 +34,9 @@ services:
       PORT: 3000
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       DATABASE_URL: postgres://botforge:${POSTGRES_PASSWORD}@postgres:5432/botforge
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
+      CLAMAV_TIMEOUT_MS: 15000
       PGSSL: disable
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
