@@ -34,7 +34,7 @@ router.post('/checkout',requireAuth,async(req,res,next)=>{try{
  const priceId=process.env[plan==='plus'?'STRIPE_PRICE_PLUS':'STRIPE_PRICE_PRO'];
  if(!process.env.STRIPE_SECRET_KEY||!priceId||!process.env.STRIPE_SUCCESS_URL||!process.env.STRIPE_CANCEL_URL)return res.status(503).json({error:'Stripe checkout is not configured by the service operator.'});
  const form=new URLSearchParams({mode:'subscription',success_url:process.env.STRIPE_SUCCESS_URL,cancel_url:process.env.STRIPE_CANCEL_URL,customer_email:req.user.email,client_reference_id:req.user.id,'line_items[0][price]':priceId,'line_items[0][quantity]':'1','metadata[userId]':req.user.id,'metadata[plan]':plan,'subscription_data[metadata][userId]':req.user.id,'subscription_data[metadata][plan]':plan});
- const response=await fetch('https://api.stripe.com/v1/checkout/sessions',{method:'POST',headers:{authorization:'Bearer '+process.env.STRIPE_SECRET_KEY,'content-type':'application/x-www-form-urlencoded'},body:form});let data={};try{data=await response.json();}catch(_){}
+ const response=await fetch('https://api.stripe.com/v1/checkout/sessions',{method:'POST',headers:{authorization:'Bearer '+process.env.STRIPE_SECRET_KEY,'content-type':'application/x-www-form-urlencoded'},body:form,signal:AbortSignal.timeout(15000)});let data={};try{data=await response.json();}catch(_){}
  if(!response.ok||!data.url)return res.status(502).json({error:'Stripe could not create a checkout session.'});res.json({checkoutUrl:data.url,provider:'stripe'});
  }catch(e){next(e);}});
 router.post('/razorpay/checkout',requireAuth,async(req,res,next)=>{try{
