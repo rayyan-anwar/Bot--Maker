@@ -11,6 +11,9 @@ This document tracks assistant-side implementation and verification. A part is c
 - [ ] Resolve any failures and rerun affected checks.
 - Status: In progress. CI trigger cleanup is committed; the latest run must still complete successfully before this part can be closed.
 
+
+- CI runner retry note: latest head `d6c6c76` has five jobs created but still queued with no assigned runner; this is infrastructure scheduling, not a test failure. Do not mark Part 1 verified until a fresh run completes.
+
 ## Part 2: Deterministic dependencies and container build
 - [ ] Generate and commit package-lock.json.
 - [ ] Switch CI and Docker production install to npm ci where appropriate.
