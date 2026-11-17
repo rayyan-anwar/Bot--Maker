@@ -107,6 +107,23 @@ async function releaseWebhookEvent(provider,eventId){
  if(!isPostgres()){const db=load();db.webhookEvents=db.webhookEvents.filter(x=>!(x.provider===provider&&x.eventId===eventId));persist();return;}
  await initialize();await pool.query('DELETE FROM botforge_webhook_events WHERE provider=$1 AND event_id=$2',[provider,eventId]);
 }
+
+async function recordFailedLoginAttempt(userId,maxAttempts=3){
+ if(!isUuid(userId)||!Number.isInteger(maxAttempts)||maxAttempts<1||maxAttempts>20)throw new Error('Invalid failed-login update.');
+ if(!isPostgres()){
+  const user=findById('users',userId);if(!user)return null;
+  const attempts=Math.min(maxAttempts,Number(user.failedLoginAttempts||0)+1),lockedAt=attempts>=maxAttempts?(user.lockedAt||new Date().toISOString()):user.lockedAt||null;
+  updateById('users',userId,{failedLoginAttempts:attempts,...(lockedAt?{lockedAt}:{})});
+  return {attempts,locked:!!lockedAt,lockedAt};
+ }
+ await initialize();
+ const result=await pool.query(
+  "UPDATE botforge_records SET data=data || jsonb_build_object('failedLoginAttempts',LEAST($2::int,COALESCE((data->>'failedLoginAttempts')::int,0)+1),'lockedAt',CASE WHEN COALESCE((data->>'failedLoginAttempts')::int,0)+1 >= $2::int THEN COALESCE(data->'lockedAt',to_jsonb(now()::text)) ELSE COALESCE(data->'lockedAt','null'::jsonb) END),updated_at=now() WHERE collection='users' AND id=$1 RETURNING (data->>'failedLoginAttempts')::int AS attempts,data->>'lockedAt' AS locked_at",
+  [userId,maxAttempts]
+ );
+ if(!result.rowCount)return null;
+ return {attempts:result.rows[0].attempts,locked:!!result.rows[0].locked_at,lockedAt:result.rows[0].locked_at};
+}
 async function health(){if(!isPostgres())return {ok:true,database:'json-development'};try{await initialize();await pool.query('SELECT 1');return {ok:true,database:'postgres'};}catch(_){return {ok:false,database:'postgres'};}}
 async function close(){if(pool){await pool.end();pool=null;}initialized=false;}
-module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotAndData,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,releaseWebhookEvent,health,load,persist};
+module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotAndData,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,releaseWebhookEvent,recordFailedLoginAttempt,health,load,persist};
