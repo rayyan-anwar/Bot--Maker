@@ -25,7 +25,7 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.equal(signup.status,201);
  const cookie=signup.headers.get('set-cookie');
  assert.ok(cookie&&cookie.includes('session='));
- const me=await fetch(base+'/api/auth/me',{headers:{cookie:customerCookie}});
+ const me=await fetch(base+'/api/auth/me',{headers:{cookie}});
  assert.equal(me.status,200);
  assert.equal((await me.json()).user.role,'user');
  const logout=await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie}});
@@ -36,11 +36,11 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  const customerCookie=customerLogin.headers.get('set-cookie');
  const adminApi=await fetch(base+'/api/admin/plans',{headers:{cookie:customerCookie}});
  assert.equal((await fetch(base+'/api/admin/engineer/diagnose-ci',{method:'POST',headers:{cookie:customerCookie,'content-type':'application/json'},body:'{}'})).status,403);
- assert.equal((await fetch(base+'/api/admin/engineer/propose-fix',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({path:'server/auth.js',task:'Review session handling'})})).status,403);
- assert.equal((await fetch(base+'/api/admin/engineer/create-draft-pr',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({path:'server/auth.js',task:'Review session handling',proposedContent:'module.exports={};',baseSha:'a'.repeat(40),confirm:true})})).status,403);
- assert.equal((await fetch(base+'/api/admin/engineer/security-scan',{headers:{cookie}})).status,403);
+ assert.equal((await fetch(base+'/api/admin/engineer/propose-fix',{method:'POST',headers:{cookie:customerCookie,'content-type':'application/json'},body:JSON.stringify({path:'server/auth.js',task:'Review session handling'})})).status,403);
+ assert.equal((await fetch(base+'/api/admin/engineer/create-draft-pr',{method:'POST',headers:{cookie:customerCookie,'content-type':'application/json'},body:JSON.stringify({path:'server/auth.js',task:'Review session handling',proposedContent:'module.exports={};',baseSha:'a'.repeat(40),confirm:true})})).status,403);
+ assert.equal((await fetch(base+'/api/admin/engineer/security-scan',{headers:{cookie:customerCookie}})).status,403);
  assert.equal(adminApi.status,403);
- assert.equal((await fetch(base+'/admin.html',{headers:{cookie}})).status,403);
+ assert.equal((await fetch(base+'/admin.html',{headers:{cookie:customerCookie}})).status,403);
  for(let i=0;i<2;i++)assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'wrong-password'})).status,401);
  assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'wrong-password'})).status,423);
  assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'strong-customer-password-123'})).status,423);
