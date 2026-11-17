@@ -147,3 +147,12 @@ These changes are implementation updates, not proof of production deployment. Th
 - Document uploads now have a dedicated 10-per-15-minute client rate limit. PostgreSQL deployments use the shared database-backed counter so the limit is consistent across app instances; JSON development uses the local in-memory adapter.
 - Corrected the heuristic scanner's insecure-HTTP rule so HTTPS provider URLs are no longer reported as plaintext HTTP. Added a regression test for secure HTTPS endpoints.
 - Razorpay paid access is now granted only when the subscription status is active; an authenticated-but-not-active subscription no longer unlocks a paid plan.
+
+## Upload security and frontend output hardening (17 November 2026)
+
+- Added a ClamAV INSTREAM client with bounded payload size and timeout. Production upload handling fails closed with HTTP 503 if the scanner is not configured or unavailable; malware detections are rejected with HTTP 422.
+- Added a private ClamAV service to the local PostgreSQL staging compose stack and documented scanner configuration. The staging daemon still needs an operator-run readiness/signature-update check; no live ClamAV service has been exercised by this repository CI.
+- Upload validation now checks PDF signatures, rejects PDF data disguised as text/Markdown, rejects invalid UTF-8 and unsupported control characters, and normalizes both Windows and POSIX filename separators before display.
+- Added protocol tests for clean and infected ClamAV responses, missing scanner configuration, and scan-size limits.
+- Escaped document IDs in HTML attributes and encoded bot IDs in dashboard navigation to reduce stored/reflected markup injection risk.
+- CI and source-level tests do not replace OS/container-level PDF parser sandboxing, malware signature operations, a full browser security review, or penetration testing.
