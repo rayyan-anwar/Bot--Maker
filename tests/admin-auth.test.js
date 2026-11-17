@@ -30,6 +30,7 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.equal((await me.json()).user.role,'user');
  const adminApi=await fetch(base+'/api/admin/plans',{headers:{cookie}});
  assert.equal((await fetch(base+'/api/admin/engineer/diagnose-ci',{method:'POST',headers:{cookie,'content-type':'application/json'},body:'{}'})).status,403);
+ assert.equal((await fetch(base+'/api/admin/engineer/propose-fix',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({path:'server/auth.js',task:'Review session handling'})})).status,403);
  assert.equal(adminApi.status,403);
  assert.equal((await fetch(base+'/admin.html',{headers:{cookie}})).status,403);
  for(let i=0;i<2;i++)assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'wrong-password'})).status,401);
@@ -62,6 +63,7 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.equal((await adminLogin.json()).user.role,'admin');
  const adminCookie=adminLogin.headers.get('set-cookie');
  assert.equal((await fetch(base+'/api/admin/engineer/diagnose-ci',{method:'POST',headers:{cookie:adminCookie,'content-type':'application/json'},body:'{}'})).status,503);
+ assert.equal((await fetch(base+'/api/admin/engineer/propose-fix',{method:'POST',headers:{cookie:adminCookie,'content-type':'application/json'},body:JSON.stringify({path:'server/auth.js',task:'Review session handling'})})).status,503);
  assert.equal((await fetch(base+'/api/admin/plans',{headers:{cookie:adminCookie}})).status,200);
  assert.equal((await fetch(base+'/admin.html',{headers:{cookie:adminCookie}})).status,200);
  await store.updateByIdAsync('users',owner.id,{sessionVersion:Number(owner.sessionVersion||0)+1});
