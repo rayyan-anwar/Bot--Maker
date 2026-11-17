@@ -17,3 +17,13 @@ test('Razorpay webhook signature validates raw body and rejects tampering',()=>{
  assert.equal(razorpaySignatureValid(Buffer.from('tampered'),digest,secret),false);
  assert.equal(razorpaySignatureValid(body,digest,''),false);
 });
+
+const {isRazorpaySubscriptionActive}=require('../server/billing');
+test('Razorpay grants paid access only after subscription is active',()=>{
+ assert.equal(isRazorpaySubscriptionActive('active'),true);
+ assert.equal(isRazorpaySubscriptionActive('authenticated'),false);
+ assert.equal(isRazorpaySubscriptionActive('created'),false);
+ assert.equal(isRazorpaySubscriptionActive('pending'),false);
+ assert.equal(isRazorpaySubscriptionActive('halted'),false);
+ assert.equal(isRazorpaySubscriptionActive('cancelled'),false);
+});
