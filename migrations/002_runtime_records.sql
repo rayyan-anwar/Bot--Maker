@@ -20,3 +20,13 @@ CREATE TABLE IF NOT EXISTS botforge_quota_reservations (
 );
 CREATE INDEX IF NOT EXISTS botforge_quota_user_day_idx
   ON botforge_quota_reservations(user_id,usage_day,expires_at);
+
+-- Shared rate-limit counters for multi-instance deployments.
+CREATE TABLE IF NOT EXISTS botforge_rate_limits (
+  rate_key text PRIMARY KEY,
+  window_started_at timestamptz NOT NULL,
+  hits integer NOT NULL CHECK (hits >= 0),
+  expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS botforge_rate_limits_expiry_idx
+  ON botforge_rate_limits(expires_at);
