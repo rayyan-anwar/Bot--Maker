@@ -19,6 +19,7 @@ function razorpaySignatureValid(raw,header,secret){
  return safeEqualHex(expected,header);
 }
 function razorpayConfigured(){return !!(process.env.RAZORPAY_KEY_ID&&process.env.RAZORPAY_KEY_SECRET&&process.env.RAZORPAY_WEBHOOK_SECRET);}
+function isRazorpaySubscriptionActive(status){return status==='active';}
 async function razorpayRequest(path,payload){
  const auth=Buffer.from(process.env.RAZORPAY_KEY_ID+':'+process.env.RAZORPAY_KEY_SECRET).toString('base64');
  const response=await fetch('https://api.razorpay.com/v1'+path,{method:'POST',headers:{authorization:'Basic '+auth,'content-type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(15000)});
@@ -74,8 +75,8 @@ razorpayWebhookRouter.post('/',express.raw({type:'application/json',limit:'256kb
  let claimed=false;
  try{
   claimed=await store.claimWebhookEvent('razorpay',eventId);if(!claimed)return res.json({received:true,duplicate:true});
-  const sub=event.payload?.subscription?.entity;if(sub){const userId=sub.notes?.userId,plan=sub.notes?.plan;if(userId){const user=await store.findByIdAsync('users',userId);if(user){const active=['authenticated','active'].includes(sub.status),cancelled=['cancelled','completed'].includes(sub.status);await store.updateByIdAsync('users',userId,{plan:active&&plans.getPlans()[plan]?plan:cancelled?'free':plans.getPlanName(user),razorpaySubscriptionId:cancelled?null:sub.id,razorpaySubscriptionStatus:sub.status||'unknown',razorpayCustomerId:sub.customer_id||user.razorpayCustomerId||null});}}}
+  const sub=event.payload?.subscription?.entity;if(sub){const userId=sub.notes?.userId,plan=sub.notes?.plan;if(userId){const user=await store.findByIdAsync('users',userId);if(user){const active=isRazorpaySubscriptionActive(sub.status),cancelled=['cancelled','completed'].includes(sub.status);await store.updateByIdAsync('users',userId,{plan:active&&plans.getPlans()[plan]?plan:cancelled?'free':plans.getPlanName(user),razorpaySubscriptionId:cancelled?null:sub.id,razorpaySubscriptionStatus:sub.status||'unknown',razorpayCustomerId:sub.customer_id||user.razorpayCustomerId||null});}}}
   return res.json({received:true});
  }catch(error){if(claimed)await store.releaseWebhookEvent('razorpay',eventId).catch(()=>{});console.error('Razorpay webhook processing failed:',error.message);return res.status(500).json({error:'Webhook processing failed.'});}
 });
-module.exports={router,webhookRouter,razorpayWebhookRouter,signatureValid,razorpaySignatureValid};
+module.exports={router,webhookRouter,razorpayWebhookRouter,signatureValid,razorpaySignatureValid,isRazorpaySubscriptionActive};
