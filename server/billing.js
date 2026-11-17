@@ -51,7 +51,10 @@ router.post('/razorpay/checkout',requireAuth,async(req,res,next)=>{try{
 webhookRouter.post('/',express.raw({type:'application/json',limit:'256kb'}),async(req,res)=>{
  const secret=process.env.STRIPE_WEBHOOK_SECRET,header=req.get('stripe-signature');if(!signatureValid(req.body,header,secret))return res.status(400).json({error:'Invalid webhook signature.'});
  let event;try{event=JSON.parse(req.body.toString('utf8'));}catch(_){return res.status(400).json({error:'Invalid webhook payload.'});}
+ const eventId=event.id;if(typeof eventId!=='string'||!eventId)return res.status(400).json({error:'Webhook event ID is required.'});
+ let claimed=false;
  try{
+  claimed=await store.claimWebhookEvent('stripe',eventId);if(!claimed)return res.json({received:true,duplicate:true});
   if(event.type==='checkout.session.completed'){
    const session=event.data&&event.data.object,userId=session?.metadata?.userId,plan=session?.metadata?.plan;
    if(userId&&plans.getPlans()[plan]&&session.mode==='subscription'&&session.status==='complete'&&['paid','no_payment_required'].includes(session.payment_status)){const user=await store.findByIdAsync('users',userId);if(user)await store.updateByIdAsync('users',userId,{plan,stripeCustomerId:session.customer||null,stripeSubscriptionId:session.subscription||null});}
@@ -62,14 +65,17 @@ webhookRouter.post('/',express.raw({type:'application/json',limit:'256kb'}),asyn
    const sub=event.data&&event.data.object,userId=sub?.metadata?.userId;if(userId){const user=await store.findByIdAsync('users',userId);if(user)await store.updateByIdAsync('users',userId,{plan:'free',stripeSubscriptionId:null});}
   }
   return res.json({received:true});
- }catch(error){console.error('Stripe webhook processing failed:',error.message);return res.status(500).json({error:'Webhook processing failed.'});}
+ }catch(error){if(claimed)await store.releaseWebhookEvent('stripe',eventId).catch(()=>{});console.error('Stripe webhook processing failed:',error.message);return res.status(500).json({error:'Webhook processing failed.'});}
 });
 razorpayWebhookRouter.post('/',express.raw({type:'application/json',limit:'256kb'}),async(req,res)=>{
  if(!razorpaySignatureValid(req.body,req.get('x-razorpay-signature'),process.env.RAZORPAY_WEBHOOK_SECRET))return res.status(400).json({error:'Invalid Razorpay webhook signature.'});
  let event;try{event=JSON.parse(req.body.toString('utf8'));}catch(_){return res.status(400).json({error:'Invalid webhook payload.'});}
+ const eventId=event.id;if(typeof eventId!=='string'||!eventId)return res.status(400).json({error:'Webhook event ID is required.'});
+ let claimed=false;
  try{
+  claimed=await store.claimWebhookEvent('razorpay',eventId);if(!claimed)return res.json({received:true,duplicate:true});
   const sub=event.payload?.subscription?.entity;if(sub){const userId=sub.notes?.userId,plan=sub.notes?.plan;if(userId){const user=await store.findByIdAsync('users',userId);if(user){const active=['authenticated','active'].includes(sub.status),cancelled=['cancelled','completed'].includes(sub.status);await store.updateByIdAsync('users',userId,{plan:active&&plans.getPlans()[plan]?plan:cancelled?'free':plans.getPlanName(user),razorpaySubscriptionId:cancelled?null:sub.id,razorpaySubscriptionStatus:sub.status||'unknown',razorpayCustomerId:sub.customer_id||user.razorpayCustomerId||null});}}}
   return res.json({received:true});
- }catch(error){console.error('Razorpay webhook processing failed:',error.message);return res.status(500).json({error:'Webhook processing failed.'});}
+ }catch(error){if(claimed)await store.releaseWebhookEvent('razorpay',eventId).catch(()=>{});console.error('Razorpay webhook processing failed:',error.message);return res.status(500).json({error:'Webhook processing failed.'});}
 });
 module.exports={router,webhookRouter,razorpayWebhookRouter,signatureValid,razorpaySignatureValid};
