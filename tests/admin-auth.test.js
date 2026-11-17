@@ -36,9 +36,19 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'wrong-password'})).status,423);
  assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'strong-customer-password-123'})).status,423);
 
+ const crypto=require('node:crypto'),store=require('../server/store');
+ const resetToken='a'.repeat(64),resetHash=crypto.createHash('sha256').update(resetToken).digest('hex');
+ const customer=(await store.findManyAsync('users',{email:'customer@example.com'}))[0];
+ await store.updateByIdAsync('users',customer.id,{passwordResetTokenHash:resetHash,passwordResetExpiresAt:new Date(Date.now()+60000).toISOString()});
+ const reset=await post('/api/auth/password/reset',{token:resetToken,password:'new-customer-password-456'});
+ assert.equal(reset.status,200);
+ assert.equal((await fetch(base+'/api/auth/me',{headers:{cookie}})).status,401);
+ assert.equal((await post('/api/auth/password/reset',{token:resetToken,password:'another-password-789'})).status,400);
+ assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'new-customer-password-456'})).status,200);
+
  // The reserved administrator is provisioned out-of-band, can access admin APIs,
  // and is subject to the same three-failure lockout policy.
- const bcrypt=require('bcryptjs'),{v4:uuidv4}=require('uuid'),store=require('../server/store');
+ const bcrypt=require('bcryptjs'),{v4:uuidv4}=require('uuid');
  await store.insertAsync('users',{id:uuidv4(),email:'owner@example.com',name:'Owner',passwordHash:await bcrypt.hash('strong-admin-password-123',12),failedLoginAttempts:0,createdAt:new Date().toISOString()});
  const adminLogin=await post('/api/auth/login',{email:'owner@example.com',password:'strong-admin-password-123'});
  assert.equal(adminLogin.status,200);
