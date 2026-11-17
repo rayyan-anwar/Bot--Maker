@@ -7,13 +7,17 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
+      - run: npm install --ignore-scripts
       - run: npm test
       - run: node scripts/check-syntax.js
-
+      - run: npm run security:scan
       - run: bash -n scripts/backup-postgres.sh scripts/restore-postgres.sh
