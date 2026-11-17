@@ -59,10 +59,8 @@ jobs:
       - run: npm install --ignore-scripts
       - name: Apply baseline and runtime migrations
         env:
-          PGPASSWORD: botforge_test_password
-        run: |
-          psql -h 127.0.0.1 -U botforge -d botforge_test -v ON_ERROR_STOP=1 -f migrations/001_initial_schema.sql
-          psql -h 127.0.0.1 -U botforge -d botforge_test -v ON_ERROR_STOP=1 -f migrations/002_runtime_records.sql
+          BOTFORGE_TEST_DATABASE_URL: postgres://botforge:botforge_test_password@127.0.0.1:5432/botforge_test
+        run: node scripts/apply-test-migrations.js
       - name: Exercise PostgreSQL concurrency and shared rate limits
         env:
           BOTFORGE_TEST_DATABASE_URL: postgres://botforge:botforge_test_password@127.0.0.1:5432/botforge_test
