@@ -27,6 +27,9 @@ async function initialize(){
   await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS botforge_records_user_email_uidx ON botforge_records((lower(data->>'email'))) WHERE collection='users'");
   await pool.query('CREATE TABLE IF NOT EXISTS botforge_quota_reservations (id uuid PRIMARY KEY, user_id uuid NOT NULL, usage_day date NOT NULL, expires_at timestamptz NOT NULL)');
   await pool.query('CREATE INDEX IF NOT EXISTS botforge_quota_user_day_idx ON botforge_quota_reservations(user_id,usage_day,expires_at)');
+  await pool.query('CREATE TABLE IF NOT EXISTS botforge_rate_limits (rate_key text PRIMARY KEY, window_started_at timestamptz NOT NULL, hits integer NOT NULL CHECK(hits>=0), expires_at timestamptz NOT NULL)');
+  await pool.query('CREATE INDEX IF NOT EXISTS botforge_rate_limits_expiry_idx ON botforge_rate_limits(expires_at)');
+
  } else load();
  initialized=true;
 }
@@ -124,6 +127,8 @@ async function recordFailedLoginAttempt(userId,maxAttempts=3){
  if(!result.rowCount)return null;
  return {attempts:result.rows[0].attempts,locked:!!result.rows[0].locked_at,lockedAt:result.rows[0].locked_at};
 }
+
+async function query(sql,values=[]){if(!isPostgres())throw new Error('Shared PostgreSQL storage is not configured.');await initialize();return pool.query(sql,values);}
 async function health(){if(!isPostgres())return {ok:true,database:'json-development'};try{await initialize();await pool.query('SELECT 1');return {ok:true,database:'postgres'};}catch(_){return {ok:false,database:'postgres'};}}
 async function close(){if(pool){await pool.end();pool=null;}initialized=false;}
-module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotAndData,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,releaseWebhookEvent,recordFailedLoginAttempt,health,load,persist};
+module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotAndData,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,releaseWebhookEvent,recordFailedLoginAttempt,query,health,load,persist};
