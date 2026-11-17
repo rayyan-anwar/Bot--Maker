@@ -50,6 +50,13 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  // and is subject to the same three-failure lockout policy.
  const bcrypt=require('bcryptjs'),{v4:uuidv4}=require('uuid');
  await store.insertAsync('users',{id:uuidv4(),email:'owner@example.com',name:'Owner',passwordHash:await bcrypt.hash('strong-admin-password-123',12),failedLoginAttempts:0,createdAt:new Date().toISOString()});
+ const adminForgot=await post('/api/auth/password/forgot',{email:'owner@example.com'});
+ assert.equal(adminForgot.status,202);
+ const owner=(await store.findManyAsync('users',{email:'owner@example.com'}))[0];
+ assert.equal(owner.passwordResetTokenHash,undefined);
+ const adminResetToken='b'.repeat(64);
+ await store.updateByIdAsync('users',owner.id,{passwordResetTokenHash:crypto.createHash('sha256').update(adminResetToken).digest('hex'),passwordResetExpiresAt:new Date(Date.now()+60000).toISOString()});
+ assert.equal((await post('/api/auth/password/reset',{token:adminResetToken,password:'attacker-chosen-password-123'})).status,400);
  const adminLogin=await post('/api/auth/login',{email:'owner@example.com',password:'strong-admin-password-123'});
  assert.equal(adminLogin.status,200);
  assert.equal((await adminLogin.json()).user.role,'admin');
