@@ -5,7 +5,7 @@ const path=require('node:path');
 const {Pool}=require('pg');
 const DB_PATH=process.env.BOTFORGE_DATA_FILE||path.join(__dirname,'..','data','db.json');
 const COLLECTIONS=['users','bots','documents','messages','usage','memory','webhookEvents'];
-let cache=null,pool=null,initialized=false;
+let cache=null,pool=null,initialized=false,initializationPromise=null;
 const localReservations=new Map();
 function emptyDB(){return Object.fromEntries(COLLECTIONS.map(k=>[k,[]]));}
 function load(){
@@ -18,20 +18,25 @@ function persist(){fs.mkdirSync(path.dirname(DB_PATH),{recursive:true});const te
 function isPostgres(){return !!process.env.DATABASE_URL;}
 async function initialize(){
  if(initialized)return;
- if(isPostgres()){
-  pool=new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSL==='disable'?false:{rejectUnauthorized:process.env.PGSSL_REJECT_UNAUTHORIZED!=='false'},max:Number(process.env.PG_POOL_MAX||10),connectionTimeoutMillis:5000,idleTimeoutMillis:30000});
-  await pool.query('SELECT 1');
-  await pool.query("CREATE TABLE IF NOT EXISTS botforge_records (collection text NOT NULL CHECK(collection IN ('users','bots','documents','messages','usage','memory')), id uuid NOT NULL, data jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(collection,id))");
-  await pool.query('CREATE INDEX IF NOT EXISTS botforge_records_collection_idx ON botforge_records(collection)');
-  await pool.query('CREATE TABLE IF NOT EXISTS botforge_webhook_events (provider text NOT NULL, event_id text NOT NULL, received_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(provider,event_id))');
-  await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS botforge_records_user_email_uidx ON botforge_records((lower(data->>'email'))) WHERE collection='users'");
-  await pool.query('CREATE TABLE IF NOT EXISTS botforge_quota_reservations (id uuid PRIMARY KEY, user_id uuid NOT NULL, usage_day date NOT NULL, expires_at timestamptz NOT NULL)');
-  await pool.query('CREATE INDEX IF NOT EXISTS botforge_quota_user_day_idx ON botforge_quota_reservations(user_id,usage_day,expires_at)');
-  await pool.query('CREATE TABLE IF NOT EXISTS botforge_rate_limits (rate_key text PRIMARY KEY, window_started_at timestamptz NOT NULL, hits integer NOT NULL CHECK(hits>=0), expires_at timestamptz NOT NULL)');
-  await pool.query('CREATE INDEX IF NOT EXISTS botforge_rate_limits_expiry_idx ON botforge_rate_limits(expires_at)');
-
- } else load();
- initialized=true;
+ if(initializationPromise)return initializationPromise;
+ initializationPromise=(async()=>{
+  if(isPostgres()){
+   pool=new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSL==='disable'?false:{rejectUnauthorized:process.env.PGSSL_REJECT_UNAUTHORIZED!=='false'},max:Number(process.env.PG_POOL_MAX||10),connectionTimeoutMillis:5000,idleTimeoutMillis:30000});
+   try{
+    await pool.query('SELECT 1');
+    await pool.query("CREATE TABLE IF NOT EXISTS botforge_records (collection text NOT NULL CHECK(collection IN ('users','bots','documents','messages','usage','memory')), id uuid NOT NULL, data jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(collection,id))");
+    await pool.query('CREATE INDEX IF NOT EXISTS botforge_records_collection_idx ON botforge_records(collection)');
+    await pool.query('CREATE TABLE IF NOT EXISTS botforge_webhook_events (provider text NOT NULL, event_id text NOT NULL, received_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(provider,event_id))');
+    await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS botforge_records_user_email_uidx ON botforge_records((lower(data->>'email'))) WHERE collection='users'");
+    await pool.query('CREATE TABLE IF NOT EXISTS botforge_quota_reservations (id uuid PRIMARY KEY, user_id uuid NOT NULL, usage_day date NOT NULL, expires_at timestamptz NOT NULL)');
+    await pool.query('CREATE INDEX IF NOT EXISTS botforge_quota_user_day_idx ON botforge_quota_reservations(user_id,usage_day,expires_at)');
+    await pool.query('CREATE TABLE IF NOT EXISTS botforge_rate_limits (rate_key text PRIMARY KEY, window_started_at timestamptz NOT NULL, hits integer NOT NULL CHECK(hits>=0), expires_at timestamptz NOT NULL)');
+    await pool.query('CREATE INDEX IF NOT EXISTS botforge_rate_limits_expiry_idx ON botforge_rate_limits(expires_at)');
+   }catch(error){const failedPool=pool;pool=null;try{await failedPool.end();}catch(_){}throw error;}
+  }else load();
+  initialized=true;
+ })().finally(()=>{initializationPromise=null;});
+ return initializationPromise;
 }
 function all(collection){const rows=load()[collection];if(!Array.isArray(rows))throw new Error('Unknown data collection: '+collection);return rows;}
 function insert(collection,record){const db=load();if(!Array.isArray(db[collection]))throw new Error('Unknown data collection: '+collection);db[collection].push(record);persist();return record;}
