@@ -106,6 +106,6 @@ router.post('/password/reset',async(req,res,next)=>{
   return res.json({ok:true,message:'Password reset successful. You can now sign in.'});
  }catch(e){next(e);}
 });
-router.post('/logout',(req,res)=>{res.clearCookie(COOKIE_NAME,cookieOptions());res.json({ok:true});});
+router.post('/logout',async(req,res,next)=>{try{const user=await getUserFromRequest(req);if(user)await store.updateByIdAsync('users',user.id,{sessionVersion:Number(user.sessionVersion||0)+1});res.clearCookie(COOKIE_NAME,cookieOptions());res.json({ok:true});}catch(e){next(e);}});
 router.get('/me',async(req,res,next)=>{try{const user=await getUserFromRequest(req);if(!user)return res.status(401).json({error:'Not signed in.'});res.json({user:publicUser(user)});}catch(e){next(e);}});
 module.exports={router,requireAuth,getUserFromRequest,publicUser,isAdminEmail,MAX_FAILED_LOGINS};
