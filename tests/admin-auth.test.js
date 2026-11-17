@@ -14,6 +14,12 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  const server=await start(0,'127.0.0.1');
  t.after(async()=>{await shutdown();fs.rmSync(dir,{recursive:true,force:true});});
  const base='http://127.0.0.1:'+server.address().port;
+ const securityHeaders=await fetch(base+'/healthz');
+ const csp=securityHeaders.headers.get('content-security-policy')||'';
+ assert.match(csp,/default-src 'self'/);
+ assert.match(csp,/object-src 'none'/);
+ assert.match(csp,/frame-ancestors 'none'/);
+ assert.match(csp,/connect-src 'self'/);
  async function post(route,body){return fetch(base+route,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});}
  const recoveryRequest=await post('/api/auth/password/forgot',{email:'customer@example.com'});
  assert.equal(recoveryRequest.status,202);
