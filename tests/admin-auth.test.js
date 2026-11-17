@@ -1,3 +1,9 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const os=require('node:os');
+const path=require('node:path');
+
 test('single-administrator startup requires a valid owner email',()=>{
  const previousEnv=process.env.NODE_ENV,previousFlag=process.env.BOTFORGE_SINGLE_ADMIN,previousEmail=process.env.BOTFORGE_ADMIN_EMAIL,previousJwt=process.env.JWT_SECRET;
  process.env.JWT_SECRET='single-admin-config-test-secret-with-at-least-thirty-two-characters';
@@ -12,12 +18,6 @@ test('single-administrator startup requires a valid owner email',()=>{
   assert.equal(validateSingleAdminConfig(),true);
  }finally{if(previousEnv===undefined)delete process.env.NODE_ENV;else process.env.NODE_ENV=previousEnv;if(previousFlag===undefined)delete process.env.BOTFORGE_SINGLE_ADMIN;else process.env.BOTFORGE_SINGLE_ADMIN=previousFlag;if(previousEmail===undefined)delete process.env.BOTFORGE_ADMIN_EMAIL;else process.env.BOTFORGE_ADMIN_EMAIL=previousEmail;if(previousJwt===undefined)delete process.env.JWT_SECRET;else process.env.JWT_SECRET=previousJwt;}
 });
-
-const test=require('node:test');
-const assert=require('node:assert/strict');
-const fs=require('node:fs');
-const os=require('node:os');
-const path=require('node:path');
 
 test('public signup works, admin email is reserved, and three wrong passwords lock a user account',async(t)=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-public-auth-'));
