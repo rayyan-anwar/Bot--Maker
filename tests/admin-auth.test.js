@@ -20,7 +20,7 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.match(csp,/object-src 'none'/);
  assert.match(csp,/frame-ancestors 'none'/);
  assert.match(csp,/connect-src 'self'/);
- async function post(route,body){return fetch(base+route,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});}
+ async function post(route,body){return fetch(base+route,{method:'POST',headers:{'content-type':'application/json',origin:base},body:JSON.stringify(body)});}
  const recoveryRequest=await post('/api/auth/password/forgot',{email:'customer@example.com'});
  assert.equal(recoveryRequest.status,202);
   const oauthUnavailable=await fetch(base+'/api/auth/oauth/google');
