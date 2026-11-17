@@ -4,16 +4,17 @@ const {PostgresRateLimitStore}=require('../server/rate-limit-store');
 
 test('PostgreSQL rate-limit store uses an atomic upsert and scoped expiry cleanup',async()=>{
  const calls=[];
- const fakeQuery=async(sql,values)=>{calls.push({sql,values});return {rows:[{hits:4,expires_at:'2026-11-17T12:01:00.000Z'}]};};
+ const fakeQuery=async(sql,values)=>{calls.push({sql,values});return sql.startsWith('INSERT')?{rows:[{hits:4,expires_at:'2026-11-17T12:01:00.000Z'}]}:{rows:[]};};
  const store=new PostgresRateLimitStore('api',fakeQuery);
  await store.init({windowMs:60000});
  const result=await store.increment('client-ip');
  assert.equal(result.totalHits,4);
  assert.ok(result.resetTime instanceof Date);
- assert.match(calls[0].sql,/ON CONFLICT\(rate_key\) DO UPDATE/);
- assert.match(calls[0].sql,/expires_at<=now\(\)/);
- assert.match(calls[0].sql,/RETURNING rate_key\) INSERT INTO/);
- assert.deepEqual(calls[0].values,['api:client-ip',60000,'api:%']);
+ assert.match(calls[0].sql,/DELETE FROM botforge_rate_limits WHERE expires_at<=now\(\)/);
+ assert.deepEqual(calls[0].values,['api:%']);
+ assert.match(calls[1].sql,/ON CONFLICT\(rate_key\) DO UPDATE/);
+ assert.match(calls[1].sql,/RETURNING hits,expires_at/);
+ assert.deepEqual(calls[1].values,['api:client-ip',60000]);
 });
 
 test('PostgreSQL rate-limit store scopes decrement and reset operations',async()=>{
