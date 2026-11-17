@@ -12,7 +12,7 @@ This document tracks assistant-side implementation and verification. A part is c
 - Status: In progress. CI trigger cleanup is committed; the latest run must still complete successfully before this part can be closed.
 
 
-- CI runner retry note: latest head `d6c6c76` has five jobs created but still queued with no assigned runner; this is infrastructure scheduling, not a test failure. Do not mark Part 1 verified until a fresh run completes.
+- CI runner note: the previous run was still queued without an assigned runner. Recheck the latest branch-head run before treating any check as verified; queue status is neither a pass nor a code failure.
 
 ## Part 2: Deterministic dependencies and container build
 - [ ] Generate and commit package-lock.json.
@@ -26,7 +26,7 @@ This document tracks assistant-side implementation and verification. A part is c
 - [ ] Audit authorization and ownership checks across all routes.
 - [ ] Review validation, SSRF boundaries, secret exposure and log redaction.
 - [ ] Add targeted negative and tenant-isolation regression tests.
-- Status: Not started.
+- Status: In progress. Source review has started; a Razorpay webhook event-ID/deduplication correction and route regression test are committed, pending CI execution.
 
 ## Part 4: AI, documents, uploads, and memory
 - [ ] Add mocked provider adapter tests for success, provider errors, timeouts and malformed responses.
