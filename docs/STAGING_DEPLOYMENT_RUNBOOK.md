@@ -43,7 +43,7 @@ For an existing JSON installation:
 
 The importer runs in one transaction and records a one-time marker. It does not copy original uploaded files. Do not delete or overwrite the JSON backup after migration.
 
-For a fresh database, apply `migrations/001_initial_schema.sql` using the database migration process, then start the app. The app creates the JSONB runtime repository and quota reservation table during startup.
+For a fresh database, apply `migrations/001_initial_schema.sql` followed by `migrations/003_oauth_and_profile_memory.sql` using the database migration process, then start the app. The app creates the JSONB runtime repository, quota reservations, shared rate limits and webhook idempotency table during startup. `003` is required so OAuth-only accounts and account-wide memory notes can be represented in the normalized reporting tables.
 
 For a reproducible local PostgreSQL staging rehearsal, copy `.env.example` to `.env`, set `POSTGRES_PASSWORD` and `JWT_SECRET`, then run `docker compose -f docker-compose.staging.yml up --build -d`. Wait for the `botforge` service healthcheck, then run the staging smoke tests below. This stack is for staging only, not public production hosting.
 
