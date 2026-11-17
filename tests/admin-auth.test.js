@@ -66,6 +66,15 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  const adminResetToken='b'.repeat(64);
  await store.updateByIdAsync('users',owner.id,{passwordResetTokenHash:crypto.createHash('sha256').update(adminResetToken).digest('hex'),passwordResetExpiresAt:new Date(Date.now()+60000).toISOString()});
  assert.equal((await post('/api/auth/password/reset',{token:adminResetToken,password:'attacker-chosen-password-123'})).status,400);
+
+ // Production cookie-authenticated mutation requests must carry a same-host Origin.
+ const previousNodeEnv=process.env.NODE_ENV;
+ process.env.NODE_ENV='production';
+ try{
+  assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:customerCookie}})).status,403);
+  assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:customerCookie,origin:base}})).status,200);
+ }finally{process.env.NODE_ENV=previousNodeEnv;}
+
  const adminLogin=await post('/api/auth/login',{email:'owner@example.com',password:'strong-admin-password-123'});
  assert.equal(adminLogin.status,200);
  assert.equal((await adminLogin.json()).user.role,'admin');
