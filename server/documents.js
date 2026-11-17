@@ -32,7 +32,7 @@ async function extractText(filePath,originalName){
  if(buffer.includes(0))throw new Error('Binary files are not supported.');
  let text;
  try{text=new TextDecoder('utf-8',{fatal:true}).decode(buffer);}catch(_){throw new Error('Text file must use valid UTF-8 encoding.');}
- if(/[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]/.test(text))throw new Error('Text file contains unsupported control characters.');
+ if(Array.from(text).some(ch=>{const code=ch.charCodeAt(0);return (code>=0&&code<=8)||code===11||code===12||(code>=14&&code<=31)||code===127;}))throw new Error('Text file contains unsupported control characters.');
  if(text.length>MAX_EXTRACTED_CHARS)throw new Error('Extracted document text exceeds the 1 million character limit.');
  return text;
 }
