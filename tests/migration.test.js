@@ -45,7 +45,7 @@ test('migration preflight rejects orphaned usage and memory records',()=>{
  const usage=fixture();usage.usage[0].userId=randomUUID();
  assert.throws(()=>validateData(usage),/usage references missing user/);
  const memory=fixture();memory.memory[0].botId=randomUUID();
- assert.throws(()=>validateData(memory),/memory references a missing user or bot/);
+ assert.throws(()=>validateData(memory),/memory references a missing bot/);
 });
 
 test('migration preflight rejects malformed document chunks',()=>{
