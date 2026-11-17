@@ -12,7 +12,7 @@ test('PostgreSQL rate-limit store uses an atomic upsert and scoped expiry cleanu
  assert.ok(result.resetTime instanceof Date);
  assert.match(calls[0].sql,/ON CONFLICT\(rate_key\) DO UPDATE/);
  assert.match(calls[0].sql,/expires_at<=now\(\)/);
- assert.match(calls[0].sql,/RETURNING rate_key\\) INSERT INTO/);
+ assert.match(calls[0].sql,/RETURNING rate_key\) INSERT INTO/);
  assert.deepEqual(calls[0].values,['api:client-ip',60000,'api:%']);
 });
 
