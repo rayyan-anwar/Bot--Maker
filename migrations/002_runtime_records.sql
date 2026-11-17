@@ -30,3 +30,11 @@ CREATE TABLE IF NOT EXISTS botforge_rate_limits (
 );
 CREATE INDEX IF NOT EXISTS botforge_rate_limits_expiry_idx
   ON botforge_rate_limits(expires_at);
+
+-- Webhook idempotency ledger used by Stripe and Razorpay callbacks.
+CREATE TABLE IF NOT EXISTS botforge_webhook_events (
+  provider text NOT NULL,
+  event_id text NOT NULL,
+  received_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (provider,event_id)
+);
