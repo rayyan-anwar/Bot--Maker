@@ -99,3 +99,23 @@ This evidence applies to that exact code commit. A later documentation-only comm
 8. **Privacy and operations:** complete account export/deletion and retention controls, secret/log redaction review, monitoring/alerts, backup restoration, browser E2E, load testing and independent security review.
 
 The application remains a staging/development foundation. Do not label it production-secure or production-ready until the release gates in `docs/SECURITY_AND_RELEASE_CHECKLIST.md` and `docs/STAGING_DEPLOYMENT_RUNBOOK.md` have evidence attached.
+
+
+## Security hardening follow-up (17 November 2026)
+
+The following additional controls were added on the upgrade branch after the previous reassessment:
+
+- PDF extraction now runs in a Node worker thread with bounded V8 memory, a worker timeout, page-count validation and extracted-text limits. The API process no longer performs PDF parsing itself.
+- Text uploads are decoded as strict UTF-8 and reject binary/NUL-containing content. Upload byte limits are checked before parsing.
+- Added automated regression tests for valid UTF-8, invalid UTF-8, binary uploads, invalid PDF signatures and oversized files.
+- Added a PostgreSQL-backed express-rate-limit store for API and authentication counters. The database uses atomic upserts, namespace separation and expiry cleanup so counters are shared across app instances. JSON-only local development continues to use the express-rate-limit in-memory store.
+- Added the rate-limit table to runtime initialization and the SQL migration, plus unit tests for atomic upsert configuration and namespaced decrement/reset behavior.
+
+### Verification for this follow-up
+
+At commit `9623c926b4c642e8d3a754a837c8ecff4b76336f`, the Node.js 18/20/22 CI matrix is running. At the latest inspection, tests, syntax checks and dependency audit had passed on all three versions; security scanning was still running on Node.js 18. Do not mark the whole run green until both workflows finish successfully.
+
+### Remaining upload and rate-limit caveats
+
+- Worker memory and timeout bounds reduce PDF parser blast radius but do not replace malware scanning, MIME/signature validation beyond the PDF magic header, parser sandboxing at the OS/container level or a broader upload threat review.
+- The PostgreSQL rate-limit store has automated adapter tests, but must still be exercised against a live PostgreSQL instance with concurrent workers and failover. Rate limiting remains process-local in JSON development mode by design.
