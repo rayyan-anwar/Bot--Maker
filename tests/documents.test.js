@@ -70,3 +70,22 @@ test('document upload route rate-limits repeated uploads for an authenticated bo
  const limited=await fetch(base+'/api/documents/'+bot.id,{method:'POST',headers:{cookie}});
  assert.equal(limited.status,429);
 });
+
+
+test('text extraction rejects a PDF renamed with a text extension',async()=>{
+ await withFile('misnamed.txt',Buffer.from('%PDF-1.7\\nnot parsed'),async file=>{
+  await assert.rejects(()=>extractText(file,'misnamed.txt'),/does not match/);
+ });
+});
+
+test('text extraction rejects unsupported control characters',async()=>{
+ await withFile('control.md',Buffer.from('safe text\\x01unsafe','utf8'),async file=>{
+  await assert.rejects(()=>extractText(file,'control.md'),/control characters/);
+ });
+});
+
+test('text extraction rejects a PDF signature with a non-PDF extension',async()=>{
+ await withFile('misnamed.md',Buffer.from('%PDF-1.7\\n'),async file=>{
+  await assert.rejects(()=>extractText(file,'misnamed.md'),/does not match/);
+ });
+});
