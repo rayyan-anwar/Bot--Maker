@@ -12,7 +12,8 @@
     "backup:postgres": "bash scripts/backup-postgres.sh",
     "restore:postgres": "bash scripts/restore-postgres.sh",
     "admin:reset-password": "node scripts/reset-admin-password.js",
-    "admin:create": "node scripts/create-admin.js"
+    "admin:create": "node scripts/create-admin.js",
+    "security:scan": "node scripts/security-scan.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
