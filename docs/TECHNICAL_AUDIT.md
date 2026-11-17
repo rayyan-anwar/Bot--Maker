@@ -163,3 +163,11 @@ These changes are implementation updates, not proof of production deployment. Th
 - Password reset token lookup now uses a dedicated indexed hash field in PostgreSQL rather than loading every user record.
 - Token consumption is a conditional atomic update that requires an unexpired token and clears it in the same database statement. Concurrent replay attempts can succeed only once.
 - JSON adapter and PostgreSQL integration tests cover concurrent reset-token consumption. Reset continues to revoke existing sessions by incrementing the session version.
+
+
+## Browser security policy and deployment configuration (17 November 2026)
+
+- Enabled an explicit same-origin Content Security Policy: scripts, styles, fonts and connections are restricted to the application origin; object embedding is disabled; framing is denied; base URI and form submission are restricted.
+- The current pages use inline scripts/styles, so the policy retains `unsafe-inline` for those two directives. A nonce/hash-based policy is a follow-up hardening task.
+- Fixed the Docker Compose administrator environment mapping so `BOTFORGE_ADMIN_EMAIL` reaches the application in both local and staging Compose stacks.
+- Corrected the uploaded-text control-character regression fixture so it contains an actual control byte rather than the literal characters `\\x01`.
