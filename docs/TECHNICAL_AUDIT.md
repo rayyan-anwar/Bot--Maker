@@ -142,3 +142,8 @@ The PostgreSQL integration workflow is now part of CI. Its result must be green 
 - Corrected deprecated logout-cookie clearing options and malformed escaped newlines in several HTML pages.
 
 These changes are implementation updates, not proof of production deployment. The current PR head must pass its complete Node.js, PostgreSQL, Docker smoke and security validation checks before these changes are considered verified.
+## Additional request-abuse controls (17 November 2026)
+
+- Document uploads now have a dedicated 10-per-15-minute client rate limit. PostgreSQL deployments use the shared database-backed counter so the limit is consistent across app instances; JSON development uses the local in-memory adapter.
+- Corrected the heuristic scanner's insecure-HTTP rule so HTTPS provider URLs are no longer reported as plaintext HTTP. Added a regression test for secure HTTPS endpoints.
+- Razorpay paid access is now granted only when the subscription status is active; an authenticated-but-not-active subscription no longer unlocks a paid plan.
