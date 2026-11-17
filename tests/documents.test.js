@@ -3,6 +3,8 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
+const suiteDir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-doc-suite-'));
+process.env.BOTFORGE_DATA_FILE=path.join(suiteDir,'db.json');
 const {extractText}=require('../server/documents');
 
 async function withFile(name,bytes,fn){
@@ -45,13 +47,11 @@ test('document extraction enforces upload byte limits before reading content',as
 
 
 test('document upload route rate-limits repeated uploads for an authenticated bot owner',async(t)=>{
- const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-upload-limit-'));
  process.env.NODE_ENV='test';
  process.env.JWT_SECRET='upload-limit-test-secret-with-at-least-thirty-two-characters';
- process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
  const {start,shutdown}=require('../server/index');
  const server=await start(0,'127.0.0.1');
- t.after(async()=>{await shutdown();fs.rmSync(dir,{recursive:true,force:true});});
+ t.after(async()=>{await shutdown();fs.rmSync(suiteDir,{recursive:true,force:true});});
  const base='http://127.0.0.1:'+server.address().port;
  const bcrypt=require('bcryptjs'),{v4:uuidv4}=require('uuid'),store=require('../server/store');
  await store.insertAsync('users',{id:uuidv4(),email:'upload-limit@example.test',name:'Upload Limit',passwordHash:await bcrypt.hash('upload-limit-password-123',10),createdAt:new Date().toISOString()});
