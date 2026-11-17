@@ -64,6 +64,8 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.equal((await fetch(base+'/api/admin/engineer/diagnose-ci',{method:'POST',headers:{cookie:adminCookie,'content-type':'application/json'},body:'{}'})).status,503);
  assert.equal((await fetch(base+'/api/admin/plans',{headers:{cookie:adminCookie}})).status,200);
  assert.equal((await fetch(base+'/admin.html',{headers:{cookie:adminCookie}})).status,200);
+ await store.updateByIdAsync('users',owner.id,{passwordChangedAt:new Date(Date.now()+1000).toISOString()});
+ assert.equal((await fetch(base+'/api/auth/me',{headers:{cookie:adminCookie}})).status,401);
  for(let i=0;i<2;i++)assert.equal((await post('/api/auth/login',{email:'owner@example.com',password:'incorrect-admin-password'})).status,401);
  assert.equal((await post('/api/auth/login',{email:'owner@example.com',password:'incorrect-admin-password'})).status,423);
  assert.equal((await post('/api/auth/login',{email:'owner@example.com',password:'strong-admin-password-123'})).status,423);
