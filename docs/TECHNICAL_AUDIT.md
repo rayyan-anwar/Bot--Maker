@@ -156,3 +156,10 @@ These changes are implementation updates, not proof of production deployment. Th
 - Added protocol tests for clean and infected ClamAV responses, missing scanner configuration, and scan-size limits.
 - Escaped document IDs in HTML attributes and encoded bot IDs in dashboard navigation to reduce stored/reflected markup injection risk.
 - CI and source-level tests do not replace OS/container-level PDF parser sandboxing, malware signature operations, a full browser security review, or penetration testing.
+
+
+## Password recovery replay protection (17 November 2026)
+
+- Password reset token lookup now uses a dedicated indexed hash field in PostgreSQL rather than loading every user record.
+- Token consumption is a conditional atomic update that requires an unexpired token and clears it in the same database statement. Concurrent replay attempts can succeed only once.
+- JSON adapter and PostgreSQL integration tests cover concurrent reset-token consumption. Reset continues to revoke existing sessions by incrementing the session version.
