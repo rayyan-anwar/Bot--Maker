@@ -103,6 +103,7 @@ router.post('/password/forgot',async(req,res,next)=>{
 });
 router.post('/password/reset',async(req,res,next)=>{
  try{
+  if(singleAdminMode())return res.status(400).json({error:'This password reset link is invalid or expired. Request a new one.'});
   const token=String(req.body?.token||''),password=req.body?.password;
   if(!/^[a-f0-9]{64}$/.test(token)||typeof password!=='string'||password.length<10||password.length>128)return res.status(400).json({error:'Enter a valid reset link and a password of 10–128 characters.'});
   const hash=crypto.createHash('sha256').update(token).digest('hex');
