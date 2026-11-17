@@ -41,4 +41,4 @@ CREATE TABLE IF NOT EXISTS botforge_webhook_events (
 
 -- Efficient lookup and atomic consumption of one-time password reset tokens.
 CREATE INDEX IF NOT EXISTS botforge_records_user_reset_token_idx
-  ON botforge_records((data->>'passwordResetTokenHash')) WHERE collection='users' AND data ? 'passwordResetTokenHash';
+  ON botforge_records((data->>'passwordResetTokenHash')) WHERE collection='users';
