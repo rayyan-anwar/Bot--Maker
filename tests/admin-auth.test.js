@@ -28,6 +28,9 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  const me=await fetch(base+'/api/auth/me',{headers:{cookie}});
  assert.equal(me.status,200);
  assert.equal((await me.json()).user.role,'user');
+ const logout=await post('/api/auth/logout',{});
+ assert.equal(logout.status,200);
+ assert.equal((await fetch(base+'/api/auth/me',{headers:{cookie}})).status,401);
  const adminApi=await fetch(base+'/api/admin/plans',{headers:{cookie}});
  assert.equal((await fetch(base+'/api/admin/engineer/diagnose-ci',{method:'POST',headers:{cookie,'content-type':'application/json'},body:'{}'})).status,403);
  assert.equal((await fetch(base+'/api/admin/engineer/propose-fix',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({path:'server/auth.js',task:'Review session handling'})})).status,403);
