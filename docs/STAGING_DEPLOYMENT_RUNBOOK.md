@@ -26,7 +26,7 @@ Set these in the hosting provider's secret manager. Never commit real values to 
 - `FREE_DAILY_MESSAGES` to the staging quota.
 - One or more of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_GEMINI_API_KEY`.
 - For the AI Engineer, set `BOTFORGE_GITHUB_TOKEN` to a fine-grained, repository-scoped token with Contents: read and Actions: read. Set `BOTFORGE_GITHUB_WRITE_TOKEN` separately only if draft PR creation is enabled; grant it Contents: read/write and Pull requests: read/write for this repository only. The dashboard requires a separate explicit confirmation before creating an isolated branch and draft PR. It never merges or deploys.
-- For Google/GitHub social sign-in, configure the matching client ID, client secret and exact callback URI from `.env.example`. Google requires OpenID email/profile scopes. GitHub requires `read:user` and `user:email`; the application accepts only a verified primary email. Existing email/password accounts are not silently linked. The reserved admin email is never accepted through public OAuth.
+- Production is single-administrator only. Public signup, non-admin login, OAuth and self-service password recovery are disabled. Create the administrator out-of-band with `BOTFORGE_ADMIN_EMAIL` and the secure `npm run admin:create` command. Do not configure customer OAuth for this owner-only deployment.
 
 Do not set `PGSSL=disable` for a public managed database. Do not expose provider keys or `DATABASE_URL` to browser code.
 
@@ -55,9 +55,9 @@ Before inviting users, verify all of the following:
 
 - `GET /healthz` returns HTTP 200.
 - `GET /readyz` returns HTTP 200 and reports `database: postgres`.
-- Sign-up, login, logout and session restoration work over HTTPS.
-- A user can create a private bot; another account cannot read or edit it.
-- A public bot can be opened by another signed-in account without exposing private instructions.
+- Public signup returns HTTP 403, non-admin login returns HTTP 401, and social login is unavailable.
+- The configured administrator can sign in, access the admin dashboard and use protected API routes.
+- Non-administrator sessions and account records cannot access application pages or protected APIs.
 - Document upload, retrieval citations and document deletion work for the owner only.
 - Chat works with a real provider key; provider failures release quota reservations.
 - Concurrent requests at the daily limit do not exceed the configured quota across multiple app instances.
