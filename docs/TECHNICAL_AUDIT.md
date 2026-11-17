@@ -130,3 +130,15 @@ At commit `9623c926b4c642e8d3a754a837c8ecff4b76336f`, the Node.js 18/20/22 CI ma
 - Added the webhook idempotency table to the runtime SQL migration.
 
 The PostgreSQL integration workflow is now part of CI. Its result must be green on the current PR head before claiming database concurrency verification. CI uses an ephemeral PostgreSQL 16 service and does not provision a production database.
+
+## Migration and container follow-up (17 November 2026)
+
+- The JSON-to-PostgreSQL preflight now accepts OAuth-only accounts when a linked OAuth identity exists, and accepts account-wide profile memories whose botId is null. It still rejects passwordless accounts without a linked provider.
+- Added migration 003_oauth_and_profile_memory.sql to make the normalized reporting schema compatible with nullable OAuth password hashes and account-wide memory notes. The JSON importer applies this migration; PostgreSQL CI applies it as well.
+- Added regression coverage for OAuth-only and account-wide-memory preflight cases, plus a PostgreSQL integration check for the normalized schema.
+- Fixed the container build path: this repository does not currently commit a package-lock.json, so npm ci could not build the Docker image. The Dockerfile now uses npm install --omit=dev --no-audit --no-fund --ignore-scripts. A reviewed lockfile is still required before switching back to deterministic npm ci installs.
+- Added CI checks to build the production Docker image and start it with dummy configuration, then verify /readyz.
+- Stripe checkout, Stripe billing portal and Razorpay API calls now have 15-second request timeouts.
+- Corrected deprecated logout-cookie clearing options and malformed escaped newlines in several HTML pages.
+
+These changes are implementation updates, not proof of production deployment. The current PR head must pass its complete Node.js, PostgreSQL, Docker smoke and security validation checks before these changes are considered verified.
