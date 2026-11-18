@@ -76,6 +76,43 @@ async function generate({provider='anthropic',model,system,messages,maxTokens=10
     throw err;
   } finally { clearTimeout(timer); }
 }
-function getDefaultModel(provider='anthropic') { return PROVIDERS[provider]?.defaultModel || null; }
+
+async function streamProviderResponse(response,provider,onToken){
+ if(!response.ok)throw providerError(provider,response.status,await safeJson(response));
+ if(!response.body)throw new Error('The provider did not return a streaming response.');
+ const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',text='',inputTokens=0,outputTokens=0;
+ const consume=async(raw)=>{
+  for(const line of raw.split(/\\r?\\n/)){
+   if(!line.startsWith('data:'))continue;
+   const value=line.slice(5).trim();if(!value||value==='[DONE]')continue;
+   let event;try{event=JSON.parse(value);}catch(_){continue;}
+   let delta='';
+   if(provider==='anthropic'){delta=event.type==='content_block_delta'&&event.delta?.type==='text_delta'?event.delta.text||'':'';if(event.type==='message_start')inputTokens=event.message?.usage?.input_tokens||inputTokens;if(event.type==='message_delta')outputTokens=event.usage?.output_tokens||outputTokens;}
+   else if(provider==='openai'){if(event.type==='response.output_text.delta')delta=event.delta||'';if(event.type==='response.completed'){inputTokens=event.response?.usage?.input_tokens||0;outputTokens=event.response?.usage?.output_tokens||0;}}
+   else {delta=(event.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('');inputTokens=event.usageMetadata?.promptTokenCount||inputTokens;outputTokens=event.usageMetadata?.candidatesTokenCount||outputTokens;}
+   if(delta){text+=delta;await onToken(delta);}
+  }
+ };
+ try{
+  while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let boundary;while((boundary=buffer.indexOf('\\n\\n'))>=0){const part=buffer.slice(0,boundary);buffer=buffer.slice(boundary+2);await consume(part);}}
+  buffer+=decoder.decode();if(buffer.trim())await consume(buffer);
+ }finally{reader.releaseLock();}
+ if(!text.trim())throw new Error('The provider returned an empty response.');
+ return {text,inputTokens,outputTokens};
+}
+async function generateStream({provider='anthropic',model,system,messages,maxTokens=1024,onToken=()=>{},timeoutMs=60000}){
+ if(provider==='mock'){const result=await generate({provider,model,system,messages,maxTokens});for(const word of result.text.match(/\\S+\\s*/g)||[])await onToken(word);return result;}
+ const adapter=PROVIDERS[provider];if(!adapter)throw new Error('Unsupported AI provider.');
+ if(!process.env[adapter.keyEnv])throw new Error('The selected AI provider is not configured on this server.');
+ const actualModel=model||adapter.defaultModel;let response;
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
+ try{
+  if(provider==='anthropic')response=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',signal:controller.signal,headers:{'content-type':'application/json','x-api-key':process.env.ANTHROPIC_API_KEY,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:actualModel,max_tokens:maxTokens,system,messages,stream:true})});
+  else if(provider==='openai'){const input=[{role:'system',content:[{type:'input_text',text:system}]},...messages.map(m=>({role:m.role,content:[{type:'input_text',text:m.content}]}))];response=await fetch('https://api.openai.com/v1/responses',{method:'POST',signal:controller.signal,headers:{'content-type':'application/json',authorization:'Bearer '+process.env.OPENAI_API_KEY},body:JSON.stringify({model:actualModel,max_output_tokens:maxTokens,input,stream:true})});}
+  else {const url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(actualModel)+':streamGenerateContent?alt=sse';const contents=messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));response=await fetch(url,{method:'POST',signal:controller.signal,headers:{'content-type':'application/json','x-goog-api-key':process.env.GOOGLE_GEMINI_API_KEY},body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents,generationConfig:{maxOutputTokens:maxTokens}})});}
+  return await streamProviderResponse(response,provider,onToken);
+ }catch(error){if(error.name==='AbortError')throw new Error('The AI provider timed out. Please try again.');throw error;}finally{clearTimeout(timer);}
+}
+\nfunction getDefaultModel(provider='anthropic') { return PROVIDERS[provider]?.defaultModel || null; }
 function isProviderConfigured(provider='anthropic') { if(provider==='mock')return MOCK_ENABLED();const keyEnv=PROVIDERS[provider]?.keyEnv;return !!keyEnv&&!!process.env[keyEnv]; }
-module.exports={generate,getDefaultModel,isProviderConfigured};
+module.exports={generate,generateStream,getDefaultModel,isProviderConfigured};
