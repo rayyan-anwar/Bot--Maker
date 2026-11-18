@@ -117,10 +117,10 @@ test('Anthropic streaming adapter emits text deltas and final token usage',async
   assert.equal(JSON.parse(options.body).stream,true);
   const encoder=new TextEncoder();
   const chunks=[
-   'event: message_start\\ndata: '+JSON.stringify({type:'message_start',message:{usage:{input_tokens:11}}})+'\\n\\n',
-   'event: content_block_delta\\ndata: '+JSON.stringify({type:'content_block_delta',delta:{type:'text_delta',text:'Hello '}})+'\\n\\n',
-   'event: content_block_delta\\ndata: '+JSON.stringify({type:'content_block_delta',delta:{type:'text_delta',text:'world'}})+'\\n\\n',
-   'event: message_delta\\ndata: '+JSON.stringify({type:'message_delta',usage:{output_tokens:4}})+'\\n\\n'
+   'event: message_start\ndata: '+JSON.stringify({type:'message_start',message:{usage:{input_tokens:11}}})+'\n\n',
+   'event: content_block_delta\ndata: '+JSON.stringify({type:'content_block_delta',delta:{type:'text_delta',text:'Hello '}})+'\n\n',
+   'event: content_block_delta\ndata: '+JSON.stringify({type:'content_block_delta',delta:{type:'text_delta',text:'world'}})+'\n\n',
+   'event: message_delta\ndata: '+JSON.stringify({type:'message_delta',usage:{output_tokens:4}})+'\n\n'
   ];
   return {ok:true,status:200,body:new ReadableStream({start(controller){for(const chunk of chunks)controller.enqueue(encoder.encode(chunk));controller.close();}})};
  },async()=>{
