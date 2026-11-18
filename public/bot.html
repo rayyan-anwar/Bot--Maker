@@ -299,7 +299,7 @@
           const restore=document.createElement('button');restore.className='btn btn-ghost';restore.type='button';restore.textContent='Restore';
           restore.addEventListener('click',async()=>{
             if(!confirm('Restore version '+version.version+'? Current settings will be saved as a newer version.'))return;
-            try{const result=await api('/bots/'+botId+'/versions/'+version.version+'/restore',{method:'POST'});bot=result.bot;document.getElementById('set-name').value=bot.name;document.getElementById('set-description').value=bot.description;document.getElementById('set-instructions').value=bot.instructions;document.getElementById('set-public').checked=bot.isPublic;document.getElementById('bot-name').textContent=bot.name;document.getElementById('bot-desc').textContent=bot.description;await loadVersions();}
+            try{const result=await api('/bots/'+botId+'/versions/'+version.version+'/restore',{method:'POST'});bot=result.bot;document.getElementById('set-name').value=bot.name;document.getElementById('set-description').value=bot.description;document.getElementById('set-instructions').value=bot.instructions;document.getElementById('set-public').checked=bot.isPublic;document.getElementById('set-purpose').value=bot.purpose||'';document.getElementById('set-audience').value=bot.audience||'';document.getElementById('set-welcome').value=bot.welcomeMessage||'';document.getElementById('bot-name').textContent=bot.name;document.getElementById('bot-desc').textContent=bot.description;await loadVersions();}
             catch(error){alert(error.message);}
           });
           row.appendChild(restore);
