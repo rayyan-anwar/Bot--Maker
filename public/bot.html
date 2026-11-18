@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chat — BotForge</title>
 <link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/fortisni.css">
 </head>
 <body>
 
@@ -39,6 +40,7 @@
     </form>
     <div id="memory-list" style="margin-top:8px"></div>
   </details>
+  <div id="fortisni-companion" class="fortisni-companion" data-state="idle"></div>
   <div class="chat-log" id="chat-log"></div>
   <div class="ad-slot" aria-label="Advertisement"><span>ADVERTISEMENT</span><div>Sponsored placement · available after ad-network approval</div></div>
   <form class="chat-input-row" id="chat-form">
@@ -90,6 +92,7 @@
 </section>
 
 <script src="/js/api.js"></script>
+<script src="/js/fortisni.js"></script>
 <script>
 (async function init() {
   const user = await requireLogin();
@@ -187,11 +190,14 @@
     if (!text) return;
     input.value = '';
     renderMessage('user', text, false);
+    window.setFortisniState('thinking');
     const pending = renderMessage('assistant', 'Thinking…', true);
 
     try {
       const { message, sources = [] } = await api('/chat/' + botId + '/messages', { method: 'POST', body: { content: text } });
       pending.textContent = message.content;
+      window.setFortisniState('speaking');
+      window.setTimeout(() => window.setFortisniState('idle'), 1800);
       pending.classList.remove('pending');
       if (sources.length) {
         const panel = document.createElement('div');
@@ -214,6 +220,7 @@
       }
     } catch (err) {
       pending.textContent = 'Error: ' + err.message;
+      window.setFortisniState('error');
       pending.classList.remove('pending');
     }
   });
