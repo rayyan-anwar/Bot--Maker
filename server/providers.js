@@ -82,7 +82,7 @@ async function streamProviderResponse(response,provider,onToken){
  if(!response.body)throw new Error('The provider did not return a streaming response.');
  const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',text='',inputTokens=0,outputTokens=0;
  const consume=async(raw)=>{
-  for(const line of raw.split(/\\r?\\n/)){
+  for(const line of raw.split(/\r?\n/)){
    if(!line.startsWith('data:'))continue;
    const value=line.slice(5).trim();if(!value||value==='[DONE]')continue;
    let event;try{event=JSON.parse(value);}catch(_){continue;}
@@ -94,14 +94,14 @@ async function streamProviderResponse(response,provider,onToken){
   }
  };
  try{
-  while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let boundary;while((boundary=buffer.indexOf('\\n\\n'))>=0){const part=buffer.slice(0,boundary);buffer=buffer.slice(boundary+2);await consume(part);}}
+  while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let boundary;while((boundary=buffer.indexOf('\n\n'))>=0){const part=buffer.slice(0,boundary);buffer=buffer.slice(boundary+2);await consume(part);}}
   buffer+=decoder.decode();if(buffer.trim())await consume(buffer);
  }finally{reader.releaseLock();}
  if(!text.trim())throw new Error('The provider returned an empty response.');
  return {text,inputTokens,outputTokens};
 }
 async function generateStream({provider='anthropic',model,system,messages,maxTokens=1024,onToken=()=>{},timeoutMs=60000}){
- if(provider==='mock'){const result=await generate({provider,model,system,messages,maxTokens});for(const word of result.text.match(/\\S+\\s*/g)||[])await onToken(word);return result;}
+ if(provider==='mock'){const result=await generate({provider,model,system,messages,maxTokens});for(const word of result.text.match(/\S+\s*/g)||[])await onToken(word);return result;}
  const adapter=PROVIDERS[provider];if(!adapter)throw new Error('Unsupported AI provider.');
  if(!process.env[adapter.keyEnv])throw new Error('The selected AI provider is not configured on this server.');
  const actualModel=model||adapter.defaultModel;let response;
@@ -113,6 +113,6 @@ async function generateStream({provider='anthropic',model,system,messages,maxTok
   return await streamProviderResponse(response,provider,onToken);
  }catch(error){if(error.name==='AbortError')throw new Error('The AI provider timed out. Please try again.');throw error;}finally{clearTimeout(timer);}
 }
-\nfunction getDefaultModel(provider='anthropic') { return PROVIDERS[provider]?.defaultModel || null; }
+function getDefaultModel(provider='anthropic') { return PROVIDERS[provider]?.defaultModel || null; }
 function isProviderConfigured(provider='anthropic') { if(provider==='mock')return MOCK_ENABLED();const keyEnv=PROVIDERS[provider]?.keyEnv;return !!keyEnv&&!!process.env[keyEnv]; }
 module.exports={generate,generateStream,getDefaultModel,isProviderConfigured};
