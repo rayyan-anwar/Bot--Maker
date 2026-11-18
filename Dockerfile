@@ -4,7 +4,7 @@ ENV NODE_ENV=production
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install --omit=dev --no-audit --no-fund --ignore-scripts
+RUN npm ci --omit=dev --no-audit --no-fund --ignore-scripts
 
 COPY --chown=node:node . .
 RUN mkdir -p /app/data /app/uploads && chown -R node:node /app
