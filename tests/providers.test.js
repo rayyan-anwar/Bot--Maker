@@ -52,7 +52,9 @@ test('OpenAI adapter sends Responses API input and extracts output text',async()
 
 test('Gemini adapter encodes model and API key and maps assistant role',async()=>{
  await withEnv({GOOGLE_GEMINI_API_KEY:'gemini test key'},()=>withFetch(async(url,options)=>{
-  assert.match(url,/models\/gemini-3\.8-flash:generateContent\?key=gemini%20test%20key$/);
+  assert.match(url,/models\/gemini-3\.8-flash:generateContent$/);
+  assert.equal(options.headers['x-goog-api-key'],'gemini test key');
+  assert.equal(url.includes('gemini test key'),false);
   const body=JSON.parse(options.body);
   assert.deepEqual(body.contents,[{role:'model',parts:[{text:'Previous answer'}]},{role:'user',parts:[{text:'Next question'}]}]);
   return response({candidates:[{content:{parts:[{text:'Gemini answer'}]}}],usageMetadata:{promptTokenCount:9,candidatesTokenCount:5}});
