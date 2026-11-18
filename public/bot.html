@@ -65,6 +65,18 @@
         <input type="text" id="set-description">
       </div>
       <div class="field">
+        <label for="set-purpose">Bot purpose</label>
+        <input type="text" id="set-purpose" maxlength="300">
+      </div>
+      <div class="field">
+        <label for="set-audience">Target audience</label>
+        <input type="text" id="set-audience" maxlength="160">
+      </div>
+      <div class="field">
+        <label for="set-welcome">Welcome message</label>
+        <input type="text" id="set-welcome" maxlength="500">
+      </div>
+      <div class="field">
         <label for="set-instructions">Instructions</label>
         <textarea id="set-instructions" required></textarea>
       </div>
@@ -131,6 +143,9 @@
     document.getElementById('set-name').value = bot.name;
     document.getElementById('set-description').value = bot.description;
     document.getElementById('set-instructions').value = bot.instructions;
+    document.getElementById('set-purpose').value = bot.purpose || '';
+    document.getElementById('set-audience').value = bot.audience || '';
+    document.getElementById('set-welcome').value = bot.welcomeMessage || '';
     document.getElementById('set-public').checked = bot.isPublic;
     loadDocs();
   }
@@ -184,7 +199,7 @@
   (async function loadHistory() {
     const { messages } = await api('/chat/' + botId + '/messages');
     if (messages.length === 0) {
-      renderMessage('assistant', `Hi, I'm ${bot.name}. ${bot.description || "Ask me anything."}`, false);
+      renderMessage('assistant', bot.welcomeMessage || `Hi, I'm ${bot.name}. ${bot.description || "Ask me anything."}`, false);
     } else {
       messages.forEach((m) => renderMessage(m.role, m.content, false));
     }
@@ -253,7 +268,10 @@
           name: document.getElementById('set-name').value,
           description: document.getElementById('set-description').value,
           instructions: document.getElementById('set-instructions').value,
-          isPublic: document.getElementById('set-public').checked
+          isPublic: document.getElementById('set-public').checked,
+          purpose: document.getElementById('set-purpose').value,
+          audience: document.getElementById('set-audience').value,
+          welcomeMessage: document.getElementById('set-welcome').value
         }
       });
       document.getElementById('bot-name').textContent = updated.name;
