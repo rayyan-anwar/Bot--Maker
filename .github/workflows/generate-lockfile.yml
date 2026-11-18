@@ -26,11 +26,14 @@ jobs:
         with:
           node-version: 22
       - name: Generate package lock
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+        run: |
+          npm config set package-lock true
+          npm install --package-lock=true --package-lock-only --ignore-scripts --no-audit --no-fund
+          test -s package-lock.json
       - name: Commit lockfile
         run: |
-          if [ -f package-lock.json ] && git diff --quiet -- package-lock.json; then
-            echo "package-lock.json is already current"
+          if [ -f package-lock.json ] && [ -z "$(git status --short --untracked-files=all -- package-lock.json)" ]; then
+            echo "package-lock.json is already tracked and current"
             exit 0
           fi
           git config user.name "github-actions[bot]"
