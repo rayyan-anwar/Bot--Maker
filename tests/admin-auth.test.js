@@ -6,10 +6,11 @@ const path=require('node:path');
 
 test('single-administrator startup requires a valid owner email',()=>{
  const previousEnv=process.env.NODE_ENV,previousFlag=process.env.BOTFORGE_SINGLE_ADMIN,previousEmail=process.env.BOTFORGE_ADMIN_EMAIL,previousJwt=process.env.JWT_SECRET;
+ process.env.NODE_ENV='test';
+ process.env.BOTFORGE_SINGLE_ADMIN='true';
  process.env.JWT_SECRET='single-admin-config-test-secret-with-at-least-thirty-two-characters';
  const {validateSingleAdminConfig}=require('../server/index');
  try{
-  process.env.NODE_ENV='production';
   process.env.BOTFORGE_ADMIN_EMAIL='';
   assert.throws(()=>validateSingleAdminConfig(),/BOTFORGE_ADMIN_EMAIL must be set/);
   process.env.BOTFORGE_ADMIN_EMAIL='not-an-email';
