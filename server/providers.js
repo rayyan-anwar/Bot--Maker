@@ -36,9 +36,9 @@ const PROVIDERS = {
     keyEnv:'GOOGLE_GEMINI_API_KEY',
     defaultModel:process.env.GEMINI_MODEL || 'gemini-3.8-flash',
     async generate({model,system,messages,maxTokens,signal}) {
-      const url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent?key='+encodeURIComponent(process.env.GOOGLE_GEMINI_API_KEY);
+      const url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent';
       const contents=messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
-      const response=await fetch(url,{method:'POST',signal,headers:{'content-type':'application/json'},body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents,generationConfig:{maxOutputTokens:maxTokens}})});
+      const response=await fetch(url,{method:'POST',signal,headers:{'content-type':'application/json','x-goog-api-key':process.env.GOOGLE_GEMINI_API_KEY},body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents,generationConfig:{maxOutputTokens:maxTokens}})});
       const data=await safeJson(response);
       if(!response.ok) throw providerError('Google Gemini',response.status,data);
       return {text:(data.candidates?.[0]?.content?.parts || []).map(p=>p.text || '').join(''),inputTokens:data.usageMetadata?.promptTokenCount || 0,outputTokens:data.usageMetadata?.candidatesTokenCount || 0};
