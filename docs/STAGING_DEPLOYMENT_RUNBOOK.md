@@ -37,7 +37,7 @@ For an existing JSON installation:
 1. Stop writes to the old instance and take a timestamped backup of `data/db.json`.
 2. Keep the backup read-only and store a separate copy outside the application host.
 3. Configure `DATABASE_URL` in a protected staging environment.
-4. Run `npm install --ignore-scripts`, then `npm run migrate:postgres -- --dry-run`. The repository currently has no committed `package-lock.json`; create and review a lockfile before a production release, then switch the install command to `npm ci`.
+4. Run `npm ci --ignore-scripts`, then `npm run migrate:postgres -- --dry-run`. The committed `package-lock.json` is the source of truth for reproducible installs.
 5. Review preflight counts and errors. Do not proceed if any record fails validation.
 6. Run `npm run migrate:postgres` once.
 7. Verify imported collection counts and the migration marker directly in PostgreSQL.
@@ -48,6 +48,20 @@ The importer runs in one transaction and records a one-time marker. It does not 
 For a fresh database, apply `migrations/001_initial_schema.sql` followed by `migrations/003_oauth_and_profile_memory.sql` using the database migration process, then start the app. The app creates the JSONB runtime repository, quota reservations, shared rate limits and webhook idempotency table during startup. `003` is required so OAuth-only accounts and account-wide memory notes can be represented in the normalized reporting tables.
 
 For a reproducible local PostgreSQL staging rehearsal, copy `.env.example` to `.env`, set `POSTGRES_PASSWORD` and `JWT_SECRET`, then run `docker compose -f docker-compose.staging.yml up --build -d`. Wait for the `botforge` service healthcheck, then run the staging smoke tests below. This stack is for staging only, not public production hosting. The staging compose stack includes a private ClamAV service; the first signature database update can delay readiness for scanning, so verify ClamAV is accepting connections before testing document uploads. The application rejects uploads with HTTP 503 if the scanner is unavailable and HTTP 422 if malware is detected.
+
+
+## 3A. Zero-cost local development (no hosting or provider key)
+
+This mode is for local feature development only. It does not create a public URL, persistent managed database, malware-scanning service or production deployment.
+
+1. Install Node.js 20 or 22 on your development computer.
+2. Clone the repository and run `npm ci`.
+3. Copy `.env.example` to `.env`. Set `NODE_ENV=development`, a unique random `JWT_SECRET` (at least 32 characters), `BOTFORGE_ADMIN_EMAIL` to your own email, `BOTFORGE_ENABLE_MOCK_PROVIDER=true`, and `DATABASE_URL=` (blank uses local JSON development storage).
+4. Run `npm run dev` and open `http://localhost:3000`.
+5. Create an account through the development signup flow, create a bot using provider `mock`, and send a message. The mock returns a deterministic local test response and makes no external AI request or API charge.
+6. Keep mock mode disabled in production. The server deliberately refuses the mock provider whenever `NODE_ENV=production`, even if the flag is accidentally set.
+
+Do not use real customer data in local JSON mode. Document uploads require a working ClamAV daemon; skip upload testing in this no-service mode. PostgreSQL, backup/restore, HTTPS, email, OAuth, payments and production AI remain unverified until their services and credentials are provisioned.
 
 ## 4. Staging smoke tests
 
