@@ -1,4 +1,7 @@
+const MOCK_ENABLED=()=>process.env.NODE_ENV!=='production'&&process.env.BOTFORGE_ENABLE_MOCK_PROVIDER==='true';
+
 const PROVIDERS = {
+  mock: { keyEnv:null, defaultModel:'botforge-mock-v1' },
   anthropic: {
     keyEnv: 'ANTHROPIC_API_KEY',
     defaultModel: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5',
@@ -56,6 +59,12 @@ function providerError(name,status,data) {
 async function generate({provider='anthropic',model,system,messages,maxTokens=1024,timeoutMs=45000}) {
   const adapter=PROVIDERS[provider];
   if(!adapter) throw new Error('Unsupported AI provider.');
+  if(provider==='mock'){
+    if(!MOCK_ENABLED()) throw new Error('The mock provider is disabled. Enable it only in a non-production development environment.');
+    const last=[...messages].reverse().find(message=>message.role==='user');
+    const prompt=String(last?.content||'').trim();
+    return {text:prompt?'[BotForge mock response] I received your message: '+prompt.slice(0,500)+'\n\nThis is a local test response. Connect a real AI provider to get an actual AI-generated answer.':'[BotForge mock response] Local provider is working. Connect a real AI provider for production AI.',inputTokens:0,outputTokens:0};
+  }
   const key=process.env[adapter.keyEnv];
   if(!key) throw new Error('The selected AI provider is not configured on this server.');
   const controller=new AbortController();
@@ -68,5 +77,5 @@ async function generate({provider='anthropic',model,system,messages,maxTokens=10
   } finally { clearTimeout(timer); }
 }
 function getDefaultModel(provider='anthropic') { return PROVIDERS[provider]?.defaultModel || null; }
-function isProviderConfigured(provider='anthropic') { return !!process.env[PROVIDERS[provider]?.keyEnv]; }
+function isProviderConfigured(provider='anthropic') { if(provider==='mock')return MOCK_ENABLED();const keyEnv=PROVIDERS[provider]?.keyEnv;return !!keyEnv&&!!process.env[keyEnv]; }
 module.exports={generate,getDefaultModel,isProviderConfigured};
