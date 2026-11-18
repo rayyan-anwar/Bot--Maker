@@ -87,3 +87,23 @@ test('unsupported and unconfigured providers fail before making a network reques
   await assert.rejects(()=>providers.generate({provider:'anthropic',messages:[],system:''}),/not configured/);
  }));
 });
+
+test('mock provider returns a deterministic local response only when explicitly enabled outside production',async()=>{
+ await withEnv({NODE_ENV:'test',BOTFORGE_ENABLE_MOCK_PROVIDER:'true'},async()=>{
+  const result=await providers.generate({provider:'mock',messages:[{role:'user',content:'Test prompt'}]});
+  assert.match(result.text,/local test response/i);
+  assert.match(result.text,/Test prompt/);
+  assert.equal(result.inputTokens,0);
+  assert.equal(result.outputTokens,0);
+  assert.equal(providers.isProviderConfigured('mock'),true);
+ });
+});
+test('mock provider is unavailable in production and when not explicitly enabled',async()=>{
+ await withEnv({NODE_ENV:'production',BOTFORGE_ENABLE_MOCK_PROVIDER:'true'},async()=>{
+  assert.equal(providers.isProviderConfigured('mock'),false);
+  await assert.rejects(()=>providers.generate({provider:'mock',messages:[{role:'user',content:'No'}]}),/mock provider is disabled/i);
+ });
+ await withEnv({NODE_ENV:'development',BOTFORGE_ENABLE_MOCK_PROVIDER:undefined},async()=>{
+  assert.equal(providers.isProviderConfigured('mock'),false);
+ });
+});
