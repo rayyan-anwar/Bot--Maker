@@ -23,10 +23,10 @@ test('authenticated chat endpoint streams mock-provider tokens and a saved compl
  const created=await fetch(base+'/api/bots',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({name:'Streaming bot',instructions:'Answer briefly.',provider:'mock'})});
  assert.equal(created.status,201);const bot=(await created.json()).bot;
  const response=await fetch(base+'/api/chat/'+bot.id+'/messages',{method:'POST',headers:{cookie,'content-type':'application/json','accept':'text/event-stream'},body:JSON.stringify({content:'Hello stream'})});
- assert.equal(response.status,200);assert.match(response.headers.get('content-type'),/text\\/event-stream/);
+ assert.equal(response.status,200);assert.match(response.headers.get('content-type'),/text\/event-stream/);
  const body=await response.text();
  assert.match(body,/event: token/);assert.match(body,/event: complete/);
- const complete=body.split('event: complete\\n')[1].split('\\n\\n')[0];
+ const complete=body.split('event: complete\n')[1].split('\n\n')[0];
  const payload=JSON.parse(complete.slice(6));
  assert.match(payload.message.content,/Hello stream/);
  const messages=await store.findManyAsync('messages',{botId:bot.id,userId:user.id});
