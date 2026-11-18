@@ -10,13 +10,13 @@
     const text=String(value||'').toLowerCase();
     if(!text.trim())return window.setFortisniState('idle');
     const tests=[
-      ['sad',/\\b(sad|depress|lonely|upset|heartbroken|unhappy|crying| दुखी|उदास|परेशान)\\b/],
-      ['concerned',/\\b(scared|afraid|worried|anxious| डर|डर लग|चिंता|घबर)\\b/],
-      ['angry',/\\b(angry|furious|annoyed|frustrated|hate|गुस्सा|नाराज़)\\b/],
-      ['grateful',/\\b(thank you|thanks|thx|धन्यवाद|शुक्रिया)\\b/],
-      ['happy',/\\b(happy|excited|awesome|amazing|great|wonderful|खुश|मज़ा|शानदार)\\b/],
-      ['curious',/\\b(why|how|what|when|where|explain|समझाओ|क्यों|कैसे|क्या)\\b/],
-      ['confused',/\\b(confused|don't understand|do not understand|unclear|समझ नहीं|कन्फ्यूज)\\b/]
+      ['sad',/\b(sad|depress|lonely|upset|heartbroken|unhappy|crying| दुखी|उदास|परेशान)\b/],
+      ['concerned',/\b(scared|afraid|worried|anxious| डर|डर लग|चिंता|घबर)\b/],
+      ['angry',/\b(angry|furious|annoyed|frustrated|hate|गुस्सा|नाराज़)\b/],
+      ['grateful',/\b(thank you|thanks|thx|धन्यवाद|शुक्रिया)\b/],
+      ['happy',/\b(happy|excited|awesome|amazing|great|wonderful|खुश|मज़ा|शानदार)\b/],
+      ['curious',/\b(why|how|what|when|where|explain|समझाओ|क्यों|कैसे|क्या)\b/],
+      ['confused',/\b(confused|don't understand|do not understand|unclear|समझ नहीं|कन्फ्यूज)\b/]
     ];
     let state='idle';
     for(const [candidate,pattern] of tests){if(pattern.test(text)){state=candidate;break;}}
