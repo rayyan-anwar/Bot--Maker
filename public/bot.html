@@ -77,6 +77,12 @@
   </div>
 
   <div class="card mt-24">
+    <h2>Version history</h2>
+    <p class="muted">Every saved configuration is recorded. Restoring a version creates a new version, so later changes remain recoverable.</p>
+    <div id="version-list" class="mt-24"><p class="muted">Loading versions…</p></div>
+  </div>
+
+  <div class="card mt-24">
     <h2>Documents</h2>
     <p>Upload .txt, .md, or .pdf files. Your bot will search them for relevant snippets when answering questions.</p>
     <input type="file" id="doc-file" accept=".txt,.md,.pdf">
@@ -252,11 +258,39 @@
       });
       document.getElementById('bot-name').textContent = updated.name;
       document.getElementById('bot-desc').textContent = updated.description;
+      bot=updated;await loadVersions();
     } catch (err) {
       errBox.textContent = err.message;
       errBox.classList.add('show');
     }
   });
+
+  // ---- version history ----
+  async function loadVersions() {
+    const list=document.getElementById('version-list');
+    try {
+      const {currentVersion,versions}=await api('/bots/'+botId+'/versions');
+      list.replaceChildren();
+      if(!versions.length){list.textContent='No saved versions yet.';return;}
+      versions.forEach(version=>{
+        const row=document.createElement('div');row.className='doc-row';
+        const label=document.createElement('span');
+        label.textContent='Version '+version.version+(version.version===currentVersion?' · Current':'')+' · '+new Date(version.createdAt).toLocaleString()+' · '+version.summary;
+        row.appendChild(label);
+        if(version.version!==currentVersion){
+          const restore=document.createElement('button');restore.className='btn btn-ghost';restore.type='button';restore.textContent='Restore';
+          restore.addEventListener('click',async()=>{
+            if(!confirm('Restore version '+version.version+'? Current settings will be saved as a newer version.'))return;
+            try{const result=await api('/bots/'+botId+'/versions/'+version.version+'/restore',{method:'POST'});bot=result.bot;document.getElementById('set-name').value=bot.name;document.getElementById('set-description').value=bot.description;document.getElementById('set-instructions').value=bot.instructions;document.getElementById('set-public').checked=bot.isPublic;document.getElementById('bot-name').textContent=bot.name;document.getElementById('bot-desc').textContent=bot.description;await loadVersions();}
+            catch(error){alert(error.message);}
+          });
+          row.appendChild(restore);
+        }
+        list.appendChild(row);
+      });
+    } catch(error) { list.textContent='Version history unavailable: '+error.message; }
+  }
+  loadVersions();
 
   // ---- documents ----
   async function loadDocs() {
