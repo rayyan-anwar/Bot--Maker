@@ -321,9 +321,19 @@
     list.innerHTML = documents.map((d) => `
       <div class="doc-row" data-id="${escapeHtml(d.id)}">
         <span>${escapeHtml(d.filename)} <span class="muted">(${Number(d.chunkCount)||0} chunks)</span></span>
+        <span class="muted">Keyword index: ${Number(d.chunkCount)||0} chunks · Semantic: ${d.semanticSearchAvailable?'ready': 'not configured'}</span>
+        <button class="btn btn-ghost doc-reindex" data-id="${escapeHtml(d.id)}" ${d.semanticSearchAvailable?'disabled':''}>Rebuild semantic index</button>
         <button class="btn btn-ghost doc-delete" data-id="${escapeHtml(d.id)}">Remove</button>
       </div>`).join('');
 
+    list.querySelectorAll('.doc-reindex').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if(btn.disabled)return;
+        btn.disabled=true;btn.textContent='Indexing…';
+        try{await api('/documents/'+botId+'/'+btn.dataset.id+'/reindex',{method:'POST'});await loadDocs();}
+        catch(error){alert(error.message);btn.disabled=false;btn.textContent='Rebuild semantic index';}
+      });
+    });
     list.querySelectorAll('.doc-delete').forEach((btn) => {
       btn.addEventListener('click', async () => {
         await api('/documents/' + botId + '/' + btn.dataset.id, { method: 'DELETE' });
