@@ -1,1 +1,14 @@
 .fortisni-companion{display:flex;align-items:center;gap:12px;padding:10px 14px;margin:12px 24px 0;border:1px solid var(--border);border-radius:16px;background:linear-gradient(120deg,rgba(84,93,255,.10),rgba(28,198,255,.07));min-height:76px}.fortisni-avatar{width:58px;height:58px;flex:0 0 58px;animation:fortisni-float 3s ease-in-out infinite;filter:drop-shadow(0 4px 10px rgba(91,110,255,.25))}.fortisni-copy{min-width:0}.fortisni-name{font-weight:700;letter-spacing:.2px}.fortisni-status{font-size:.88rem;color:var(--muted);margin-top:3px}.fortisni-status strong{color:var(--text)}.fortisni-companion[data-state="thinking"] .fortisni-avatar{animation:fortisni-think .65s ease-in-out infinite alternate}.fortisni-companion[data-state="speaking"] .fortisni-mouth{transform:scaleY(1.5);transform-origin:center}.fortisni-companion[data-state="happy"] .fortisni-eyes{transform:scaleY(.35);transform-origin:center}.fortisni-companion[data-state="error"] .fortisni-aura{stroke:#fb7185}@keyframes fortisni-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}@keyframes fortisni-think{from{transform:translateY(0) rotate(-3deg)}to{transform:translateY(-3px) rotate(3deg)}}@media(prefers-reduced-motion:reduce){.fortisni-avatar,.fortisni-companion[data-state="thinking"] .fortisni-avatar{animation:none}}
+/* Text-aware emotional expressions */
+.fortisni-companion[data-state="sad"] .fortisni-mouth{transform:rotate(180deg) translateY(-2px);transform-origin:center}
+.fortisni-companion[data-state="sad"] .fortisni-aura{stroke:#60a5fa}
+.fortisni-companion[data-state="concerned"] .fortisni-eyes{transform:translateY(2px) scaleY(1.25);transform-origin:center}
+.fortisni-companion[data-state="concerned"] .fortisni-aura{stroke:#fbbf24}
+.fortisni-companion[data-state="angry"] .fortisni-eyes{transform:translateY(2px) scaleY(.7);transform-origin:center}
+.fortisni-companion[data-state="angry"] .fortisni-aura{stroke:#fb7185}
+.fortisni-companion[data-state="curious"] .fortisni-avatar{transform:rotate(5deg)}
+.fortisni-companion[data-state="curious"] .fortisni-aura{stroke:#a78bfa}
+.fortisni-companion[data-state="confused"] .fortisni-avatar{transform:rotate(-5deg)}
+.fortisni-companion[data-state="confused"] .fortisni-mouth{transform:scaleX(.7)}
+.fortisni-companion[data-state="grateful"] .fortisni-eyes{transform:scaleY(.35);transform-origin:center}
+.fortisni-companion[data-state="grateful"] .fortisni-aura{stroke:#34d399}
