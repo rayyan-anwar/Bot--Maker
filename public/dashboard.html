@@ -3,14 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Your bots — Botworks</title>
+<title>Your bots — BotForge</title>
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
 
 <header class="topbar">
-  <a class="brand" href="/dashboard.html"><span class="mark"></span> Botworks</a>
+  <a class="brand" href="/dashboard.html"><span class="mark"></span> BotForge</a>
   <nav>
+    <a href="/billing.html">Plans &amp; billing</a>
     <span class="muted" id="whoami"></span>
     <a href="#" id="logout">Log out</a>
   </nav>
@@ -21,7 +22,17 @@
     <h1 style="margin:0">Your bots</h1>
     <button class="btn btn-primary" id="new-bot-btn">+ New bot</button>
   </div>
-  <div id="my-bots" class="bot-grid"></div>
+  <div class="ad-slot" aria-label="Advertisement"><span>ADVERTISEMENT</span><div>Sponsored placement · available after ad-network approval</div></div><div class="card usage-card" id="usage-card" style="margin-top:20px"><div class="flex-between"><div><h2 style="margin:0">Usage today</h2><p id="usage-copy" style="margin:4px 0 0">Loading usage…</p></div><strong id="usage-count">—</strong></div><div class="usage-track"><span id="usage-progress"></span></div></div><div id="my-bots" class="bot-grid"></div>
+  <section class="card" style="margin-top:20px">
+    <h2>Personal AI Memory</h2>
+    <p class="muted">Notes you save here can provide context across your own bots. You control and can remove these notes.</p>
+    <form id="profile-memory-form" class="row">
+      <input id="profile-memory-content" type="text" maxlength="500" required placeholder="Add a useful preference or fact">
+      <button class="btn btn-primary" type="submit">Save memory</button>
+    </form>
+    <div id="profile-memory-list" style="margin-top:12px"></div>
+  </section>
+
   <div id="my-bots-empty" class="empty-state" style="display:none">
     You haven't made a bot yet. Click <strong>New bot</strong> to give one a name and a personality.
   </div>
@@ -48,6 +59,10 @@
       <div class="field">
         <label for="bot-description">Short description <span class="muted">(optional)</span></label>
         <input type="text" id="bot-description" placeholder="What is this bot for?">
+      </div>
+      <div class="field">
+        <label for="bot-provider">AI provider</label>
+        <select id="bot-provider"><option value="anthropic">Anthropic Claude</option><option value="openai">OpenAI</option><option value="gemini">Google Gemini</option></select>
       </div>
       <div class="field">
         <label for="bot-instructions">Instructions — how should it behave?</label>
@@ -77,10 +92,32 @@
     window.location.href = '/index.html';
   });
 
+
+  // Account-wide memory profile, applied to all of this user's bots.
+  const profileMemoryList=document.getElementById('profile-memory-list');
+  async function loadProfileMemory(){
+    const {memories=[]}=await api('/chat/memory/me');
+    profileMemoryList.replaceChildren();
+    if(!memories.length){profileMemoryList.textContent='No personal memories saved yet.';return;}
+    memories.forEach(note=>{
+      const row=document.createElement('div');row.className='doc-row';
+      const label=document.createElement('span');label.textContent=note.content;
+      const remove=document.createElement('button');remove.className='btn btn-ghost';remove.type='button';remove.textContent='Remove';
+      remove.addEventListener('click',async()=>{try{await api('/chat/memory/me/'+note.id,{method:'DELETE'});await loadProfileMemory();}catch(err){alert(err.message);}});
+      row.append(label,remove);profileMemoryList.appendChild(row);
+    });
+  }
+  document.getElementById('profile-memory-form').addEventListener('submit',async e=>{
+    e.preventDefault();const field=document.getElementById('profile-memory-content');
+    try{await api('/chat/memory/me',{method:'POST',body:{content:field.value}});field.value='';await loadProfileMemory();}
+    catch(err){alert(err.message);}
+  });
+  loadProfileMemory().catch(()=>{profileMemoryList.textContent='Personal memory is temporarily unavailable.';});
+
   function botCard(bot, isOwn) {
     const tag = isOwn ? (bot.isPublic ? 'Public' : 'Private') : 'Public · by someone else';
     return `
-      <a class="bot-card" href="/bot.html?id=${bot.id}">
+      <a class="bot-card" href="/bot.html?id=${encodeURIComponent(bot.id)}">
         <h3>${escapeHtml(bot.name)}</h3>
         <p>${escapeHtml(bot.description || 'No description yet.')}</p>
         <span class="tag">${tag}</span>
@@ -100,6 +137,21 @@
     document.getElementById('public-bots-empty').style.display = theirs.length ? 'none' : 'block';
   }
   loadBots();
+  api('/chat/providers').then(({providers})=>{
+    const select=document.getElementById('bot-provider');
+    providers.forEach(provider=>{
+      const option=select.querySelector('option[value="'+provider.id+'"]');
+      if(option){
+        option.disabled=!provider.configured;
+        option.textContent=option.textContent+(provider.configured?'':' (server key not configured)');
+      }
+    });
+  }).catch(()=>{});
+  api('/chat/usage/me').then(({used,limit,remaining,plan})=>{
+    document.getElementById('usage-copy').textContent=(plan?plan.toUpperCase()+' plan · ':'')+remaining+' messages remaining today';
+    document.getElementById('usage-count').textContent=used+' / '+limit;
+    document.getElementById('usage-progress').style.width=Math.min(100,used/limit*100)+'%';
+  }).catch(()=>{document.getElementById('usage-copy').textContent='Usage information unavailable';});
 
   const overlay = document.getElementById('new-bot-overlay');
   document.getElementById('new-bot-btn').addEventListener('click', () => { overlay.style.display = 'flex'; });
@@ -116,7 +168,8 @@
           name: document.getElementById('bot-name').value,
           description: document.getElementById('bot-description').value,
           instructions: document.getElementById('bot-instructions').value,
-          isPublic: document.getElementById('bot-public').checked
+          isPublic: document.getElementById('bot-public').checked,
+          provider: document.getElementById('bot-provider').value
         }
       });
       window.location.href = '/bot.html?id=' + bot.id;

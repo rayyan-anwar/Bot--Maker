@@ -1,0 +1,101 @@
+name: BotForge CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A branch update already triggers the open pull_request workflow. Avoid a second
+# run for the same commit and cancel stale runs when newer commits arrive.
+concurrency:
+  group: botforge-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18, 20, 22]
+    permissions:
+      contents: read
+    name: Node.js ${{ matrix.node-version }} verification
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm install --ignore-scripts
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - run: npm test
+      - run: node scripts/check-syntax.js
+      - run: npm run security:scan
+      - run: bash -n scripts/backup-postgres.sh scripts/restore-postgres.sh
+
+  postgres-integration:
+    name: PostgreSQL 16 integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: botforge_test
+          POSTGRES_USER: botforge
+          POSTGRES_PASSWORD: botforge_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U botforge -d botforge_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --ignore-scripts
+      - name: Apply baseline and runtime migrations
+        env:
+          BOTFORGE_TEST_DATABASE_URL: postgres://botforge:botforge_test_password@127.0.0.1:5432/botforge_test
+        run: node scripts/apply-test-migrations.js
+      - name: Exercise PostgreSQL concurrency and shared rate limits
+        env:
+          BOTFORGE_TEST_DATABASE_URL: postgres://botforge:botforge_test_password@127.0.0.1:5432/botforge_test
+        run: node --test tests/postgres.integration.test.js
+
+  docker-build:
+    name: Docker image build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build production container image
+        run: docker build --tag botforge:ci .
+      - name: Smoke test container startup and readiness
+        run: |
+          docker run -d --rm --name botforge-ci -p 3000:3000 \
+            -e JWT_SECRET=ci-only-dummy-secret-value-that-is-long-enough-12345 \
+            -e BOTFORGE_ADMIN_EMAIL=admin@example.test botforge:ci
+          trap 'docker stop botforge-ci >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent http://127.0.0.1:3000/readyz; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs botforge-ci
+          exit 1

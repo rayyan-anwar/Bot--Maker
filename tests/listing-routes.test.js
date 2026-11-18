@@ -1,0 +1,36 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const os=require('node:os');
+const path=require('node:path');
+
+test('administrator-only bot and document listing routes require the configured admin account',async(t)=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-listing-'));
+ process.env.JWT_SECRET='test-only-secret-with-at-least-thirty-two-characters';
+ process.env.BOTFORGE_ADMIN_EMAIL='listing-test@example.com';
+ process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
+ const {start,shutdown}=require('../server/index');
+ const server=await start(0,'127.0.0.1');
+ t.after(async()=>{await shutdown();fs.rmSync(dir,{recursive:true,force:true});});
+ const base='http://127.0.0.1:'+server.address().port;
+ const bcrypt=require('bcryptjs'),{v4:uuidv4}=require('uuid'),store=require('../server/store');
+ await store.insertAsync('users',{id:uuidv4(),email:'listing-test@example.com',name:'Admin',passwordHash:await bcrypt.hash('a-secure-admin-password-123',12),createdAt:new Date().toISOString()});
+ const login=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'listing-test@example.com',password:'a-secure-admin-password-123'})});
+ assert.equal(login.status,200);
+ const cookie=(login.headers.get('set-cookie')||'').split(';')[0];
+ const created=await fetch(base+'/api/bots',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({name:'Test bot',instructions:'Answer clearly.',isPublic:true})});
+ assert.equal(created.status,201);
+ const bot=(await created.json()).bot;
+ const mine=await fetch(base+'/api/bots/mine',{headers:{cookie}});
+ assert.equal(mine.status,200);
+ assert.equal((await mine.json()).bots[0].id,bot.id);
+ const shared=await fetch(base+'/api/bots/public',{headers:{cookie}});
+ assert.equal(shared.status,200);
+ assert.equal((await shared.json()).bots[0].id,bot.id);
+ const history=await fetch(base+'/api/chat/'+bot.id+'/messages',{headers:{cookie}});
+ assert.equal(history.status,200);
+ assert.deepEqual((await history.json()).messages,[]);
+ const docs=await fetch(base+'/api/documents/'+bot.id,{headers:{cookie}});
+ assert.equal(docs.status,200);
+ assert.deepEqual((await docs.json()).documents,[]);
+});

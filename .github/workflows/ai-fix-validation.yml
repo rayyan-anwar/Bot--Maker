@@ -1,0 +1,40 @@
+name: BotForge AI Patch Validation
+
+on:
+  # Full PR verification is handled by BotForge CI. Keep this isolated patch
+  # validator available for deliberate manual runs to avoid duplicate CI queues.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-patch-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate proposed patch in isolated runner
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out proposed revision without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies without lifecycle scripts
+        run: npm install --ignore-scripts
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Run repository test suite
+        run: npm test
+      - name: Check JavaScript syntax
+        run: node scripts/check-syntax.js
+      - name: Run heuristic source security scan
+        run: npm run security:scan
+      - name: Check PostgreSQL backup and restore shell syntax
+        run: bash -n scripts/backup-postgres.sh scripts/restore-postgres.sh

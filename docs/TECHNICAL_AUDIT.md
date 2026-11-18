@@ -1,0 +1,173 @@
+# BotForge Technical Audit
+**Repository:** `rayyan-anwar/Bot--Maker`  
+**Audited baseline:** `main`, commit `3809808091d47d8ac7812a0f439beb9ecc8dcef7`  
+**Date:** 16 November 2026  
+**Scope:** All tracked application source files, frontend pages, package manifest and README. This is a source review, not a penetration test or a verified runtime test.
+
+## Executive assessment
+
+The repository is a small, understandable Node.js/Express MVP. It supports email/password accounts, bot CRUD, public bots, document uploads, keyword-based retrieval and Claude-backed chat. It is a useful prototype, but **it is not ready for public commercial production**.
+
+The largest blockers are the JSON-file database, missing request throttling and usage accounting, insufficient upload/content controls, no automated tests, a single hard-coded model provider, and no production deployment/operations baseline.
+
+## Findings
+
+| Priority | Area | Finding | Consequence |
+|---|---|---|---|
+| Critical before launch | Persistence | `server/store.js` writes the entire JSON database synchronously and directly to one file. There is no transaction, file lock, atomic rename or multi-instance coordination. | Concurrent requests, crashes or multiple server instances can lose or corrupt data. |
+| High | Data recovery | A JSON parse error is caught and replaced in memory with an empty database. A later write can overwrite the damaged file. | Silent loss of user, bot and conversation data. |
+| High | Cost abuse | `server/chat.js` has no per-user quota, account spend cap or provider request rate limit. | One account or automated client can create an uncontrolled provider bill. |
+| High | Authentication | Signup/login use synchronous bcrypt calls and have no visible IP/account login throttling. | Event-loop blocking and brute-force/credential-stuffing exposure. |
+| High | Upload security | `server/documents.js` checks the filename extension, but not file signatures or extracted-text limits. PDF parsing has no explicit page/text ceiling or worker isolation. | Spoofed files, parser resource exhaustion and oversized stored documents. |
+| High | API resource controls | JSON body size is not explicitly bounded; chat input length and total stored history are not bounded. | Memory/CPU/storage exhaustion and unexpectedly large provider requests. |
+| High | Error handling | Provider errors are returned to the client using the upstream error message. | Provider/internal details may be exposed; error responses are not normalized. |
+| Medium | Authorization/privacy | Public bot serialization includes the creator's full system instructions. | A creator's proprietary prompt may be disclosed when a bot is public. Decide explicitly whether prompts are public. |
+| Medium | CSRF | Authentication is cookie-based. SameSite=Lax is helpful, but there is no explicit Origin/Referer validation or CSRF token strategy for state-changing routes. | Cross-site request risk depends on deployment and browser context. |
+| Medium | Validation | Several update paths call `.trim()` on values without consistently checking their types. | Malformed JSON can produce 500 errors. Boolean fields are coerced with `!!value`. |
+| Medium | Retrieval quality | `server/retrieval.js` uses English-centric tokenization and raw word overlap. There are no embeddings, reranking, citations or retrieval evaluation tests. | Weak multilingual retrieval and irrelevant context. |
+| Medium | Prompt injection | Retrieved document text is concatenated into the system prompt without a clear untrusted-data boundary or injection policy. | Instructions inside uploaded documents may influence model behavior. |
+| Medium | Observability | No structured request logs, trace IDs, provider latency/token/cost metrics or operational health checks are present. | Hard to investigate failures or understand unit economics. |
+| Medium | Frontend | The UI is a basic server-served HTML/CSS/JS experience. It has no shared design system, explicit theme preference, loading/empty/error patterns across all views, or accessibility review. | Product feels like an MVP and is harder to evolve. |
+| Medium | Delivery quality | No test script, test suite, CI workflow, dependency scanning or release process is defined. | Regressions and unsafe releases can reach users. |
+| Medium | Operations | No Docker setup, migration framework, backup/restore procedure or deployment runbook. | Deployments and recovery are fragile. |
+
+## File-by-file review
+
+- `server/index.js`: minimal Express boot; no explicit JSON size limit, security headers, request IDs, rate-limit middleware, health endpoint or graceful shutdown.
+- `server/auth.js`: basic email/password/JWT flow; synchronous bcrypt; no login/signup throttling; no email verification, reset flow, session revocation or CSRF/Origin defense.
+- `server/bots.js`: owner checks exist. Input types and patch validation need hardening. Public bot payload currently includes instructions.
+- `server/chat.js`: Anthropic-only; no provider abstraction, quotas, per-plan limits, timeout/retry policy, cost accounting or maximum prompt size. User message is persisted before provider success, leaving failed user turns in history.
+- `server/documents.js`: extension-only validation; extraction and storage are synchronous/monolithic for some paths; extracted content size and PDF complexity are not capped; no upload quota.
+- `server/retrieval.js`: keyword matching only; English-centric tokenization; no vector index, metadata filters, citation references or evaluation harness.
+- `server/store.js`: single-process JSON cache and whole-file synchronous writes; no atomicity, transactions, locking, migrations or backup strategy.
+- `public/index.html`, `dashboard.html`, `bot.html`, `css/style.css`, `js/api.js`: functional baseline but limited interaction states, theme support, responsive refinements, component reuse and accessibility coverage.
+- `package.json`: no test/lint scripts and no production toolchain. Dependencies should be audited and pinned via a lockfile.
+
+## Recommended remediation order
+
+1. **Before any public beta:** move persistence to PostgreSQL; add migrations; add rate limits and quota enforcement; cap request/upload/extracted-text sizes; normalize errors; add security headers and CSRF/Origin protections; add tests.
+2. **Before paid plans:** provider abstraction, token/cost metering, user-level and workspace-level budgets, idempotent billing events, payment webhook verification and audit logs.
+3. **Before scale:** background job queue for ingestion, object storage, vector database/pgvector, caching, observability, backups with restore drills and horizontal deployment.
+4. **Before enterprise:** RBAC, SSO, tenant isolation tests, retention controls, export/delete workflows, audit trails, data-processing terms and independent security review.
+
+## Verification status
+
+The GitHub source tree was inspected. This review does not claim that the application was installed, run, load-tested, penetration-tested or deployed. Do not describe the current code as production-secure until those checks have been completed.
+
+## Remediation added on the upgrade branch
+
+The branch now includes initial mitigations for several findings: asynchronous password hashing and stricter input checks; public bot payloads no longer include private instructions; basic API/auth rate limiting, security headers, request-body limits and Origin checks; file-size/signature/extracted-text checks; safe provider error responses; provider adapters for Anthropic/OpenAI/Gemini; server-side daily message caps and token usage records; and user-managed per-bot memory notes.
+
+These are **initial controls**, not a security certification. The JSON store remains unsuitable for multi-instance production, keyword retrieval is not vector RAG, and the new CI workflow must run successfully before merge. Upload parsing still needs isolated worker execution and malware scanning. Rate limiting is in-memory and must move to a shared store before horizontal scaling.
+
+
+## Current upgrade-branch reassessment (17 November 2026)
+
+This section supersedes the earlier baseline statements where the implementation has changed. The original findings above are retained as a historical audit of `main` at the recorded baseline.
+
+### Controls now present in the upgrade branch
+
+- Express JSON body limit, Helmet security headers, request IDs, API/auth rate limits and same-host Origin checks when an Origin header is supplied.
+- Async password hashing, server-derived administrator role, three-failure account lockout, signed sessions with a per-user session version, logout revocation and one-time password reset tokens.
+- Optional Google/GitHub OAuth with signed state and verified email checks. Provider credentials and live callback verification remain unconfigured.
+- Bot ownership checks and public bot serialization that excludes private instructions.
+- Chat message/history limits, pre-call quota reservation, usage event recording and quota release on failed provider calls.
+- Upload byte limits, extension checks and extracted-text limits. These controls do not replace malware scanning or parser isolation.
+- Provider adapters for Anthropic, OpenAI and Gemini; provider calls still need live credential, timeout and failure-mode testing.
+- User-scoped memory routes, explicit memory deletion and opt-in automatic extraction with sensitive-trait exclusions in the extraction prompt.
+- PostgreSQL runtime adapter, migration tooling, quota reservation storage and webhook idempotency foundations.
+- CI tests, syntax checks, dependency audit and heuristic security scanning.
+- Admin-only AI Engineer with bounded source paths, 30 KB patch limit, syntax validation, stale-file SHA check, explicit confirmation and draft-PR-only GitHub writes.
+
+### Current verification evidence
+
+At commit `de39a0fc579942d678e2b92bd53bda5008740df0`, both GitHub Actions workflows completed successfully:
+- BotForge CI: run `44007284375`
+- BotForge AI Patch Validation: run `44007284311`
+
+This evidence applies to that exact code commit. A later documentation-only commit may trigger another CI run; check the PR's current head checks before treating the branch as fully verified. Passing CI does not establish production readiness.
+
+### Remaining high-priority risks
+
+1. **Persistence and concurrency:** JSON remains the default without `DATABASE_URL`. PostgreSQL needs a live managed-database migration, concurrent quota and tenant-isolation tests, and a successful restore drill.
+2. **Rate limiting:** Express rate limits use in-process memory. Use a shared store before multiple instances or workers.
+3. **Request origin/CSRF:** mutation Origin validation currently rejects a supplied cross-origin Origin, but requests without an Origin header are not rejected. Review cookie-authenticated mutation threat models and enforce an explicit deployment-appropriate CSRF policy.
+4. **Uploads:** add malware scanning, strict MIME/signature verification for each accepted format, PDF page/resource ceilings and isolated parsing.
+5. **AI/RAG:** test prompt-injection boundaries, retrieval quality, multilingual documents, citation correctness, provider spend ceilings and concurrent quota enforcement.
+6. **Authentication:** test lockout and session revocation under concurrent requests and across PostgreSQL instances; complete OAuth and email-reset integration tests.
+7. **Billing:** test Stripe and Razorpay subscription lifecycle transitions, retries, duplicate and out-of-order events in provider sandbox environments.
+8. **Privacy and operations:** complete account export/deletion and retention controls, secret/log redaction review, monitoring/alerts, backup restoration, browser E2E, load testing and independent security review.
+
+The application remains a staging/development foundation. Do not label it production-secure or production-ready until the release gates in `docs/SECURITY_AND_RELEASE_CHECKLIST.md` and `docs/STAGING_DEPLOYMENT_RUNBOOK.md` have evidence attached.
+
+
+## Security hardening follow-up (17 November 2026)
+
+The following additional controls were added on the upgrade branch after the previous reassessment:
+
+- PDF extraction now runs in a Node worker thread with bounded V8 memory, a worker timeout, page-count validation and extracted-text limits. The API process no longer performs PDF parsing itself.
+- Text uploads are decoded as strict UTF-8 and reject binary/NUL-containing content. Upload byte limits are checked before parsing.
+- Added automated regression tests for valid UTF-8, invalid UTF-8, binary uploads, invalid PDF signatures and oversized files.
+- Added a PostgreSQL-backed express-rate-limit store for API and authentication counters. The database uses atomic upserts, namespace separation and expiry cleanup so counters are shared across app instances. JSON-only local development continues to use the express-rate-limit in-memory store.
+- Added the rate-limit table to runtime initialization and the SQL migration, plus unit tests for atomic upsert configuration and namespaced decrement/reset behavior.
+
+### Verification for this follow-up
+
+At commit `9623c926b4c642e8d3a754a837c8ecff4b76336f`, the Node.js 18/20/22 CI matrix is running. At the latest inspection, tests, syntax checks and dependency audit had passed on all three versions; security scanning was still running on Node.js 18. Do not mark the whole run green until both workflows finish successfully.
+
+### Remaining upload and rate-limit caveats
+
+- Worker memory and timeout bounds reduce PDF parser blast radius but do not replace malware scanning, MIME/signature validation beyond the PDF magic header, parser sandboxing at the OS/container level or a broader upload threat review.
+- The PostgreSQL rate-limit store has automated adapter tests, but must still be exercised against a live PostgreSQL instance with concurrent workers and failover. Rate limiting remains process-local in JSON development mode by design.
+
+
+## PostgreSQL integration hardening follow-up
+
+- Added a PostgreSQL 16 service to the CI workflow. CI applies both SQL migrations through the Node PostgreSQL client and runs an opt-in real-database integration suite.
+- Integration coverage exercises concurrent store initialization, concurrent shared rate-limit increments, atomic failed-login lockout updates and concurrent daily quota reservations.
+- Serialized runtime store initialization through a shared promise so simultaneous first requests do not create and overwrite multiple connection pools.
+- Rate-limit expiry cleanup now runs as a separate statement before the atomic upsert. This avoids relying on a data-modifying CTE and keeps the upsert's uniqueness handling straightforward.
+- Added the webhook idempotency table to the runtime SQL migration.
+
+The PostgreSQL integration workflow is now part of CI. Its result must be green on the current PR head before claiming database concurrency verification. CI uses an ephemeral PostgreSQL 16 service and does not provision a production database.
+
+## Migration and container follow-up (17 November 2026)
+
+- The JSON-to-PostgreSQL preflight now accepts OAuth-only accounts when a linked OAuth identity exists, and accepts account-wide profile memories whose botId is null. It still rejects passwordless accounts without a linked provider.
+- Added migration 003_oauth_and_profile_memory.sql to make the normalized reporting schema compatible with nullable OAuth password hashes and account-wide memory notes. The JSON importer applies this migration; PostgreSQL CI applies it as well.
+- Added regression coverage for OAuth-only and account-wide-memory preflight cases, plus a PostgreSQL integration check for the normalized schema.
+- Fixed the container build path: this repository does not currently commit a package-lock.json, so npm ci could not build the Docker image. The Dockerfile now uses npm install --omit=dev --no-audit --no-fund --ignore-scripts. A reviewed lockfile is still required before switching back to deterministic npm ci installs.
+- Added CI checks to build the production Docker image and start it with dummy configuration, then verify /readyz.
+- Stripe checkout, Stripe billing portal and Razorpay API calls now have 15-second request timeouts.
+- Corrected deprecated logout-cookie clearing options and malformed escaped newlines in several HTML pages.
+
+These changes are implementation updates, not proof of production deployment. The current PR head must pass its complete Node.js, PostgreSQL, Docker smoke and security validation checks before these changes are considered verified.
+## Additional request-abuse controls (17 November 2026)
+
+- Document uploads now have a dedicated 10-per-15-minute client rate limit. PostgreSQL deployments use the shared database-backed counter so the limit is consistent across app instances; JSON development uses the local in-memory adapter.
+- Corrected the heuristic scanner's insecure-HTTP rule so HTTPS provider URLs are no longer reported as plaintext HTTP. Added a regression test for secure HTTPS endpoints.
+- Razorpay paid access is now granted only when the subscription status is active; an authenticated-but-not-active subscription no longer unlocks a paid plan.
+
+## Upload security and frontend output hardening (17 November 2026)
+
+- Added a ClamAV INSTREAM client with bounded payload size and timeout. Production upload handling fails closed with HTTP 503 if the scanner is not configured or unavailable; malware detections are rejected with HTTP 422.
+- Added a private ClamAV service to the local PostgreSQL staging compose stack and documented scanner configuration. The staging daemon still needs an operator-run readiness/signature-update check; no live ClamAV service has been exercised by this repository CI.
+- Upload validation now checks PDF signatures, rejects PDF data disguised as text/Markdown, rejects invalid UTF-8 and unsupported control characters, and normalizes both Windows and POSIX filename separators before display.
+- Added protocol tests for clean and infected ClamAV responses, missing scanner configuration, and scan-size limits.
+- Escaped document IDs in HTML attributes and encoded bot IDs in dashboard navigation to reduce stored/reflected markup injection risk.
+- CI and source-level tests do not replace OS/container-level PDF parser sandboxing, malware signature operations, a full browser security review, or penetration testing.
+
+
+## Password recovery replay protection (17 November 2026)
+
+- Password reset token lookup now uses a dedicated indexed hash field in PostgreSQL rather than loading every user record.
+- Token consumption is a conditional atomic update that requires an unexpired token and clears it in the same database statement. Concurrent replay attempts can succeed only once.
+- JSON adapter and PostgreSQL integration tests cover concurrent reset-token consumption. Reset continues to revoke existing sessions by incrementing the session version.
+
+
+## Browser security policy and deployment configuration (17 November 2026)
+
+- Enabled an explicit same-origin Content Security Policy: scripts, styles, fonts and connections are restricted to the application origin; object embedding is disabled; framing is denied; base URI and form submission are restricted.
+- The current pages use inline scripts/styles, so the policy retains `unsafe-inline` for those two directives. A nonce/hash-based policy is a follow-up hardening task.
+- Fixed the Docker Compose administrator environment mapping so `BOTFORGE_ADMIN_EMAIL` reaches the application in both local and staging Compose stacks.
+- Corrected the uploaded-text control-character regression fixture so it contains an actual control byte rather than the literal characters `\\x01`.

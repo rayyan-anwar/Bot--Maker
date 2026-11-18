@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chat — Botworks</title>
+<title>Chat — BotForge</title>
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
 
 <header class="topbar">
-  <a class="brand" href="/dashboard.html"><span class="mark"></span> Botworks</a>
+  <a class="brand" href="/dashboard.html"><span class="mark"></span> BotForge</a>
   <nav>
     <a href="/dashboard.html">&larr; Your bots</a>
   </nav>
@@ -28,7 +28,19 @@
       <p id="bot-desc"></p>
     </div>
   </div>
+  <details class="memory-panel" style="margin:10px 24px 0;padding:10px 14px;border:1px solid var(--border);border-radius:12px">
+    <summary style="cursor:pointer">My memory for this bot</summary>
+    <p class="muted" style="margin:8px 0">Save up to 10 short notes this assistant may use in future chats. You can remove them anytime.</p>
+    <label style="display:flex;gap:8px;align-items:center;margin:10px 0"><input id="memory-auto-toggle" type="checkbox"> Automatically remember useful details I explicitly share</label>
+    <p class="muted" style="margin:4px 0 10px">Optional. This uses an additional AI request after each chat. Sensitive details are excluded by the extraction instructions.</p>
+    <form id="memory-form" style="display:flex;gap:8px;flex-wrap:wrap">
+      <input id="memory-content" type="text" maxlength="500" placeholder="e.g. I prefer concise answers" required style="flex:1;min-width:180px">
+      <button class="btn btn-ghost" type="submit">Save note</button>
+    </form>
+    <div id="memory-list" style="margin-top:8px"></div>
+  </details>
   <div class="chat-log" id="chat-log"></div>
+  <div class="ad-slot" aria-label="Advertisement"><span>ADVERTISEMENT</span><div>Sponsored placement · available after ad-network approval</div></div>
   <form class="chat-input-row" id="chat-form">
     <textarea id="chat-input" placeholder="Say something…" required></textarea>
     <button type="submit" class="btn btn-primary">Send</button>
@@ -97,7 +109,7 @@
 
   document.getElementById('bot-name').textContent = bot.name;
   document.getElementById('bot-desc').textContent = bot.description || '';
-  document.title = bot.name + ' — Botworks';
+  document.title = bot.name + ' — BotForge';
 
   // ---- tabs ----
   const tabChat = document.getElementById('tab-chat');
@@ -122,6 +134,29 @@
     tabSettings.classList.add('active'); tabChat.classList.remove('active');
     viewSettings.style.display = 'block'; viewChat.style.display = 'none';
   });
+
+  // Personal, user-controlled memory for this bot.
+  const memoryList=document.getElementById('memory-list');
+  async function loadMemory(){
+    const {memories,automaticEnabled}=await api('/chat/'+botId+'/memory');
+    document.getElementById('memory-auto-toggle').checked=!!automaticEnabled;
+    memoryList.replaceChildren();
+    memories.forEach(note=>{
+      const row=document.createElement('div');row.className='doc-row';
+      const text=document.createElement('span');text.textContent=(note.kind==='automatic'?'Auto: ':'')+note.content;
+      const remove=document.createElement('button');remove.className='btn btn-ghost';remove.type='button';remove.textContent='Remove';
+      remove.addEventListener('click',async()=>{await api('/chat/'+botId+'/memory/'+note.id,{method:'DELETE'});loadMemory();});
+      row.append(text,remove);memoryList.appendChild(row);
+    });
+  }
+  document.getElementById('memory-auto-toggle').addEventListener('change',async e=>{try{await api('/chat/'+botId+'/memory/automatic',{method:'POST',body:{enabled:e.target.checked}});}catch(err){e.target.checked=!e.target.checked;alert(err.message);}});
+  document.getElementById('memory-form').addEventListener('submit',async e=>{
+    e.preventDefault();const field=document.getElementById('memory-content');
+    if(!field.value.trim())return;
+    try{await api('/chat/'+botId+'/memory',{method:'POST',body:{content:field.value}});field.value='';await loadMemory();}
+    catch(err){alert(err.message);}
+  });
+  loadMemory().catch(()=>{memoryList.textContent='Memory is temporarily unavailable.';});
 
   // ---- chat ----
   const log = document.getElementById('chat-log');
@@ -155,9 +190,28 @@
     const pending = renderMessage('assistant', 'Thinking…', true);
 
     try {
-      const { message } = await api('/chat/' + botId + '/messages', { method: 'POST', body: { content: text } });
+      const { message, sources = [] } = await api('/chat/' + botId + '/messages', { method: 'POST', body: { content: text } });
       pending.textContent = message.content;
       pending.classList.remove('pending');
+      if (sources.length) {
+        const panel = document.createElement('div');
+        panel.className = 'citation-list';
+        panel.style.cssText = 'margin:8px 0 14px 12px;padding:10px 12px;border-left:2px solid var(--border);font-size:0.88rem;color:var(--muted)';
+        const heading = document.createElement('strong');
+        heading.textContent = 'Retrieved references';
+        panel.appendChild(heading);
+        sources.forEach(source => {
+          const item = document.createElement('div');
+          item.style.marginTop = '6px';
+          const label = document.createElement('strong');
+          label.textContent = '[' + source.citation + '] ' + source.filename;
+          const excerpt = document.createElement('div');
+          excerpt.textContent = source.excerpt;
+          item.append(label, excerpt);
+          panel.appendChild(item);
+        });
+        pending.after(panel);
+      }
     } catch (err) {
       pending.textContent = 'Error: ' + err.message;
       pending.classList.remove('pending');
@@ -205,9 +259,9 @@
       return;
     }
     list.innerHTML = documents.map((d) => `
-      <div class="doc-row" data-id="${d.id}">
-        <span>${escapeHtml(d.filename)} <span class="muted">(${d.chunkCount} chunks)</span></span>
-        <button class="btn btn-ghost doc-delete" data-id="${d.id}">Remove</button>
+      <div class="doc-row" data-id="${escapeHtml(d.id)}">
+        <span>${escapeHtml(d.filename)} <span class="muted">(${Number(d.chunkCount)||0} chunks)</span></span>
+        <button class="btn btn-ghost doc-delete" data-id="${escapeHtml(d.id)}">Remove</button>
       </div>`).join('');
 
     list.querySelectorAll('.doc-delete').forEach((btn) => {

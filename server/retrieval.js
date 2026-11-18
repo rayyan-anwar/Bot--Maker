@@ -18,11 +18,13 @@ const STOPWORDS = new Set([
 ]);
 
 function tokenize(text) {
-  return (text.toLowerCase().match(/[a-z0-9']+/g) || []).filter((w) => w.length > 1 && !STOPWORDS.has(w));
+  return (String(text).toLocaleLowerCase().match(/[\p{L}\p{M}\p{N}']+/gu) || []).filter((w) => w.length > 1 && !STOPWORDS.has(w));
 }
 
 /** Split a long text into overlapping chunks of roughly `size` words. */
 function chunkText(text, size = 220, overlap = 40) {
+  if (!Number.isInteger(size) || size < 1) throw new RangeError('Chunk size must be a positive integer.');
+  if (!Number.isInteger(overlap) || overlap < 0 || overlap >= size) throw new RangeError('Chunk overlap must be a non-negative integer smaller than chunk size.');
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length === 0) return [];
   const chunks = [];
@@ -62,7 +64,7 @@ function topChunks(documents, query, k = 4) {
       for (const t of tokens) counts.set(t, (counts.get(t) || 0) + 1);
       const score = scoreChunk(counts, queryTokens);
       if (score > 0) {
-        scored.push({ text: chunk.text, filename: doc.filename, score });
+        scored.push({ text: chunk.text, filename: doc.filename, documentId: doc.id, chunkId: chunk.id, score });
       }
     }
   }
@@ -71,4 +73,28 @@ function topChunks(documents, query, k = 4) {
   return scored.slice(0, k);
 }
 
-module.exports = { chunkText, topChunks };
+
+function cosineSimilarity(a,b){
+ if(!Array.isArray(a)||!Array.isArray(b)||a.length!==b.length||!a.length)return 0;
+ let dot=0,aa=0,bb=0;
+ for(let i=0;i<a.length;i++){const x=a[i],y=b[i];if(!Number.isFinite(x)||!Number.isFinite(y))return 0;dot+=x*y;aa+=x*x;bb+=y*y;}
+ return aa&&bb?dot/(Math.sqrt(aa)*Math.sqrt(bb)):0;
+}
+async function topChunksHybrid(documents,query,k=4){
+ const keyword=topChunks(documents,query,Math.max(k,documents.reduce((n,d)=>n+(d.chunks||[]).length,0)));
+ const embeddings=require('./embeddings');
+ if(!embeddings.enabled())return keyword.slice(0,k);
+ try{
+  const [queryVector]=await embeddings.embedTexts([query]);
+  const candidates=[];
+  for(const doc of documents)for(const chunk of doc.chunks||[]){
+   const semantic=cosineSimilarity(queryVector,chunk.embedding);
+   const lexical=keyword.find(item=>item.chunkId===chunk.id)?.score||0;
+   if(semantic>0||lexical>0)candidates.push({text:chunk.text,filename:doc.filename,documentId:doc.id,chunkId:chunk.id,score:semantic*0.75+(lexical?Math.min(lexical/8,1)*0.25:0),semanticScore:semantic,keywordScore:lexical});
+  }
+  candidates.sort((a,b)=>b.score-a.score);
+  return candidates.slice(0,k);
+ }catch(error){return keyword.slice(0,k);}
+}
+
+module.exports = { chunkText, topChunks, topChunksHybrid, cosineSimilarity };
