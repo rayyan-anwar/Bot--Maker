@@ -73,7 +73,7 @@ async function consumePasswordResetToken(tokenHash,patch){
 }
 async function deleteBotAndData(botId){
  if(!isUuid(botId))return false;
- if(!isPostgres()){const db=load(),exists=db.bots.some(x=>x.id===botId);if(!exists)return false;db.bots=db.bots.filter(x=>x.id!==botId);for(const c of ['documents','messages','memory','usage'])db[c]=db[c].filter(x=>x.botId!==botId);persist();return true;}
+ if(!isPostgres()){const db=load(),exists=db.bots.some(x=>x.id===botId);if(!exists)return false;db.bots=db.bots.filter(x=>x.id!==botId);for(const c of ['botVersions','documents','messages','memory','usage'])db[c]=db[c].filter(x=>x.botId!==botId);persist();return true;}
  await initialize();const client=await pool.connect();
  try{
   await client.query('BEGIN');
