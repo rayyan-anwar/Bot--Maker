@@ -61,6 +61,18 @@
         <input type="text" id="bot-description" placeholder="What is this bot for?">
       </div>
       <div class="field">
+        <label for="bot-purpose">Bot purpose</label>
+        <input type="text" id="bot-purpose" maxlength="300" placeholder="What task should this assistant solve?">
+      </div>
+      <div class="field">
+        <label for="bot-audience">Target audience</label>
+        <input type="text" id="bot-audience" maxlength="160" placeholder="e.g. students, customers, internal team">
+      </div>
+      <div class="field">
+        <label for="bot-welcome">Welcome message <span class="muted">(optional)</span></label>
+        <input type="text" id="bot-welcome" maxlength="500" placeholder="A short greeting shown when a chat starts">
+      </div>
+      <div class="field">
         <label for="bot-provider">AI provider</label>
         <select id="bot-provider"><option value="anthropic">Anthropic Claude</option><option value="openai">OpenAI</option><option value="gemini">Google Gemini</option></select>
       </div>
@@ -167,6 +179,9 @@
         body: {
           name: document.getElementById('bot-name').value,
           description: document.getElementById('bot-description').value,
+          purpose: document.getElementById('bot-purpose').value,
+          audience: document.getElementById('bot-audience').value,
+          welcomeMessage: document.getElementById('bot-welcome').value,
           instructions: document.getElementById('bot-instructions').value,
           isPublic: document.getElementById('bot-public').checked,
           provider: document.getElementById('bot-provider').value
