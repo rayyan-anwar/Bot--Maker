@@ -69,7 +69,7 @@ function topChunks(documents, query, k = 4) {
     }
   }
 
-  scored.sort((a, b) => b.score - a.score);
+  scored.sort((a, b) => b.score - a.score || String(a.filename).localeCompare(String(b.filename)) || String(a.chunkId).localeCompare(String(b.chunkId)));
   return scored.slice(0, k);
 }
 
@@ -97,4 +97,24 @@ async function topChunksHybrid(documents,query,k=4){
  }catch(error){return keyword.slice(0,k);}
 }
 
-module.exports = { chunkText, topChunks, topChunksHybrid, cosineSimilarity };
+/**
+ * Evaluate retrieval against labelled queries. Each case is {query, relevantChunkIds}.
+ * Reports recall@k and mean reciprocal rank without requiring a paid model/API.
+ */
+function evaluateRetrieval(documents,cases,k=4){
+ if(!Array.isArray(cases)||!Number.isInteger(k)||k<1)throw new TypeError('Evaluation cases and a positive k are required.');
+ if(!cases.length)return {queries:0,recallAtK:0,meanReciprocalRank:0};
+ let recalled=0,reciprocal=0;
+ for(const item of cases){
+  if(!item||typeof item.query!=='string'||!Array.isArray(item.relevantChunkIds))throw new TypeError('Each evaluation case needs a query and relevantChunkIds.');
+  const relevant=new Set(item.relevantChunkIds);
+  if(!relevant.size)continue;
+  const results=topChunks(documents,item.query,k);
+  const rank=results.findIndex(row=>relevant.has(row.chunkId));
+  if(rank>=0){recalled++;reciprocal+=1/(rank+1);}
+ }
+ const denominator=cases.filter(item=>Array.isArray(item.relevantChunkIds)&&item.relevantChunkIds.length>0).length;
+ return {queries:denominator,recallAtK:denominator?recalled/denominator:0,meanReciprocalRank:denominator?reciprocal/denominator:0};
+}
+
+module.exports = { chunkText, topChunks, topChunksHybrid, cosineSimilarity, evaluateRetrieval };
