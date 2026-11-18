@@ -1,6 +1,6 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {chunkText,topChunks}=require('../server/retrieval');
+const {chunkText,topChunks,evaluateRetrieval}=require('../server/retrieval');
 
 test('chunkText returns no chunks for blank text',()=>assert.deepEqual(chunkText('   '),[]));
 test('chunkText splits long text and preserves content',()=>{
@@ -50,4 +50,25 @@ test('hybrid retrieval safely falls back to keyword search when embeddings are d
  const docs=[{id:'d1',filename:'source.txt',chunks:[{id:'c1',text:'refund policy returns within thirty days'}]}];
  const rows=await topChunksHybrid(docs,'refund returns',2);
  assert.equal(rows.length,1);assert.equal(rows[0].documentId,'d1');
+});
+
+
+test('offline RAG evaluation reports recall@k and mean reciprocal rank',()=>{
+ const docs=[{filename:'manual.md',chunks:[
+  {id:'c1',text:'account password reset recovery instructions'},
+  {id:'c2',text:'invoice payment billing subscription'},
+  {id:'c3',text:'workspace project configuration settings'}
+ ]}];
+ const metrics=evaluateRetrieval(docs,[
+  {query:'password reset',relevantChunkIds:['c1']},
+  {query:'billing invoice',relevantChunkIds:['c2']},
+  {query:'workspace settings',relevantChunkIds:['c3']}
+ ],1);
+ assert.deepEqual(metrics,{queries:3,recallAtK:1,meanReciprocalRank:1});
+});
+test('offline RAG evaluation reports misses and validates input',()=>{
+ const docs=[{filename:'manual.md',chunks:[{id:'c1',text:'password recovery steps'}]}];
+ const metrics=evaluateRetrieval(docs,[{query:'billing invoice',relevantChunkIds:['missing']}],1);
+ assert.equal(metrics.recallAtK,0);assert.equal(metrics.meanReciprocalRank,0);
+ assert.throws(()=>evaluateRetrieval(docs,[],0),TypeError);
 });
