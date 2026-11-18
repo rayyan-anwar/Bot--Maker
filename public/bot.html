@@ -216,8 +216,15 @@
     const pending = renderMessage('assistant', 'Thinking…', true);
 
     try {
-      const { message, sources = [] } = await api('/chat/' + botId + '/messages', { method: 'POST', body: { content: text } });
-      pending.textContent = message.content;
+      const response=await fetch('/api/chat/'+botId+'/messages',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json','accept':'text/event-stream'},body:JSON.stringify({content:text})});
+      if(!response.ok){let failure={};try{failure=await response.json();}catch(_){}throw new Error(failure.error||'Chat request failed ('+response.status+').');}
+      if(!response.body)throw new Error('Streaming is not supported by this browser.');
+      const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',message=null,sources=[];
+      const handleEvent=async block=>{let event='message',data='';for(const line of block.split(/\\r?\\n/)){if(line.startsWith('event:'))event=line.slice(6).trim();else if(line.startsWith('data:'))data+=line.slice(5).trim();}if(!data)return;const value=JSON.parse(data);if(event==='token'){pending.textContent+=value.text;log.scrollTop=log.scrollHeight;}else if(event==='complete'){message=value.message;sources=value.sources||[];}else if(event==='error')throw new Error(value.error||'Streaming chat failed.');};
+      while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let boundary;while((boundary=buffer.indexOf('\\n\\n'))>=0){const block=buffer.slice(0,boundary);buffer=buffer.slice(boundary+2);await handleEvent(block);}}
+      buffer+=decoder.decode();if(buffer.trim())await handleEvent(buffer);
+      if(!message)throw new Error('The streaming connection ended before the response was saved.');
+      pending.textContent=message.content;
       window.setFortisniText(message.content, 'assistant');
       window.setTimeout(() => window.setFortisniState('idle'), 2600);
       pending.classList.remove('pending');
