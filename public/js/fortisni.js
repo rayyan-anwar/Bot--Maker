@@ -4,5 +4,24 @@
   const status=host.querySelector('.fortisni-status');
   status.setAttribute('role','status');
   status.setAttribute('aria-atomic','true');
-  window.setFortisniState=function(state){const messages={idle:'Here to help you build something great.',thinking:'Fortisni is thinking…',speaking:'Fortisni is responding…',happy:'Great! Let’s keep building.',error:'Something went wrong. Let’s try again.'};host.dataset.state=state;status.textContent=messages[state]||messages.idle;};
+  const messages={idle:'Here to help you build something great.',thinking:'I’m thinking about that…',speaking:'Here’s what I found.',happy:'That’s wonderful!',sad:'I’m here with you. Let’s work through it.',concerned:'I’ll take this seriously and help.',curious:'That’s an interesting question!',confused:'Let me make that clearer.',grateful:'You’re welcome!',error:'Something went wrong. Let’s try again.'};
+  window.setFortisniState=function(state,customMessage){host.dataset.state=messages[state]?state:'idle';status.textContent=customMessage||messages[host.dataset.state];};
+  window.setFortisniText=function(value,source){
+    const text=String(value||'').toLowerCase();
+    if(!text.trim())return window.setFortisniState('idle');
+    const tests=[
+      ['sad',/\\b(sad|depress|lonely|upset|heartbroken|unhappy|crying| दुखी|उदास|परेशान)\\b/],
+      ['concerned',/\\b(scared|afraid|worried|anxious| डर|डर लग|चिंता|घबर)\\b/],
+      ['angry',/\\b(angry|furious|annoyed|frustrated|hate|गुस्सा|नाराज़)\\b/],
+      ['grateful',/\\b(thank you|thanks|thx|धन्यवाद|शुक्रिया)\\b/],
+      ['happy',/\\b(happy|excited|awesome|amazing|great|wonderful|खुश|मज़ा|शानदार)\\b/],
+      ['curious',/\\b(why|how|what|when|where|explain|समझाओ|क्यों|कैसे|क्या)\\b/],
+      ['confused',/\\b(confused|don't understand|do not understand|unclear|समझ नहीं|कन्फ्यूज)\\b/]
+    ];
+    let state='idle';
+    for(const [candidate,pattern] of tests){if(pattern.test(text)){state=candidate;break;}}
+    if(source==='assistant' && state==='idle')state='speaking';
+    window.setFortisniState(state);
+    return state;
+  };
 })();
