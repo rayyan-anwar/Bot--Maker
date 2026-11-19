@@ -70,6 +70,7 @@ test('AI Engineer creates a reviewed draft PR through the one-time approval work
     calls.push({ url, method, authorization: headers.authorization || headers.Authorization || null });
 
     if (url === 'https://api.openai.com/v1/responses') {
+      providerRequest = JSON.parse(options.body);
       return githubResponse(200, {
         output_text: JSON.stringify({ summary: 'Replace the status marker for the test.', updatedContent: proposedSource }),
         usage: { input_tokens: 10, output_tokens: 20 }
