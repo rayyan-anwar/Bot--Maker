@@ -7,6 +7,7 @@ const providers=require('./providers');
 const metrics=require('./metrics');
 const securityScanner=require('../scripts/security-scan');
 const engineerControl=require('./engineer-control');
+const {isAllowedEngineerPath}=require('./engineer-path');
 const {requireAuth,isAdminEmail}=require('./auth');
 const router=express.Router();
 const securityScanLimiter=rateLimit({windowMs:60*1000,limit:5,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'Security scan rate limit reached. Try again in a minute.'}});
@@ -64,7 +65,7 @@ router.post('/engineer/propose-fix',engineerWriteLimiter,requireEngineerEnabled,
   const filePath=String(req.body?.path||'').trim(),task=String(req.body?.task||'').trim();
   if(!token||!/^[A-Za-z0-9_.-]+[/][A-Za-z0-9_.-]+$/.test(repository))return res.status(503).json({error:'Configure read-only GitHub access and repository settings to enable patch proposals.'});
   if(!providers.isProviderConfigured(provider))return res.status(503).json({error:'Configure the selected AI provider API key before requesting a patch.'});
-  if(!/^(server|tests)[/][A-Za-z0-9_./-]+[.](js|json)$/.test(filePath)||filePath.includes('..'))return res.status(400).json({error:'Only JavaScript and JSON files under server/ or tests/ can be proposed for editing.'});
+  if(!isAllowedEngineerPath(filePath))return res.status(400).json({error:'Only normalized JavaScript and JSON paths under server/ or tests/ are allowed. Traversal and encoded paths are rejected.'});
   if(!task||task.length>2000)return res.status(400).json({error:'Provide a concise task of up to 2,000 characters.'});
   const headers={accept:'application/vnd.github+json',authorization:'Bearer '+token,'x-github-api-version':'2022-11-28'};
   const url='https://api.github.com/repos/'+repository+'/contents/'+filePath.split('/').map(encodeURIComponent).join('/')+'?ref='+encodeURIComponent(targetBranch);
@@ -89,7 +90,7 @@ router.post('/engineer/create-draft-pr',engineerWriteLimiter,requireEngineerEnab
   if(!readToken||!writeToken||!/^[A-Za-z0-9_.-]+[/][A-Za-z0-9_.-]+$/.test(repository))return res.status(503).json({error:'Configure a read-only GitHub token and a separate write token for draft PR creation.'});
   if(req.body?.confirm!==true)return res.status(400).json({error:'Explicit administrator confirmation is required.'});
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(approvalId))return res.status(400).json({error:'A valid one-time approval ID from the current proposal is required.'});
-  if(!/^(server|tests)[/][A-Za-z0-9_./-]+[.](js|json)$/.test(filePath)||filePath.includes('..'))return res.status(400).json({error:'Only JavaScript and JSON files under server/ or tests/ can be proposed for editing.'});
+  if(!isAllowedEngineerPath(filePath))return res.status(400).json({error:'Only normalized JavaScript and JSON paths under server/ or tests/ are allowed. Traversal and encoded paths are rejected.'});
   if(typeof content!=='string'||!content||Buffer.byteLength(content,'utf8')>30000||!task||task.length>2000||!/^[a-f0-9]{40}$/i.test(baseSha))return res.status(400).json({error:'Invalid patch content, task or base file SHA. Patch files are limited to 30 KB.'});
   try{if(filePath.endsWith('.json'))JSON.parse(content);else new (require('node:vm').Script)(content,{filename:filePath});}catch(_){return res.status(422).json({error:'The proposed file failed syntax validation.'});}
   const approval=await store.getEngineerApproval(approvalId);
