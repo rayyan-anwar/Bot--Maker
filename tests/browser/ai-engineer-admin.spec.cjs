@@ -9,7 +9,7 @@ test('administrator can sign in, pause and resume AI Engineer, and verify fail-c
   await page.locator('#login-password').fill(adminPassword);
   await page.getByRole('button', { name: 'Log in' }).click();
 
-  await expect(page).toHaveURL(/admin\\.html/);
+  await expect(page).toHaveURL(/admin[.]html/);
   await expect(page.getByRole('heading', { name: 'AI Engineer controls' })).toBeVisible();
 
   const controlStatus = page.locator('#engineer-control-status');
@@ -61,7 +61,7 @@ test('ordinary signed-in users cannot access the administrator dashboard or API'
   await page.locator('#signup-email').fill('regular-admin-e2e@example.test');
   await page.locator('#signup-password').fill('regular-browser-password-123');
   await page.getByRole('button', { name: 'Create free account' }).click();
-  await expect(page).toHaveURL(/dashboard\\.html/);
+  await expect(page).toHaveURL(/dashboard[.]html/);
 
   await page.goto('/admin.html');
   await expect(page.getByText('Administrator access required.')).toBeVisible();
