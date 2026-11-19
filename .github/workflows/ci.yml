@@ -1,7 +1,7 @@
 name: BotForge CI
 on:
   push:
-    branches: [main]
+    branches: [main, work/part1-core-product]
   pull_request:
     branches: [main]
 
