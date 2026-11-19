@@ -13,7 +13,7 @@ const engineerWriteLimiter=rateLimit({windowMs:60*1000,limit:5,standardHeaders:'
 router.use(requireAuth,(req,res,next)=>{if(!isAdminEmail(req.user.email))return res.status(403).json({error:'Administrator access is not enabled for this account.'});next();});
 router.use('/engineer',(req,res,next)=>{
  res.on('finish',()=>{
-  engineerControl.appendAudit({actorId:req.user?.id,method:req.method,route:String(req.originalUrl||req.path).split('?')[0].replace(/^\\/api\\/admin/,'') ,statusCode:res.statusCode,repository:process.env.BOTFORGE_GITHUB_REPO,filePath:req.body?.path}).catch(()=>{});
+  engineerControl.appendAudit({actorId:req.user?.id,method:req.method,route:String(req.originalUrl||req.path).split('?')[0].replace(/^\/api\/admin/,''),statusCode:res.statusCode,repository:process.env.BOTFORGE_GITHUB_REPO,filePath:req.body?.path}).catch(()=>{});
  });
  next();
 });
