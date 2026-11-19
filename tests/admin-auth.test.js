@@ -38,7 +38,7 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.match(csp,/object-src 'none'/);
  assert.match(csp,/frame-ancestors 'none'/);
  assert.match(csp,/connect-src 'self'/);
- async function post(route,body){return fetch(base+route,{method:'POST',headers:{'content-type':'application/json',origin:base},body:JSON.stringify(body)});}
+ async function post(route,body){const origin=process.env.NODE_ENV==='production'?base.replace(/^http:/,'https:'):base;return fetch(base+route,{method:'POST',headers:{'content-type':'application/json',origin},body:JSON.stringify(body)});}
  const recoveryRequest=await post('/api/auth/password/forgot',{email:'customer@example.com'});
  assert.equal(recoveryRequest.status,202);
   const oauthUnavailable=await fetch(base+'/api/auth/oauth/google');
@@ -117,9 +117,11 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
   const ownerLogin=await post('/api/auth/login',{email:'owner@example.com',password:'strong-admin-password-123'});
   assert.equal(ownerLogin.status,200);
   const ownerCookie=ownerLogin.headers.get('set-cookie');
+  assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:ownerCookie}})).status,403);
+  assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:ownerCookie,origin:base}})).status,403);
   assert.equal((await fetch(base+'/api/auth/me',{headers:{cookie:ownerCookie}})).status,200);
   assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:customerCookie}})).status,403);
-  assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:customerCookie,origin:base}})).status,200);
+  assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:customerCookie,origin:base.replace(/^http:/,'https:')}})).status,200);
  }finally{process.env.NODE_ENV=previousNodeEnv;}
 
  const adminLogin=await post('/api/auth/login',{email:'owner@example.com',password:'strong-admin-password-123'});
