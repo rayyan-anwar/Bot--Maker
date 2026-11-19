@@ -10,9 +10,9 @@ test('PostgreSQL rate-limit store uses an atomic upsert and scoped expiry cleanu
  const result=await store.increment('client-ip');
  assert.equal(result.totalHits,4);
  assert.ok(result.resetTime instanceof Date);
- assert.match(calls[0].sql,/DELETE FROM botforge_rate_limits WHERE expires_at<=now\\(\\)/);
+ assert.match(calls[0].sql,/DELETE FROM botforge_rate_limits WHERE expires_at<=now\(\)/);
  assert.deepEqual(calls[0].values,['api:%']);
- assert.match(calls[1].sql,/ON CONFLICT\\(rate_key\\) DO UPDATE/);
+ assert.match(calls[1].sql,/ON CONFLICT\(rate_key\) DO UPDATE/);
  assert.match(calls[1].sql,/RETURNING hits,expires_at/);
  assert.deepEqual(calls[1].values,['api:client-ip',60000]);
 });
@@ -23,7 +23,7 @@ test('PostgreSQL rate-limit store scopes decrement and reset operations',async()
  await store.decrement('client-ip');
  await store.resetKey('client-ip');
  assert.deepEqual(calls.map(x=>x.values),[['auth:client-ip'],['auth:client-ip']]);
- assert.match(calls[0].sql,/GREATEST\\(0,hits-1\\)/);
+ assert.match(calls[0].sql,/GREATEST\(0,hits-1\)/);
  assert.match(calls[1].sql,/DELETE FROM botforge_rate_limits/);
 });
 
@@ -59,6 +59,6 @@ test('AI Engineer write limit can be shared by multiple app instances',async()=>
 test('AI Engineer write limiter uses PostgreSQL shared storage when configured',()=>{
  const fs=require('node:fs');
  const source=fs.readFileSync(require.resolve('../server/admin.js'),'utf8');
- assert.match(source,/new PostgresRateLimitStore\\('ai-engineer-write',store\\.query\\)/);
- assert.match(source,/store\\.isPostgres\\(\\)/);
+ assert.match(source,/new PostgresRateLimitStore\('ai-engineer-write',store\.query\)/);
+ assert.match(source,/store\.isPostgres\(\)/);
 });
