@@ -1,0 +1,35 @@
+name: AI Engineer Admin Browser E2E
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'server/admin.js'
+      - 'server/engineer-control.js'
+      - 'server/auth.js'
+      - 'public/admin.html'
+      - 'tests/browser/ai-engineer-admin.spec.cjs'
+      - 'tests/fixtures/seed-admin.cjs'
+      - 'playwright.admin.config.cjs'
+      - '.github/workflows/ai-engineer-admin-browser-e2e.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  admin-control-flow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Install Playwright test runner
+        run: npm install --no-save --package-lock=false @playwright/test
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run AI Engineer administrator browser tests
+        run: npx playwright test --config=playwright.admin.config.cjs tests/browser/ai-engineer-admin.spec.cjs
