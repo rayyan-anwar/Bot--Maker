@@ -8,7 +8,7 @@ It does not inspect workflow logs, execute generated code on the application ser
 
 ## Administrator control and audit trail
 
-AI Engineer operations start paused when `BOTFORGE_AI_ENGINEER_ENABLED=false` is set and no saved administrator setting exists. An administrator can resume or pause CI diagnosis and AI patch operations from the admin dashboard. The saved control state is stored in the application database and takes precedence over the bootstrap environment default. If the control record cannot be read, the guarded operation fails closed.
+AI Engineer operations start paused by default when no saved administrator setting exists. Set `BOTFORGE_AI_ENGINEER_ENABLED=true` only for an explicit bootstrap enable; otherwise leave it false or unset. An administrator can resume or pause CI diagnosis and AI patch operations from the admin dashboard. The saved control state is stored in the application database and takes precedence over the bootstrap environment default. If the control record cannot be read, the guarded operation fails closed.
 
 The admin dashboard exposes the latest 100 operational audit events. Events record the administrator identifier, route, HTTP result, repository, optional permitted file path and timestamp. Raw prompts, source contents, proposed code, provider responses, API keys and GitHub tokens are not written to this audit stream. Up to 1,000 events are retained; older events are pruned. The audit stream is operational metadata, not an immutable compliance ledger.
 
@@ -28,6 +28,10 @@ Set these values in the hosting provider's server-side environment settings. Nev
 Grant the read token only access to the selected repository, with **Actions: read**, **Contents: read**, and **Metadata: read**. Grant the separate write token only access to the selected repository, with **Contents: read/write**, **Pull requests: read/write**, and **Metadata: read**. Do not grant administration, workflow modification, secrets, deployment or organization permissions. Confirm the exact permissions supported by the token type in GitHub before use.
 
 The write token is optional. Without it, diagnosis and proposal generation can be enabled while draft PR creation remains unavailable. Rotate either token immediately if exposure is suspected.
+
+## One-time approval and duplicate prevention
+
+Each changed proposal receives a server-generated approval ID tied to the administrator, repository, base branch, file path, base file SHA, exact proposed-content hash and task hash. The approval expires after 30 minutes. Draft creation requires that ID plus explicit confirmation; changing the task or proposed content invalidates the approval. The server atomically claims the approval before writing to GitHub. Concurrent replays are rejected while a claim is active, and completed replays return the same recorded draft PR rather than creating another one. The deterministic branch name is derived from the approval ID so an interrupted request can look for and recover an already-created PR. Failed approvals require a fresh proposal.
 
 ## Request limits and patch boundaries
 
