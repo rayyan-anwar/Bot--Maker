@@ -121,7 +121,7 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
   assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:ownerCookie,origin:base}})).status,403);
   assert.equal((await fetch(base+'/api/auth/me',{headers:{cookie:ownerCookie}})).status,200);
   assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:customerCookie}})).status,403);
-  assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:customerCookie,origin:base}})).status,200);
+  assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:customerCookie,origin:base.replace(/^http:/,'https:')}})).status,200);
  }finally{process.env.NODE_ENV=previousNodeEnv;}
 
  const adminLogin=await post('/api/auth/login',{email:'owner@example.com',password:'strong-admin-password-123'});
