@@ -1,0 +1,77 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const Fortisni = require('../public/js/fortisni');
+
+function createDocument(withHost = true) {
+  const status = { textContent: '' };
+  const host = {
+    dataset: {},
+    innerHTML: '',
+    querySelector(selector) {
+      assert.equal(selector, '.fortisni-status');
+      return status;
+    }
+  };
+  return {
+    host,
+    status,
+    getElementById(id) {
+      assert.equal(id, 'fortisni-companion');
+      return withHost ? host : null;
+    }
+  };
+}
+
+test('Fortisni mounts its companion and starts in idle state', () => {
+  const doc = createDocument();
+  const root = {};
+  const mounted = Fortisni.mount.call(null, doc);
+  assert.ok(mounted);
+  assert.equal(mounted.host, doc.host);
+  assert.match(doc.host.innerHTML, /fortisni-avatar/);
+  assert.equal(doc.host.dataset.state, 'idle');
+  assert.equal(doc.status.textContent, Fortisni.STATES.idle);
+  // mount exposes the two small integration methods on the supplied root only
+  // when a browser root is available; the returned methods remain directly testable.
+  assert.equal(typeof mounted.setState, 'function');
+  assert.equal(typeof mounted.setText, 'function');
+  void root;
+});
+
+test('Fortisni state updates use textContent and reject unknown states', () => {
+  const doc = createDocument();
+  const mounted = Fortisni.mount(doc);
+  assert.equal(mounted.setState('excited'), 'excited');
+  assert.equal(doc.host.dataset.state, 'excited');
+  assert.equal(doc.status.textContent, Fortisni.STATES.excited);
+  assert.equal(mounted.setState('not-a-real-state'), 'idle');
+  assert.equal(doc.host.dataset.state, 'idle');
+  const untrusted = '<img src=x onerror=alert(1)>';
+  mounted.setState('thinking', untrusted);
+  assert.equal(doc.status.textContent, untrusted);
+  assert.equal(doc.host.innerHTML.includes(untrusted), false);
+});
+
+test('Fortisni text updates classify user and assistant content', () => {
+  const doc = createDocument();
+  const mounted = Fortisni.mount(doc);
+  assert.equal(mounted.setText('I am worried about this', 'user'), 'concerned');
+  assert.equal(doc.host.dataset.state, 'concerned');
+  assert.equal(mounted.setText('Your answer is ready.', 'assistant'), 'speaking');
+  assert.equal(doc.host.dataset.state, 'speaking');
+});
+
+test('Fortisni safely does nothing when the companion host is absent', () => {
+  assert.equal(Fortisni.mount(createDocument(false)), null);
+});
+
+test('chat integration clears the delayed thinking transition after success and failure', () => {
+  const html = fs.readFileSync(path.join(__dirname, '../public/bot.html'), 'utf8');
+  assert.match(html, /const thinkingTimer = window\.setTimeout\(\(\) => window\.setFortisniState\('thinking'\), 1100\)/);
+  assert.match(html, /window\.clearTimeout\(thinkingTimer\);\s*pending\.textContent=message\.content/);
+  assert.match(html, /catch \(err\) \{\s*window\.clearTimeout\(thinkingTimer\);\s*pending\.textContent = 'Error: '/);
+  assert.match(html, /window\.setFortisniText\(text, 'user'\)/);
+  assert.match(html, /window\.setFortisniText\(message\.content, 'assistant'\)/);
+});
