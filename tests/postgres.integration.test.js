@@ -57,6 +57,18 @@ test('PostgreSQL integration: shared rate limits, atomic login lockout and quota
    assert.equal(results.filter(Boolean).length,1);
    assert.equal(results.filter(x=>x===null).length,1);
   });
+  await t.test('AI Engineer approval claim is atomic and completed replay is idempotent',async()=>{
+   const approvalId=crypto.randomUUID();
+   await store.insertAsync('aiEngineerApprovals',{id:approvalId,actorId:'admin-one',repository:'owner/repo',filePath:'server/auth.js',baseSha:'a'.repeat(40),contentHash:'b'.repeat(64),taskHash:'c'.repeat(64),status:'pending',createdAt:new Date().toISOString(),expiresAt:new Date(Date.now()+60000).toISOString(),attempts:0});
+   const claims=await Promise.all(Array.from({length:8},()=>store.claimEngineerApproval(approvalId,'admin-one')));
+   assert.equal(claims.filter(x=>x.state==='claimed').length,1);
+   assert.equal(claims.filter(x=>x.state==='in_progress').length,7);
+   await store.updateEngineerApproval(approvalId,'admin-one',{status:'created',leaseUntil:null,branch:'botforge-ai-fix/'+approvalId,pullRequestNumber:84,url:'https://github.com/owner/repo/pull/84'});
+   const replay=await store.claimEngineerApproval(approvalId,'admin-one');
+   assert.equal(replay.state,'created');
+   assert.equal(replay.approval.pullRequestNumber,84);
+   await store.deleteByIdAsync('aiEngineerApprovals',approvalId);
+  });
   await t.test('concurrent quota reservations never exceed the daily limit',async()=>{
    const day=new Date().toISOString().slice(0,10);
    const results=await Promise.all(Array.from({length:8},async()=>{
