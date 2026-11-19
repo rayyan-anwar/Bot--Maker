@@ -27,10 +27,7 @@ test('authenticated chat endpoint streams mock-provider tokens and a saved compl
  assert.equal(response.status,200);assert.match(response.headers.get('content-type'),/text\/event-stream/);
  const body=await response.text();
  assert.match(body,/event: token/);assert.match(body,/event: complete/);
- const complete=body.split('event: complete
-')[1].split('
-
-')[0];
+ const complete=body.split('event: complete\n')[1].split('\n\n')[0];
  const payload=JSON.parse(complete.slice(6));
  assert.match(payload.message.content,/Hello stream/);
  const messages=await store.findManyAsync('messages',{botId:bot.id,userId:user.id});
