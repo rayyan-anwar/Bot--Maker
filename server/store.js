@@ -27,7 +27,7 @@ async function initialize(){
     await pool.query("CREATE TABLE IF NOT EXISTS botforge_records (collection text NOT NULL CHECK(collection IN ('users','bots','botVersions','documents','messages','usage','memory','settings','aiEngineerRuns','aiEngineerApprovals')), id uuid NOT NULL, data jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(collection,id))");
     await pool.query('CREATE INDEX IF NOT EXISTS botforge_records_collection_idx ON botforge_records(collection)');
     await pool.query('ALTER TABLE botforge_records DROP CONSTRAINT IF EXISTS botforge_records_collection_check');
-    await pool.query("ALTER TABLE botforge_records ADD CONSTRAINT botforge_records_collection_check CHECK(collection IN ('users','bots','botVersions','documents','messages','usage','memory','settings','aiEngineerRuns'))");
+    await pool.query("ALTER TABLE botforge_records ADD CONSTRAINT botforge_records_collection_check CHECK(collection IN ('users','bots','botVersions','documents','messages','usage','memory','settings','aiEngineerRuns','aiEngineerApprovals'))");
     await pool.query("CREATE INDEX IF NOT EXISTS botforge_records_user_reset_token_idx ON botforge_records((data->>'passwordResetTokenHash')) WHERE collection='users'");
     await pool.query('CREATE TABLE IF NOT EXISTS botforge_webhook_events (provider text NOT NULL, event_id text NOT NULL, received_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(provider,event_id))');
     await pool.query('ALTER TABLE botforge_webhook_events ADD COLUMN IF NOT EXISTS processing_until timestamptz');
