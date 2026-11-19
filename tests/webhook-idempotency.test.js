@@ -12,9 +12,11 @@ test('webhook event claims are idempotent, provider-scoped, and retryable after 
  await store.initialize();
  t.after(async()=>{await store.close();fs.rmSync(dir,{recursive:true,force:true});});
  assert.equal(await store.claimWebhookEvent('stripe','evt_duplicate_test'),true);
- assert.equal(await store.claimWebhookEvent('stripe','evt_duplicate_test'),false);
+ await assert.rejects(()=>store.claimWebhookEvent('stripe','evt_duplicate_test'),error=>error.status===409);
  assert.equal(await store.claimWebhookEvent('razorpay','evt_duplicate_test'),true);
  await store.releaseWebhookEvent('stripe','evt_duplicate_test');
  assert.equal(await store.claimWebhookEvent('stripe','evt_duplicate_test'),true);
+ await store.completeWebhookEvent('stripe','evt_duplicate_test');
+ assert.equal(await store.claimWebhookEvent('stripe','evt_duplicate_test'),false);
  await assert.rejects(()=>store.claimWebhookEvent('stripe',''),/Invalid webhook event identity/);
 });
