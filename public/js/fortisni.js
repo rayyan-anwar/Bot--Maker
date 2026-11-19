@@ -22,7 +22,7 @@
   const MATCHERS = [
     ['sad', /\b(sad|depressed|depressing|lonely|upset|heartbroken|unhappy|crying|miserable)\b/, ['दुखी', 'उदास', 'अकेला', 'अकेली', 'परेशान हूं', 'रो रहा', 'रो रही']],
     ['concerned', /\b(scared|afraid|worried|anxious|nervous|unsafe|emergency|help me)\b/, ['डर लग', 'चिंता', 'घबरा', 'डर गया', 'डर गई', 'मदद करो']],
-    ['angry', /\b(angry|furious|annoyed|frustrated|irritated|hate|stupid|useless)\b/, ['गुस्सा', 'नाराज़', 'चिढ़', 'बेकार', 'बकवास']],
+    ['angry', /\b(angry|furious|annoyed|frustrated|frustrating|frustration|irritated|irritating|hate|stupid|useless)\b/, ['गुस्सा', 'नाराज़', 'चिढ़', 'बेकार', 'बकवास']],
     ['grateful', /\b(thank you|thanks|thx|grateful|appreciate it)\b/, ['धन्यवाद', 'शुक्रिया', 'आभारी']],
     ['excited', /\b(excited|can't wait|cant wait|let’s go|lets go|congratulations|congrats)\b/, ['उत्साहित', 'बधाई', 'कमाल', 'जश्न']],
     ['happy', /\b(happy|glad|awesome|amazing|great|wonderful|fantastic|good news)\b/, ['खुश', 'शानदार', 'बहुत अच्छा', 'अच्छी खबर']],
