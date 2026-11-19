@@ -64,8 +64,11 @@
       return state;
     }
 
-    root.setFortisniState = setState;
-    root.setFortisniText = setText;
+    const globalRoot = typeof globalThis !== 'undefined' ? globalThis : null;
+    if (globalRoot) {
+      globalRoot.setFortisniState = setState;
+      globalRoot.setFortisniText = setText;
+    }
     setState('idle');
     return { setState, setText, host };
   }
