@@ -137,7 +137,7 @@ test('OpenAI streaming adapter emits Responses API deltas and final token usage'
   assert.equal(JSON.parse(options.body).stream,true);
   const encoder=new TextEncoder();
   const chunks=[
-   'event: response.output_text.delta\r\n data: '+JSON.stringify({type:'response.output_text.delta',delta:'OpenAI '})+'\r\n\r\n',
+   'event: response.output_text.delta\r\ndata: '+JSON.stringify({type:'response.output_text.delta',delta:'OpenAI '})+'\r\n\r\n',
    'event: response.output_text.delta\r\ndata: '+JSON.stringify({type:'response.output_text.delta',delta:'stream'})+'\r\n\r\n',
    'event: response.completed\r\ndata: '+JSON.stringify({type:'response.completed',response:{usage:{input_tokens:13,output_tokens:6}}})+'\r\n\r\n'
   ];
