@@ -212,7 +212,7 @@
     input.value = '';
     renderMessage('user', text, false);
     window.setFortisniText(text, 'user');
-    window.setTimeout(() => window.setFortisniState('thinking'), 1100);
+    const thinkingTimer = window.setTimeout(() => window.setFortisniState('thinking'), 1100);
     const pending = renderMessage('assistant', 'Thinking…', true);
 
     try {
@@ -224,6 +224,7 @@
       while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let boundary;while((boundary=/\r?\n\r?\n/.exec(buffer))){const block=buffer.slice(0,boundary.index);buffer=buffer.slice(boundary.index+boundary[0].length);await handleEvent(block);}}
       buffer+=decoder.decode();if(buffer.trim())await handleEvent(buffer);
       if(!message)throw new Error('The streaming connection ended before the response was saved.');
+      window.clearTimeout(thinkingTimer);
       pending.textContent=message.content;
       window.setFortisniText(message.content, 'assistant');
       window.setTimeout(() => window.setFortisniState('idle'), 2600);
@@ -248,6 +249,7 @@
         pending.after(panel);
       }
     } catch (err) {
+      window.clearTimeout(thinkingTimer);
       pending.textContent = 'Error: ' + err.message;
       window.setFortisniState('error');
       pending.classList.remove('pending');
