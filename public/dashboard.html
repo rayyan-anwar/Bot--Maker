@@ -210,7 +210,9 @@
       const purpose=document.getElementById('bot-purpose').value.trim()||'General assistant';
       const audience=document.getElementById('bot-audience').value.trim()||'Not specified';
       const provider=document.getElementById('bot-provider').selectedOptions[0]?.textContent||'Selected provider';
-      document.getElementById('bot-preview').textContent=name+' · '+purpose+' · Audience: '+audience+' · '+provider;
+      const welcome=document.getElementById('bot-welcome').value.trim()||'Default greeting';
+      const visibility=document.getElementById('bot-public').checked?'Public':'Private';
+      document.getElementById('bot-preview').textContent=name+' · '+purpose+' · Audience: '+audience+' · '+provider+' · '+visibility+' · Welcome: '+welcome;
     }
   }
   function validateWizardStep(){
