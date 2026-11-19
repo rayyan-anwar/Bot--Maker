@@ -13,7 +13,7 @@ const {PostgresRateLimitStore}=require('./rate-limit-store');
 const {requireAuth,isAdminEmail}=require('./auth');
 const router=express.Router();
 const securityScanLimiter=rateLimit({windowMs:60*1000,limit:5,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'Security scan rate limit reached. Try again in a minute.'}});
-const engineerWriteLimiter=rateLimit({windowMs:60*1000,limit:process.env.NODE_ENV==='test'?20:5,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'AI Engineer rate limit reached. Try again in a minute.'},...(store.isPostgres()?{store:new PostgresRateLimitStore('ai-engineer-write',store.query)}:{})});
+const engineerWriteLimiter=rateLimit({windowMs:60*1000,limit:Number.isInteger(Number(process.env.BOTFORGE_ENGINEER_WRITE_LIMIT))&&Number(process.env.BOTFORGE_ENGINEER_WRITE_LIMIT)>=1?Number(process.env.BOTFORGE_ENGINEER_WRITE_LIMIT):5,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'AI Engineer rate limit reached. Try again in a minute.'},...(store.isPostgres()?{store:new PostgresRateLimitStore('ai-engineer-write',store.query)}:{})});
 router.use(requireAuth,(req,res,next)=>{if(!isAdminEmail(req.user.email))return res.status(403).json({error:'Administrator access is not enabled for this account.'});next();});
 router.use('/engineer',(req,res,next)=>{
  res.on('finish',()=>{
