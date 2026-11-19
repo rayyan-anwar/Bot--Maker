@@ -39,6 +39,14 @@ test('PostgreSQL integration: shared rate limits, atomic login lockout and quota
    assert.equal(user.failedLoginAttempts,3);
    assert.ok(user.lockedAt);
   });
+  await t.test('bot deletion removes version snapshots in PostgreSQL',async()=>{
+   const botId=crypto.randomUUID(),versionId=crypto.randomUUID(),now=new Date().toISOString();
+   await store.insertAsync('bots',{id:botId,ownerId:userId,name:'Version cleanup test',instructions:'Test',createdAt:now});
+   await store.insertAsync('botVersions',{id:versionId,botId,ownerId:userId,version:1,snapshot:{name:'Version cleanup test'},createdAt:now});
+   assert.equal((await store.findManyAsync('botVersions',{botId})).length,1);
+   assert.equal(await store.deleteBotAndData(botId),true);
+   assert.deepEqual(await store.findManyAsync('botVersions',{botId}),[]);
+  });
   await t.test('password reset tokens are consumed only once under concurrency',async()=>{
    const tokenHash=crypto.createHash('sha256').update('one-time-reset-token').digest('hex');
    await store.updateByIdAsync('users',userId,{passwordResetTokenHash:tokenHash,passwordResetExpiresAt:new Date(Date.now()+60000).toISOString(),sessionVersion:0});

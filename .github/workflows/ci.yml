@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, work/part1-core-product]
 
 # A branch update already triggers the open pull_request workflow. Avoid a second
 # run for the same commit and cancel stale runs when newer commits arrive.

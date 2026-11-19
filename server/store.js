@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {Pool}=require('pg');
 const DB_PATH=process.env.BOTFORGE_DATA_FILE||path.join(__dirname,'..','data','db.json');
-const COLLECTIONS=['users','bots','documents','messages','usage','memory','webhookEvents'];
+const COLLECTIONS=['users','bots','botVersions','documents','messages','usage','memory','webhookEvents'];
 let cache=null,pool=null,initialized=false,initializationPromise=null;
 const localReservations=new Map();
 function emptyDB(){return Object.fromEntries(COLLECTIONS.map(k=>[k,[]]));}
@@ -24,8 +24,10 @@ async function initialize(){
    pool=new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSL==='disable'?false:{rejectUnauthorized:process.env.PGSSL_REJECT_UNAUTHORIZED!=='false'},max:Number(process.env.PG_POOL_MAX||10),connectionTimeoutMillis:5000,idleTimeoutMillis:30000});
    try{
     await pool.query('SELECT 1');
-    await pool.query("CREATE TABLE IF NOT EXISTS botforge_records (collection text NOT NULL CHECK(collection IN ('users','bots','documents','messages','usage','memory')), id uuid NOT NULL, data jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(collection,id))");
+    await pool.query("CREATE TABLE IF NOT EXISTS botforge_records (collection text NOT NULL CHECK(collection IN ('users','bots','botVersions','documents','messages','usage','memory')), id uuid NOT NULL, data jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(collection,id))");
     await pool.query('CREATE INDEX IF NOT EXISTS botforge_records_collection_idx ON botforge_records(collection)');
+    await pool.query('ALTER TABLE botforge_records DROP CONSTRAINT IF EXISTS botforge_records_collection_check');
+    await pool.query("ALTER TABLE botforge_records ADD CONSTRAINT botforge_records_collection_check CHECK(collection IN ('users','bots','botVersions','documents','messages','usage','memory'))");
     await pool.query("CREATE INDEX IF NOT EXISTS botforge_records_user_reset_token_idx ON botforge_records((data->>'passwordResetTokenHash')) WHERE collection='users'");
     await pool.query('CREATE TABLE IF NOT EXISTS botforge_webhook_events (provider text NOT NULL, event_id text NOT NULL, received_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(provider,event_id))');
     await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS botforge_records_user_email_uidx ON botforge_records((lower(data->>'email'))) WHERE collection='users'");
@@ -71,13 +73,13 @@ async function consumePasswordResetToken(tokenHash,patch){
 }
 async function deleteBotAndData(botId){
  if(!isUuid(botId))return false;
- if(!isPostgres()){const db=load(),exists=db.bots.some(x=>x.id===botId);if(!exists)return false;db.bots=db.bots.filter(x=>x.id!==botId);for(const c of ['documents','messages','memory','usage'])db[c]=db[c].filter(x=>x.botId!==botId);persist();return true;}
+ if(!isPostgres()){const db=load(),exists=db.bots.some(x=>x.id===botId);if(!exists)return false;db.bots=db.bots.filter(x=>x.id!==botId);for(const c of ['botVersions','documents','messages','memory','usage'])db[c]=db[c].filter(x=>x.botId!==botId);persist();return true;}
  await initialize();const client=await pool.connect();
  try{
   await client.query('BEGIN');
   const removed=await client.query("DELETE FROM botforge_records WHERE collection='bots' AND id=$1",[botId]);
   if(!removed.rowCount){await client.query('ROLLBACK');return false;}
-  for(const c of ['documents','messages','memory','usage'])await client.query("DELETE FROM botforge_records WHERE collection=$1 AND data->>'botId'=$2",[c,botId]);
+  for(const c of ['botVersions','documents','messages','memory','usage'])await client.query("DELETE FROM botforge_records WHERE collection=$1 AND data->>'botId'=$2",[c,botId]);
   await client.query('COMMIT');return true;
  }catch(e){try{await client.query('ROLLBACK');}catch(_){}throw e;}
  finally{client.release();}

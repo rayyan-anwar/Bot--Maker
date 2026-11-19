@@ -109,3 +109,59 @@ test('mock provider is unavailable in production and when not explicitly enabled
   assert.equal(providers.isProviderConfigured('mock'),false);
  });
 });
+
+
+test('Anthropic streaming adapter emits text deltas and final token usage',async()=>{
+ await withEnv({ANTHROPIC_API_KEY:'anthropic-stream-key'},()=>withFetch(async(url,options)=>{
+  assert.equal(url,'https://api.anthropic.com/v1/messages');
+  assert.equal(JSON.parse(options.body).stream,true);
+  const encoder=new TextEncoder();
+  const chunks=[
+   'event: message_start\ndata: '+JSON.stringify({type:'message_start',message:{usage:{input_tokens:11}}})+'\n\n',
+   'event: content_block_delta\ndata: '+JSON.stringify({type:'content_block_delta',delta:{type:'text_delta',text:'Hello '}})+'\n\n',
+   'event: content_block_delta\ndata: '+JSON.stringify({type:'content_block_delta',delta:{type:'text_delta',text:'world'}})+'\n\n',
+   'event: message_delta\ndata: '+JSON.stringify({type:'message_delta',usage:{output_tokens:4}})+'\n\n'
+  ];
+  return {ok:true,status:200,body:new ReadableStream({start(controller){for(const chunk of chunks)controller.enqueue(encoder.encode(chunk));controller.close();}})};
+ },async()=>{
+  const tokens=[];const result=await providers.generateStream({provider:'anthropic',system:'Rules',messages:[{role:'user',content:'Hi'}],onToken:token=>tokens.push(token)});
+  assert.deepEqual(tokens,['Hello ','world']);
+  assert.deepEqual(result,{text:'Hello world',inputTokens:11,outputTokens:4});
+ }));
+});
+
+
+test('OpenAI streaming adapter emits Responses API deltas and final token usage',async()=>{
+ await withEnv({OPENAI_API_KEY:'openai-stream-key'},()=>withFetch(async(url,options)=>{
+  assert.equal(url,'https://api.openai.com/v1/responses');
+  assert.equal(JSON.parse(options.body).stream,true);
+  const encoder=new TextEncoder();
+  const chunks=[
+   'event: response.output_text.delta\r\ndata: '+JSON.stringify({type:'response.output_text.delta',delta:'OpenAI '})+'\r\n\r\n',
+   'event: response.output_text.delta\r\ndata: '+JSON.stringify({type:'response.output_text.delta',delta:'stream'})+'\r\n\r\n',
+   'event: response.completed\r\ndata: '+JSON.stringify({type:'response.completed',response:{usage:{input_tokens:13,output_tokens:6}}})+'\r\n\r\n'
+  ];
+  return {ok:true,status:200,body:new ReadableStream({start(controller){for(const chunk of chunks)controller.enqueue(encoder.encode(chunk));controller.close();}})};
+ },async()=>{
+  const tokens=[];const result=await providers.generateStream({provider:'openai',system:'Rules',messages:[{role:'user',content:'Hi'}],onToken:token=>tokens.push(token)});
+  assert.deepEqual(tokens,['OpenAI ','stream']);
+  assert.deepEqual(result,{text:'OpenAI stream',inputTokens:13,outputTokens:6});
+ }));
+});
+
+test('Gemini streaming adapter emits candidate text and usage metadata',async()=>{
+ await withEnv({GOOGLE_GEMINI_API_KEY:'gemini-stream-key'},()=>withFetch(async(url,options)=>{
+  assert.ok(url.includes('/models/gemini-3.8-flash:streamGenerateContent?alt=sse'));
+  assert.equal(options.headers['x-goog-api-key'],'gemini-stream-key');
+  const encoder=new TextEncoder();
+  const chunks=[
+   'data: '+JSON.stringify({candidates:[{content:{parts:[{text:'Gemini '}]}}],usageMetadata:{promptTokenCount:17}})+'\n\n',
+   'data: '+JSON.stringify({candidates:[{content:{parts:[{text:'stream'}]}}],usageMetadata:{promptTokenCount:17,candidatesTokenCount:8}})+'\n\n'
+  ];
+  return {ok:true,status:200,body:new ReadableStream({start(controller){for(const chunk of chunks)controller.enqueue(encoder.encode(chunk));controller.close();}})};
+ },async()=>{
+  const tokens=[];const result=await providers.generateStream({provider:'gemini',system:'Rules',messages:[{role:'user',content:'Hi'}],onToken:token=>tokens.push(token)});
+  assert.deepEqual(tokens,['Gemini ','stream']);
+  assert.deepEqual(result,{text:'Gemini stream',inputTokens:17,outputTokens:8});
+ }));
+});

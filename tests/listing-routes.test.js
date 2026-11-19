@@ -34,3 +34,46 @@ test('administrator-only bot and document listing routes require the configured 
  assert.equal(docs.status,200);
  assert.deepEqual((await docs.json()).documents,[]);
 });
+
+
+test('bot edits create immutable versions and owner can restore an earlier version',async(t)=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-versions-'));
+ process.env.NODE_ENV='test';
+ process.env.JWT_SECRET='version-test-secret-with-at-least-thirty-two-characters';
+ process.env.BOTFORGE_ADMIN_EMAIL='versions@example.test';
+ process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
+ const {start,shutdown}=require('../server/index');
+ const server=await start(0,'127.0.0.1');
+ t.after(async()=>{await shutdown();fs.rmSync(dir,{recursive:true,force:true});});
+ const base='http://127.0.0.1:'+server.address().port;
+ const bcrypt=require('bcryptjs'),{v4:uuidv4}=require('uuid'),store=require('../server/store');
+ await store.insertAsync('users',{id:uuidv4(),email:'versions@example.test',name:'Versions',passwordHash:await bcrypt.hash('version-password-123',10),createdAt:new Date().toISOString()});
+ const login=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'versions@example.test',password:'version-password-123'})});
+ assert.equal(login.status,200);const cookie=(login.headers.get('set-cookie')||'').split(';')[0];
+ const created=await fetch(base+'/api/bots',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({name:'First name',instructions:'First instructions'})});
+ assert.equal(created.status,201);const bot=(await created.json()).bot;
+ const edited=await fetch(base+'/api/bots/'+bot.id,{method:'PUT',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({name:'Second name'})});
+ assert.equal(edited.status,200);assert.equal((await edited.json()).bot.version,2);
+ const history=await fetch(base+'/api/bots/'+bot.id+'/versions',{headers:{cookie}});
+ assert.equal(history.status,200);assert.deepEqual((await history.json()).versions.map(v=>v.version),[2,1]);
+ const restored=await fetch(base+'/api/bots/'+bot.id+'/versions/1/restore',{method:'POST',headers:{cookie}});
+ assert.equal(restored.status,200);const result=(await restored.json());
+ assert.equal(result.bot.name,'First name');assert.equal(result.bot.version,3);assert.equal(result.restoredFrom,1);
+ const latest=await fetch(base+'/api/bots/'+bot.id+'/versions',{headers:{cookie}});
+ assert.deepEqual((await latest.json()).versions.map(v=>v.version),[3,2,1]);
+});
+
+test('deleting a bot also removes its version history',async()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-version-delete-'));
+ process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
+ const store=require('../server/store');
+ const {v4:uuidv4}=require('uuid');
+ const botId=uuidv4(),ownerId=uuidv4(),now=new Date().toISOString();
+ try{
+  await store.insertAsync('bots',{id:botId,ownerId,name:'Delete me',instructions:'Test',createdAt:now});
+  await store.insertAsync('botVersions',{id:uuidv4(),botId,ownerId,version:1,snapshot:{name:'Delete me'},createdAt:now});
+  assert.equal((await store.findManyAsync('botVersions',{botId})).length,1);
+  assert.equal(await store.deleteBotAndData(botId),true);
+  assert.deepEqual(await store.findManyAsync('botVersions',{botId}),[]);
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});

@@ -1,0 +1,34 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const os=require('node:os');
+const path=require('node:path');
+
+test('authenticated chat endpoint streams mock-provider tokens and a saved completion event',async(t)=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-chat-stream-'));
+ process.env.NODE_ENV='test';
+ process.env.BOTFORGE_ENABLE_MOCK_PROVIDER='true';
+ process.env.JWT_SECRET='chat-stream-test-secret-with-at-least-thirty-two-characters';
+ process.env.BOTFORGE_ADMIN_EMAIL='stream@example.test';
+ process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
+ const {start,shutdown}=require('../server/index');
+ const server=await start(0,'127.0.0.1');
+ t.after(async()=>{await shutdown();fs.rmSync(dir,{recursive:true,force:true});});
+ const base='http://127.0.0.1:'+server.address().port;
+ const bcrypt=require('bcryptjs'),{v4:uuidv4}=require('uuid'),store=require('../server/store');
+ const user={id:uuidv4(),email:'stream@example.test',name:'Stream',passwordHash:await bcrypt.hash('stream-password-123',10),createdAt:new Date().toISOString()};
+ await store.insertAsync('users',user);
+ const login=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:user.email,password:'stream-password-123'})});
+ assert.equal(login.status,200);const cookie=(login.headers.get('set-cookie')||'').split(';')[0];
+ const created=await fetch(base+'/api/bots',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({name:'Streaming bot',instructions:'Answer briefly.',provider:'mock'})});
+ assert.equal(created.status,201);const bot=(await created.json()).bot;
+ const response=await fetch(base+'/api/chat/'+bot.id+'/messages',{method:'POST',headers:{cookie,'content-type':'application/json','accept':'text/event-stream'},body:JSON.stringify({content:'Hello stream'})});
+ assert.equal(response.status,200);assert.match(response.headers.get('content-type'),/text\/event-stream/);
+ const body=await response.text();
+ assert.match(body,/event: token/);assert.match(body,/event: complete/);
+ const complete=body.split('event: complete\n')[1].split('\n\n')[0];
+ const payload=JSON.parse(complete.slice(6));
+ assert.match(payload.message.content,/Hello stream/);
+ const messages=await store.findManyAsync('messages',{botId:bot.id,userId:user.id});
+ assert.equal(messages.length,2);assert.equal(messages[1].role,'assistant');
+});

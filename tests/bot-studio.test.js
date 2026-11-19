@@ -1,0 +1,24 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+
+const html=fs.readFileSync(path.join(__dirname,'..','public','dashboard.html'),'utf8');
+
+test('Bot Studio wizard has three complete steps and unique field IDs',()=>{
+ const markers=[0,1,2].map(n=>html.indexOf('data-wizard-step="'+n+'"'));
+ assert.ok(markers.every(index=>index>=0));
+ assert.ok(markers[0]<markers[1]&&markers[1]<markers[2]);
+ const steps=markers.map((start,index)=>html.slice(start,index===2?html.indexOf('</form>',start):markers[index+1]));
+ const ids=html.match(/id="[^"]+"/g)||[];
+ assert.equal(ids.length,new Set(ids).size,'Dashboard element IDs must be unique');
+ for(const id of ['bot-name','bot-purpose','bot-audience'])assert.ok(steps[0].includes('id="'+id+'"'),id);
+ for(const id of ['bot-provider','bot-instructions'])assert.ok(steps[1].includes('id="'+id+'"'),id);
+ for(const id of ['bot-welcome','bot-public','bot-preview'])assert.ok(steps[2].includes('id="'+id+'"'),id);
+});
+
+test('Bot Studio wizard exposes progress, navigation, and final create controls',()=>{
+ for(const id of ['wizard-progress','wizard-progress-bar','wizard-back','wizard-next','wizard-create','cancel-new-bot','new-bot-error']) {
+  assert.ok(html.includes('id="'+id+'"'),id);
+ }
+});

@@ -65,6 +65,18 @@
         <input type="text" id="set-description">
       </div>
       <div class="field">
+        <label for="set-purpose">Bot purpose</label>
+        <input type="text" id="set-purpose" maxlength="300">
+      </div>
+      <div class="field">
+        <label for="set-audience">Target audience</label>
+        <input type="text" id="set-audience" maxlength="160">
+      </div>
+      <div class="field">
+        <label for="set-welcome">Welcome message</label>
+        <input type="text" id="set-welcome" maxlength="500">
+      </div>
+      <div class="field">
         <label for="set-instructions">Instructions</label>
         <textarea id="set-instructions" required></textarea>
       </div>
@@ -74,6 +86,12 @@
       </div>
       <button type="submit" class="btn btn-primary">Save changes</button>
     </form>
+  </div>
+
+  <div class="card mt-24">
+    <h2>Version history</h2>
+    <p class="muted">Every saved configuration is recorded. Restoring a version creates a new version, so later changes remain recoverable.</p>
+    <div id="version-list" class="mt-24"><p class="muted">Loading versions…</p></div>
   </div>
 
   <div class="card mt-24">
@@ -125,6 +143,9 @@
     document.getElementById('set-name').value = bot.name;
     document.getElementById('set-description').value = bot.description;
     document.getElementById('set-instructions').value = bot.instructions;
+    document.getElementById('set-purpose').value = bot.purpose || '';
+    document.getElementById('set-audience').value = bot.audience || '';
+    document.getElementById('set-welcome').value = bot.welcomeMessage || '';
     document.getElementById('set-public').checked = bot.isPublic;
     loadDocs();
   }
@@ -178,7 +199,7 @@
   (async function loadHistory() {
     const { messages } = await api('/chat/' + botId + '/messages');
     if (messages.length === 0) {
-      renderMessage('assistant', `Hi, I'm ${bot.name}. ${bot.description || "Ask me anything."}`, false);
+      renderMessage('assistant', bot.welcomeMessage || `Hi, I'm ${bot.name}. ${bot.description || "Ask me anything."}`, false);
     } else {
       messages.forEach((m) => renderMessage(m.role, m.content, false));
     }
@@ -195,8 +216,15 @@
     const pending = renderMessage('assistant', 'Thinking…', true);
 
     try {
-      const { message, sources = [] } = await api('/chat/' + botId + '/messages', { method: 'POST', body: { content: text } });
-      pending.textContent = message.content;
+      const response=await fetch('/api/chat/'+botId+'/messages',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json','accept':'text/event-stream'},body:JSON.stringify({content:text})});
+      if(!response.ok){let failure={};try{failure=await response.json();}catch(_){}throw new Error(failure.error||'Chat request failed ('+response.status+').');}
+      if(!response.body)throw new Error('Streaming is not supported by this browser.');
+      const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',message=null,sources=[],receivedToken=false;
+      const handleEvent=async block=>{let event='message',data='';for(const line of block.split(/\r?\n/)){if(line.startsWith('event:'))event=line.slice(6).trim();else if(line.startsWith('data:'))data+=line.slice(5).trim();}if(!data)return;const value=JSON.parse(data);if(event==='token'){if(!receivedToken){pending.textContent='';receivedToken=true;}pending.textContent+=value.text;log.scrollTop=log.scrollHeight;}else if(event==='complete'){message=value.message;sources=value.sources||[];}else if(event==='error')throw new Error(value.error||'Streaming chat failed.');};
+      while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let boundary;while((boundary=/\r?\n\r?\n/.exec(buffer))){const block=buffer.slice(0,boundary.index);buffer=buffer.slice(boundary.index+boundary[0].length);await handleEvent(block);}}
+      buffer+=decoder.decode();if(buffer.trim())await handleEvent(buffer);
+      if(!message)throw new Error('The streaming connection ended before the response was saved.');
+      pending.textContent=message.content;
       window.setFortisniText(message.content, 'assistant');
       window.setTimeout(() => window.setFortisniState('idle'), 2600);
       pending.classList.remove('pending');
@@ -247,16 +275,47 @@
           name: document.getElementById('set-name').value,
           description: document.getElementById('set-description').value,
           instructions: document.getElementById('set-instructions').value,
-          isPublic: document.getElementById('set-public').checked
+          isPublic: document.getElementById('set-public').checked,
+          purpose: document.getElementById('set-purpose').value,
+          audience: document.getElementById('set-audience').value,
+          welcomeMessage: document.getElementById('set-welcome').value
         }
       });
       document.getElementById('bot-name').textContent = updated.name;
       document.getElementById('bot-desc').textContent = updated.description;
+      bot=updated;await loadVersions();
     } catch (err) {
       errBox.textContent = err.message;
       errBox.classList.add('show');
     }
   });
+
+  // ---- version history ----
+  async function loadVersions() {
+    const list=document.getElementById('version-list');
+    try {
+      const {currentVersion,versions}=await api('/bots/'+botId+'/versions');
+      list.replaceChildren();
+      if(!versions.length){list.textContent='No saved versions yet.';return;}
+      versions.forEach(version=>{
+        const row=document.createElement('div');row.className='doc-row';
+        const label=document.createElement('span');
+        label.textContent='Version '+version.version+(version.version===currentVersion?' · Current':'')+' · '+new Date(version.createdAt).toLocaleString()+' · '+version.summary;
+        row.appendChild(label);
+        if(version.version!==currentVersion){
+          const restore=document.createElement('button');restore.className='btn btn-ghost';restore.type='button';restore.textContent='Restore';
+          restore.addEventListener('click',async()=>{
+            if(!confirm('Restore version '+version.version+'? Current settings will be saved as a newer version.'))return;
+            try{const result=await api('/bots/'+botId+'/versions/'+version.version+'/restore',{method:'POST'});bot=result.bot;document.getElementById('set-name').value=bot.name;document.getElementById('set-description').value=bot.description;document.getElementById('set-instructions').value=bot.instructions;document.getElementById('set-public').checked=bot.isPublic;document.getElementById('set-purpose').value=bot.purpose||'';document.getElementById('set-audience').value=bot.audience||'';document.getElementById('set-welcome').value=bot.welcomeMessage||'';document.getElementById('bot-name').textContent=bot.name;document.getElementById('bot-desc').textContent=bot.description;await loadVersions();}
+            catch(error){alert(error.message);}
+          });
+          row.appendChild(restore);
+        }
+        list.appendChild(row);
+      });
+    } catch(error) { list.textContent='Version history unavailable: '+error.message; }
+  }
+  loadVersions();
 
   // ---- documents ----
   async function loadDocs() {
@@ -269,9 +328,18 @@
     list.innerHTML = documents.map((d) => `
       <div class="doc-row" data-id="${escapeHtml(d.id)}">
         <span>${escapeHtml(d.filename)} <span class="muted">(${Number(d.chunkCount)||0} chunks)</span></span>
+        <span class="muted">Keyword index: ${Number(d.chunkCount)||0} chunks · Semantic: ${d.semanticSearchAvailable?'ready ('+Number(d.indexedChunkCount||0)+' indexed)': 'not configured'}</span>
+        <button class="btn btn-ghost doc-reindex" data-id="${escapeHtml(d.id)}" >Rebuild semantic index</button>
         <button class="btn btn-ghost doc-delete" data-id="${escapeHtml(d.id)}">Remove</button>
       </div>`).join('');
 
+    list.querySelectorAll('.doc-reindex').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        btn.disabled=true;btn.textContent='Indexing…';
+        try{await api('/documents/'+botId+'/'+btn.dataset.id+'/reindex',{method:'POST'});await loadDocs();}
+        catch(error){alert(error.message);btn.disabled=false;btn.textContent='Rebuild semantic index';}
+      });
+    });
     list.querySelectorAll('.doc-delete').forEach((btn) => {
       btn.addEventListener('click', async () => {
         await api('/documents/' + botId + '/' + btn.dataset.id, { method: 'DELETE' });
