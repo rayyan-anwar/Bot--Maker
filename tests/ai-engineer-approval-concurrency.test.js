@@ -53,6 +53,24 @@ test('AI Engineer approval has one winner under concurrent claims and recovers a
   const wrongOwner = await store.claimEngineerApproval(id, 'different-admin');
   assert.equal(wrongOwner.state, 'invalid');
 
+  const expiredId = crypto.randomUUID();
+  await store.insertAsync('aiEngineerApprovals', {
+    id: expiredId,
+    actorId,
+    repository: 'owner/repo',
+    filePath: 'server/auth.js',
+    baseSha: 'a'.repeat(40),
+    contentHash: 'b'.repeat(64),
+    taskHash: 'c'.repeat(64),
+    status: 'pending',
+    createdAt: new Date(Date.now() - 60_000).toISOString(),
+    expiresAt: new Date(Date.now() - 1_000).toISOString(),
+    attempts: 0
+  });
+  const expired = await store.claimEngineerApproval(expiredId, actorId);
+  assert.equal(expired.state, 'expired');
+  assert.equal((await store.findByIdAsync('aiEngineerApprovals', expiredId)).attempts, 0);
+
   // Simulate a worker crash after claiming: the lease expires, so a retry may recover.
   await store.updateEngineerApproval(id, actorId, {
     status: 'creating',
