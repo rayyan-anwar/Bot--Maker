@@ -14,7 +14,10 @@ test('AI Engineer kill switch persists across control reads and can be re-enable
  delete require.cache[controlPath];delete require.cache[storePath];
  const store=require('../server/store'),control=require('../server/engineer-control');
  try{
+  assert.equal(await control.isEnabled(),false);
+  process.env.BOTFORGE_AI_ENGINEER_ENABLED='true';
   assert.equal(await control.isEnabled(),true);
+  delete process.env.BOTFORGE_AI_ENGINEER_ENABLED;
   const disabled=await control.setEnabled(false,'admin-user');
   assert.equal(disabled.aiEngineerEnabled,false);
   assert.equal(await control.isEnabled(),false);
