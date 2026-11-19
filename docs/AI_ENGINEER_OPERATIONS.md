@@ -6,6 +6,12 @@ The current AI Engineer is an administrator-only, proposal-first integration. It
 
 It does not inspect workflow logs, execute generated code on the application server, merge pull requests, deploy, or autonomously modify production. The GitHub Actions validation workflow checks qualifying pull requests in an isolated GitHub-hosted runner. A successful CI run is evidence for the tested revision, not a security certification.
 
+## Administrator control and audit trail
+
+AI Engineer operations start paused when `BOTFORGE_AI_ENGINEER_ENABLED=false` is set and no saved administrator setting exists. An administrator can resume or pause CI diagnosis and AI patch operations from the admin dashboard. The saved control state is stored in the application database and takes precedence over the bootstrap environment default. If the control record cannot be read, the guarded operation fails closed.
+
+The admin dashboard exposes the latest 100 operational audit events. Events record the administrator identifier, route, HTTP result, repository, optional permitted file path and timestamp. Raw prompts, source contents, proposed code, provider responses, API keys and GitHub tokens are not written to this audit stream. Up to 1,000 events are retained; older events are pruned. The audit stream is operational metadata, not an immutable compliance ledger.
+
 ## Required configuration
 
 Set these values in the hosting provider's server-side environment settings. Never put real credentials in source control, browser JavaScript, issue text or chat.
