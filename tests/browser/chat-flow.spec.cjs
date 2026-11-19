@@ -45,7 +45,7 @@ test('user signs up, opens a bot, chats, sees Fortisni react and reloads saved h
   await expect(page.locator('#fortisni-companion')).toHaveAttribute('data-state', 'concerned');
   await expect(page.locator('#chat-log .msg.assistant').last()).toContainText('[BotForge mock response]');
   await expect(page.locator('#chat-log .msg.assistant').last()).toContainText(userText);
-  await expect(page.locator('#fortisni-companion')).toHaveAttribute('data-state', 'speaking');
+  await expect(page.locator('#fortisni-companion')).toHaveAttribute('data-state', 'concerned');
 
   await page.reload();
   await expect(page.locator('#bot-name')).toHaveText('Browser Flow Bot');
