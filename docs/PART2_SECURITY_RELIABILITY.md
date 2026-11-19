@@ -31,7 +31,7 @@ These code-path reviews are not a substitute for external operational verificati
 ## Remaining external verification
 
 - Run current-head CI after the latest webhook lease and entitlement changes.
-- Perform a real staging backup and restore rehearsal against a disposable PostgreSQL instance.
+- A disposable PostgreSQL backup/restore rehearsal is now part of CI; a separate live managed-database rehearsal remains required.
 - Exercise live Stripe/Razorpay sandbox events and real provider timeout behavior with test credentials.
 - Run browser E2E, load testing and an independent penetration/security review before production deployment.
 
