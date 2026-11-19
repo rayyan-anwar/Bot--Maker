@@ -119,7 +119,7 @@ The AI Engineer is admin-only and proposal-first. It can inspect CI metadata, re
 - No hosting, custom domain, production database, storage service or monitoring has been provisioned by this repository work.
 - OAuth, email delivery, live AI provider calls and billing have not been end-to-end tested with operator credentials.
 - PostgreSQL migration and runtime need a live managed-database rehearsal, concurrency testing and restore drill.
-- Rate limiting is process-local and needs a shared backing store before horizontal scaling.
+- **Rate limiting:** PostgreSQL deployments use the shared database-backed store for configured API counters; JSON-only local development uses an in-memory process-local store. The shared store still needs a live multi-instance staging and failover rehearsal before horizontal scaling.
 - PDF parsing needs stronger resource isolation and malware scanning before accepting untrusted public uploads.
 - The heuristic scanner is not a substitute for a professional security review.
 - Privacy policy, terms, retention/deletion/export workflows, billing disclosures and ad-network integration need completion and review before a commercial launch.
