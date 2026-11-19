@@ -1,0 +1,32 @@
+name: Fortisni Browser E2E
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'public/js/fortisni.js'
+      - 'public/css/fortisni.css'
+      - 'tests/browser/**'
+      - 'tests/fixtures/fortisni-browser.html'
+      - 'playwright.config.cjs'
+      - '.github/workflows/fortisni-browser-e2e.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - name: Install Playwright test runner
+        run: npm install --no-save --package-lock=false @playwright/test
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run Fortisni browser tests
+        run: npx playwright test --config=playwright.config.cjs
