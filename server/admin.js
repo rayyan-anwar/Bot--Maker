@@ -1,4 +1,5 @@
 const express=require('express');
+const crypto=require('node:crypto');
 const rateLimit=require('express-rate-limit');
 const store=require('./store');
 const plans=require('./plans');
@@ -20,6 +21,18 @@ router.use('/engineer',(req,res,next)=>{
 async function requireEngineerEnabled(req,res,next){
  try{if(!(await engineerControl.isEnabled()))return res.status(423).json({error:'AI Engineer is paused by the administrator.'});next();}
  catch(_){res.status(503).json({error:'AI Engineer control state is unavailable. No operation was started.'});}
+}
+function sha256(value){return crypto.createHash('sha256').update(String(value),'utf8').digest('hex');}
+async function findExistingEngineerPr(api,headers,repository,branch,baseBranch){
+ const owner=repository.split('/')[0];
+ const url=api+'/pulls?state=all&head='+encodeURIComponent(owner+':'+branch)+'&base='+encodeURIComponent(baseBranch);
+ const response=await fetch(url,{headers,signal:AbortSignal.timeout(12000)});
+ if(!response.ok)return null;
+ const items=await response.json();
+ return Array.isArray(items)?items.find(item=>item.head?.ref===branch&&item.base?.ref===baseBranch)||null:null;
+}
+async function recordCreatedEngineerPr(approvalId,actorId,branch,pr){
+ return store.updateEngineerApproval(approvalId,actorId,{status:'created',leaseUntil:null,branch,pullRequestNumber:pr.number,url:pr.html_url,completedAt:new Date().toISOString()});
 }
 router.get('/plans',(req,res)=>res.json({plans:plans.getPlans()}));
 router.get('/engineer/control',async(req,res,next)=>{try{res.json({enabled:await engineerControl.isEnabled(),source:'persistent administrator control'});}catch(e){next(e);}});
@@ -64,7 +77,9 @@ router.post('/engineer/propose-fix',engineerWriteLimiter,requireEngineerEnabled,
   let proposal;try{let raw=result.text.trim();const fence=String.fromCharCode(96).repeat(3);if(raw.startsWith(fence))raw=raw.slice(3).replace(/^json\s*/i,'');if(raw.endsWith(fence))raw=raw.slice(0,-3).trim();proposal=JSON.parse(raw);}catch(_){return res.status(502).json({error:'AI response was not valid structured patch data. No repository changes were made.'});}
   if(typeof proposal.summary!=='string'||proposal.summary.length>1000||typeof proposal.updatedContent!=='string'||Buffer.byteLength(proposal.updatedContent,'utf8')>30000)return res.status(502).json({error:'AI returned an invalid or oversized patch proposal.'});
   if(proposal.updatedContent!==original){try{if(filePath.endsWith('.json'))JSON.parse(proposal.updatedContent);else new (require('node:vm').Script)(proposal.updatedContent,{filename:filePath});}catch(_){return res.status(422).json({error:'The proposed file has a JavaScript syntax or JSON parsing error. No repository changes were made.'});}}
-  res.json({ok:true,mode:'proposal-only',repository,branch:targetBranch,path:filePath,baseSha:file.sha,summary:proposal.summary,originalContent:original,proposedContent:proposal.updatedContent,changed:proposal.updatedContent!==original,applied:false,notice:'This is a proposal only. No GitHub file, branch, commit, pull request or deployment was changed.'});
+  const changed=proposal.updatedContent!==original,approvalId=changed?crypto.randomUUID():null,expiresAt=changed?new Date(Date.now()+30*60*1000).toISOString():null;
+  if(approvalId)await store.insertAsync('aiEngineerApprovals',{id:approvalId,actorId:req.user.id,repository,baseBranch:targetBranch,filePath,baseSha:file.sha,contentHash:sha256(proposal.updatedContent),taskHash:sha256(task),status:'pending',createdAt:new Date().toISOString(),expiresAt,attempts:0});
+  res.json({ok:true,mode:'proposal-only',repository,branch:targetBranch,path:filePath,baseSha:file.sha,summary:proposal.summary,originalContent:original,proposedContent:proposal.updatedContent,changed,approvalId,approvalExpiresAt:expiresAt,applied:false,notice:'This is a proposal only. No GitHub file, branch, commit, pull request or deployment was changed.'});
  }catch(e){next(e);}
 });
 router.post('/engineer/create-draft-pr',engineerWriteLimiter,requireEngineerEnabled,async(req,res,next)=>{
