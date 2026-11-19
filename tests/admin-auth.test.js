@@ -107,8 +107,6 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  process.env.NODE_ENV='production';
  try{
   assert.equal((await fetch(base+'/api/auth/mode')).status,200);
-  assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:ownerCookie}})).status,403);
-  assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:ownerCookie,origin:base}})).status,403);
   assert.deepEqual(await (await fetch(base+'/api/auth/mode')).json(),{singleAdmin:true});
   assert.equal((await post('/api/auth/signup',{name:'Attacker',email:'new-user@example.com',password:'strong-password-123'})).status,403);
   assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'new-customer-password-456'})).status,401);
@@ -119,6 +117,8 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
   const ownerLogin=await post('/api/auth/login',{email:'owner@example.com',password:'strong-admin-password-123'});
   assert.equal(ownerLogin.status,200);
   const ownerCookie=ownerLogin.headers.get('set-cookie');
+  assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:ownerCookie}})).status,403);
+  assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:ownerCookie,origin:base}})).status,403);
   assert.equal((await fetch(base+'/api/auth/me',{headers:{cookie:ownerCookie}})).status,200);
   assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:customerCookie}})).status,403);
   assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:customerCookie,origin:base}})).status,200);
