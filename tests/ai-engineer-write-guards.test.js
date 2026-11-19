@@ -95,6 +95,20 @@ test('AI Engineer write endpoints enforce pause, explicit approval and patch bou
   const missingTask = await proposal({ path: 'server/auth.js', task: '' });
   assert.equal(missingTask.status, 400);
 
+  const oversizedTask = await proposal({ path: 'server/auth.js', task: 'x'.repeat(2001) });
+  assert.equal(oversizedTask.status, 400);
+
+  for (const path of [
+    'server／auth.js',
+    'server/admіn.js',
+    'server/%252e%252e/secrets.js',
+    'server/auth.js\\n',
+    'server/..\\u002fauth.js'
+  ]) {
+    const adversarialPath = await proposal({ path, task: 'Review session validation' });
+    assert.equal(adversarialPath.status, 400, JSON.stringify(path));
+  }
+
   const missingConfirmation = await createDraft({
     path: 'server/auth.js',
     task: 'Review session validation',
