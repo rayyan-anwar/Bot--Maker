@@ -8,6 +8,7 @@ test('authenticated chat endpoint streams mock-provider tokens and a saved compl
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-chat-stream-'));
  process.env.NODE_ENV='test';
  process.env.BOTFORGE_ENABLE_MOCK_PROVIDER='true';
+ process.env.BOTFORGE_CHAT_RATE_LIMIT='1';
  process.env.JWT_SECRET='chat-stream-test-secret-with-at-least-thirty-two-characters';
  process.env.BOTFORGE_ADMIN_EMAIL='stream@example.test';
  process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
@@ -26,9 +27,15 @@ test('authenticated chat endpoint streams mock-provider tokens and a saved compl
  assert.equal(response.status,200);assert.match(response.headers.get('content-type'),/text\/event-stream/);
  const body=await response.text();
  assert.match(body,/event: token/);assert.match(body,/event: complete/);
- const complete=body.split('event: complete\n')[1].split('\n\n')[0];
+ const complete=body.split('event: complete
+')[1].split('
+
+')[0];
  const payload=JSON.parse(complete.slice(6));
  assert.match(payload.message.content,/Hello stream/);
  const messages=await store.findManyAsync('messages',{botId:bot.id,userId:user.id});
  assert.equal(messages.length,2);assert.equal(messages[1].role,'assistant');
+ const limited=await fetch(base+'/api/chat/'+bot.id+'/messages',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({content:'This second message should be throttled.'})});
+ assert.equal(limited.status,429);
+ assert.match((await limited.json()).error,/Too many chat requests/);
 });
