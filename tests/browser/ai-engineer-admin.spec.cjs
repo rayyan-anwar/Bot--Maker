@@ -7,7 +7,7 @@ test('administrator can sign in, pause and resume AI Engineer, and verify fail-c
   await page.goto('/');
   await page.locator('#login-email').fill(adminEmail);
   await page.locator('#login-password').fill(adminPassword);
-  await page.getByRole('button', { name: 'Log in' }).click();
+  await page.locator('#login-form button[type="submit"]').click();
 
   await expect(page).toHaveURL(/admin[.]html/);
   await expect(page.getByRole('heading', { name: 'AI Engineer controls' })).toBeVisible();
