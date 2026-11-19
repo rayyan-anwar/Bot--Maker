@@ -1,0 +1,71 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const os=require('node:os');
+const path=require('node:path');
+
+test('private bot resources are isolated between two authenticated accounts',async(t)=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-tenant-isolation-'));
+ process.env.NODE_ENV='test';
+ process.env.JWT_SECRET='tenant-isolation-test-secret-with-at-least-thirty-two-characters';
+ process.env.BOTFORGE_ADMIN_EMAIL='owner-a@example.test';
+ process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
+ const {start,shutdown}=require('../server/index');
+ const server=await start(0,'127.0.0.1');
+ t.after(async()=>{await shutdown();fs.rmSync(dir,{recursive:true,force:true});});
+ const base='http://127.0.0.1:'+server.address().port;
+ const bcrypt=require('bcryptjs'),{v4:uuidv4}=require('uuid'),store=require('../server/store');
+ for(const [email,name] of [['owner-a@example.test','Owner A'],['owner-b@example.test','Owner B']]){
+  await store.insertAsync('users',{id:uuidv4(),email,name,passwordHash:await bcrypt.hash('tenant-test-password-123',10),createdAt:new Date().toISOString()});
+ }
+ async function login(email){
+  const response=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email,password:'tenant-test-password-123'})});
+  assert.equal(response.status,200);
+  return (response.headers.get('set-cookie')||'').split(';')[0];
+ }
+ const cookieA=await login('owner-a@example.test'),cookieB=await login('owner-b@example.test');
+ const userA=(await store.findManyAsync('users',{email:'owner-a@example.test'}))[0];
+ const userB=(await store.findManyAsync('users',{email:'owner-b@example.test'}))[0];
+ await store.insertAsync('usage',{id:uuidv4(),userId:userA.id,botId:null,provider:'mock',model:'mock',inputTokens:10,outputTokens:5,day:new Date().toISOString().slice(0,10),createdAt:new Date().toISOString()});
+ await store.insertAsync('memory',{id:uuidv4(),userId:userA.id,botId:null,kind:'profile',content:'Private account A memory',createdAt:new Date().toISOString()});
+ await store.updateByIdAsync('users',userA.id,{stripeCustomerId:'cus_private_owner_a'});
+ const usageB=await fetch(base+'/api/chat/usage/me',{headers:{cookie:cookieB}});
+ assert.equal(usageB.status,200);
+ assert.equal(JSON.stringify(await usageB.json()).includes('cus_private_owner_a'),false);
+ const memoryB=await fetch(base+'/api/chat/memory/me',{headers:{cookie:cookieB}});
+ assert.equal(memoryB.status,200);
+ assert.equal(JSON.stringify(await memoryB.json()).includes('Private account A memory'),false);
+ const billingB=await fetch(base+'/api/billing/plans',{headers:{cookie:cookieB}});
+ assert.equal(billingB.status,200);
+ assert.equal((await billingB.json()).hasBillingCustomer,false);
+ const billingA=await fetch(base+'/api/billing/plans',{headers:{cookie:cookieA}});
+ assert.equal(billingA.status,200);
+ assert.equal((await billingA.json()).hasBillingCustomer,true);
+ const created=await fetch(base+'/api/bots',{method:'POST',headers:{cookie:cookieA,'content-type':'application/json'},body:JSON.stringify({name:'Private research bot',instructions:'Confidential owner-only instructions.'})});
+ assert.equal(created.status,201);
+ const bot=(await created.json()).bot;
+ const forbidden=async(response)=>assert.equal(response.status,403);
+ await forbidden(await fetch(base+'/api/bots/'+bot.id,{headers:{cookie:cookieB}}));
+ await forbidden(await fetch(base+'/api/bots/'+bot.id+'/versions',{headers:{cookie:cookieB}}));
+ await forbidden(await fetch(base+'/api/bots/'+bot.id,{method:'PUT',headers:{cookie:cookieB,'content-type':'application/json'},body:JSON.stringify({name:'Hijacked'})}));
+ await forbidden(await fetch(base+'/api/bots/'+bot.id+'/versions/1/restore',{method:'POST',headers:{cookie:cookieB}}));
+ await forbidden(await fetch(base+'/api/documents/'+bot.id,{headers:{cookie:cookieB}}));
+ await forbidden(await fetch(base+'/api/chat/'+bot.id+'/messages',{headers:{cookie:cookieB}}));
+ await forbidden(await fetch(base+'/api/chat/'+bot.id+'/memory',{headers:{cookie:cookieB}}));
+ await forbidden(await fetch(base+'/api/chat/'+bot.id+'/messages',{method:'POST',headers:{cookie:cookieB,'content-type':'application/json'},body:JSON.stringify({content:'Try to use another account bot'})}));
+ await forbidden(await fetch(base+'/api/bots/'+bot.id,{method:'DELETE',headers:{cookie:cookieB}}));
+ const ownerRead=await fetch(base+'/api/bots/'+bot.id,{headers:{cookie:cookieA}});
+ assert.equal(ownerRead.status,200);
+ assert.equal((await ownerRead.json()).bot.instructions,'Confidential owner-only instructions.');
+ const stillExists=await fetch(base+'/api/bots/'+bot.id,{headers:{cookie:cookieA}});
+ assert.equal(stillExists.status,200);
+
+ const madePublic=await fetch(base+'/api/bots/'+bot.id,{method:'PUT',headers:{cookie:cookieA,'content-type':'application/json'},body:JSON.stringify({isPublic:true})});
+ assert.equal(madePublic.status,200);
+ const publicRead=await fetch(base+'/api/bots/'+bot.id,{headers:{cookie:cookieB}});
+ assert.equal(publicRead.status,200);
+ const publicPayload=await publicRead.json();
+ assert.equal(publicPayload.isOwner,false);
+ assert.equal(Object.hasOwn(publicPayload.bot,'instructions'),false);
+ assert.equal(JSON.stringify(publicPayload).includes('Confidential owner-only instructions.'),false);
+});
