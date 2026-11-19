@@ -5,15 +5,29 @@ const plans=require('./plans');
 const providers=require('./providers');
 const metrics=require('./metrics');
 const securityScanner=require('../scripts/security-scan');
+const engineerControl=require('./engineer-control');
 const {requireAuth,isAdminEmail}=require('./auth');
 const router=express.Router();
 const securityScanLimiter=rateLimit({windowMs:60*1000,limit:5,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'Security scan rate limit reached. Try again in a minute.'}});
 const engineerWriteLimiter=rateLimit({windowMs:60*1000,limit:5,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'AI Engineer rate limit reached. Try again in a minute.'}});
 router.use(requireAuth,(req,res,next)=>{if(!isAdminEmail(req.user.email))return res.status(403).json({error:'Administrator access is not enabled for this account.'});next();});
+router.use('/engineer',(req,res,next)=>{
+ res.on('finish',()=>{
+  engineerControl.appendAudit({actorId:req.user?.id,method:req.method,route:String(req.originalUrl||req.path).split('?')[0].replace(/^\/api\/admin/,''),statusCode:res.statusCode,repository:process.env.BOTFORGE_GITHUB_REPO,filePath:req.body?.path}).catch(()=>{});
+ });
+ next();
+});
+async function requireEngineerEnabled(req,res,next){
+ try{if(!(await engineerControl.isEnabled()))return res.status(423).json({error:'AI Engineer is paused by the administrator.'});next();}
+ catch(_){res.status(503).json({error:'AI Engineer control state is unavailable. No operation was started.'});}
+}
 router.get('/plans',(req,res)=>res.json({plans:plans.getPlans()}));
+router.get('/engineer/control',async(req,res,next)=>{try{res.json({enabled:await engineerControl.isEnabled(),source:'persistent administrator control'});}catch(e){next(e);}});
+router.put('/engineer/control',async(req,res,next)=>{try{if(typeof req.body?.enabled!=='boolean')return res.status(400).json({error:'enabled must be a boolean.'});const control=await engineerControl.setEnabled(req.body.enabled,req.user?.id);res.json({enabled:control.aiEngineerEnabled,updatedAt:control.updatedAt});}catch(e){next(e);}});
+router.get('/engineer/audit',async(req,res,next)=>{try{res.json({events:await engineerControl.listAudit(100),retentionLimit:engineerControl.MAX_AUDIT_ROWS,redacted:true});}catch(e){next(e);}});
 router.get('/engineer/security-scan',securityScanLimiter,(req,res)=>{try{const result=securityScanner.scanPaths(['server','public/js','.github/workflows']);const counts={critical:0,high:0,medium:0,low:0};for(const finding of result.findings)if(Object.prototype.hasOwnProperty.call(counts,finding.severity))counts[finding.severity]++;res.json({ok:true,generatedAt:new Date().toISOString(),scanner:'BotForge heuristic source scanner',scope:'Scans server/, public/js/ and .github/workflows/ only. Pattern matching is not a complete security audit.',filesScanned:result.filesScanned,counts,findings:result.findings.slice(0,200)});}catch(error){res.status(500).json({error:'Security scan could not be completed.'});}});
 router.get('/engineer/diagnostics',async(req,res,next)=>{try{const database=await store.health();res.json({generatedAt:new Date().toISOString(),application:{name:'BotForge',node:process.version,uptimeSeconds:Math.floor(process.uptime()),environment:process.env.NODE_ENV||'development'},database,providers:['anthropic','openai','gemini'].map(id=>({id,configured:providers.isProviderConfigured(id),defaultModel:providers.getDefaultModel(id)})),httpMetrics:metrics.render(),checks:[{id:'database',status:database.ok?'pass':'fail',detail:database.ok?'Database health check succeeded.':'Database health check failed.'},{id:'provider-configuration',status:['anthropic','openai','gemini'].some(id=>providers.isProviderConfigured(id))?'pass':'warning',detail:'Provider keys are never returned by this endpoint.'},{id:'ci',status:'manual',detail:'Repository CI is not connected to this diagnostic endpoint yet.'}]});}catch(e){next(e);}});
-router.post('/engineer/diagnose-ci',async(req,res,next)=>{
+router.post('/engineer/diagnose-ci',requireEngineerEnabled,async(req,res,next)=>{
  try{
   const token=process.env.BOTFORGE_GITHUB_TOKEN,repository=String(process.env.BOTFORGE_GITHUB_REPO||'').trim(),provider=String(process.env.BOTFORGE_ENGINEER_PROVIDER||'openai').trim();
   if(!token||!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository))return res.status(503).json({error:'Configure BOTFORGE_GITHUB_TOKEN and BOTFORGE_GITHUB_REPO to enable read-only CI diagnosis.'});
@@ -31,7 +45,7 @@ router.post('/engineer/diagnose-ci',async(req,res,next)=>{
   res.json({ok:true,run:safeRun,diagnosis:result.text,provider});
  }catch(e){next(e);}
 });
-router.post('/engineer/propose-fix',engineerWriteLimiter,async(req,res,next)=>{
+router.post('/engineer/propose-fix',engineerWriteLimiter,requireEngineerEnabled,async(req,res,next)=>{
  try{
   const token=process.env.BOTFORGE_GITHUB_TOKEN,repository=String(process.env.BOTFORGE_GITHUB_REPO||'').trim(),targetBranch=String(process.env.BOTFORGE_GITHUB_BRANCH||'botforge-production-upgrade').trim(),provider=String(process.env.BOTFORGE_ENGINEER_PROVIDER||'openai').trim();
   const filePath=String(req.body?.path||'').trim(),task=String(req.body?.task||'').trim();
@@ -53,7 +67,7 @@ router.post('/engineer/propose-fix',engineerWriteLimiter,async(req,res,next)=>{
   res.json({ok:true,mode:'proposal-only',repository,branch:targetBranch,path:filePath,baseSha:file.sha,summary:proposal.summary,originalContent:original,proposedContent:proposal.updatedContent,changed:proposal.updatedContent!==original,applied:false,notice:'This is a proposal only. No GitHub file, branch, commit, pull request or deployment was changed.'});
  }catch(e){next(e);}
 });
-router.post('/engineer/create-draft-pr',engineerWriteLimiter,async(req,res,next)=>{
+router.post('/engineer/create-draft-pr',engineerWriteLimiter,requireEngineerEnabled,async(req,res,next)=>{
  try{
   const readToken=process.env.BOTFORGE_GITHUB_TOKEN,writeToken=process.env.BOTFORGE_GITHUB_WRITE_TOKEN,repository=String(process.env.BOTFORGE_GITHUB_REPO||'').trim(),baseBranch=String(process.env.BOTFORGE_GITHUB_BRANCH||'botforge-production-upgrade').trim();
   const filePath=String(req.body?.path||'').trim(),task=String(req.body?.task||'').trim(),content=req.body?.proposedContent,baseSha=String(req.body?.baseSha||'').trim();
