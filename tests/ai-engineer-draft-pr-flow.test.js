@@ -74,7 +74,9 @@ test('AI Engineer creates a reviewed draft PR through the one-time approval work
       providerRequest = JSON.parse(options.body);
       const updatedContent = providerResponseMode === 'oversized' ? 'x'.repeat(30001) : proposedSource;
       return githubResponse(200, {
-        output_text: JSON.stringify({ summary: 'Replace the status marker for the test.', updatedContent }),
+        output_text: providerResponseMode === 'malformed'
+          ? 'This is not valid JSON patch data.'
+          : JSON.stringify({ summary: 'Replace the status marker for the test.', updatedContent }),
         usage: { input_tokens: 10, output_tokens: 20 }
       });
     }
@@ -189,6 +191,17 @@ test('AI Engineer creates a reviewed draft PR through the one-time approval work
   });
   assert.equal(oversizedProposal.status, 502);
   assert.match((await oversizedProposal.json()).error, /invalid or oversized patch proposal/i);
+  assert.equal((await store.allAsync('aiEngineerApprovals')).length, approvalsBeforeOversized.length);
+  assert.equal(createdPrCount, 0);
+
+  providerResponseMode = 'malformed';
+  const malformedProposal = await originalFetch(base + '/api/admin/engineer/propose-fix', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ path: 'server/auth.js', task: 'Return malformed structured patch data.' })
+  });
+  assert.equal(malformedProposal.status, 502);
+  assert.match((await malformedProposal.json()).error, /not valid structured patch data/i);
   assert.equal((await store.allAsync('aiEngineerApprovals')).length, approvalsBeforeOversized.length);
   assert.equal(createdPrCount, 0);
   providerResponseMode = 'valid';
