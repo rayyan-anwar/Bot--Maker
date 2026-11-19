@@ -4,6 +4,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const {EventEmitter}=require('node:events');
 const fs=require('node:fs/promises');
+const nodeFs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 const {validateJavaScriptInSandbox,dockerArgs,sandboxImage,MAX_SOURCE_BYTES}=require('../server/engineer-sandbox');
@@ -12,6 +13,8 @@ function fakeSpawn(code=0){
  const calls=[];
  const spawnImpl=(command,args,options)=>{
   calls.push({command,args,options});
+  const mount=args.find(value=>typeof value==='string'&&value.startsWith('type=bind,'));
+  if(mount){const source=mount.match(/src=([^,]+)/)[1];assert.equal(nodeFs.statSync(source).mode&0o777,0o755);assert.equal(nodeFs.statSync(path.join(source,'proposal.js')).mode&0o777,0o444);}
   const child=new EventEmitter();
   child.kill=()=>{};
   queueMicrotask(()=>child.emit('close',code,null));
@@ -25,6 +28,7 @@ test('sandbox command disables network, locks workspace and limits resources',()
  for(const flag of ['--network=none','--read-only','--memory=128m','--memory-swap=128m','--cpus=0.50','--pids-limit=32','--cap-drop=ALL','--security-opt=no-new-privileges'])assert.ok(args.includes(flag),flag);
  assert.ok(args.some(value=>value.includes('readonly')));
  assert.ok(args.includes('--check'));
+ assert.ok(args.includes('--name'));
  assert.ok(!args.includes('-e'));
 });
 
