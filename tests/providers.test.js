@@ -151,7 +151,7 @@ test('OpenAI streaming adapter emits Responses API deltas and final token usage'
 
 test('Gemini streaming adapter emits candidate text and usage metadata',async()=>{
  await withEnv({GOOGLE_GEMINI_API_KEY:'gemini-stream-key'},()=>withFetch(async(url,options)=>{
-  assert.match(url,/models\\/gemini-3\\.8-flash:streamGenerateContent\\?alt=sse$/);
+  assert.ok(url.includes('/models/gemini-3.8-flash:streamGenerateContent?alt=sse'));
   assert.equal(options.headers['x-goog-api-key'],'gemini-stream-key');
   const encoder=new TextEncoder();
   const chunks=[
