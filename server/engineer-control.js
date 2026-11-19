@@ -6,7 +6,7 @@ const MAX_AUDIT_ROWS=1000;
 async function isEnabled(){
  const control=await store.findByIdAsync('settings',CONTROL_ID);
  if(control&&typeof control.aiEngineerEnabled==='boolean')return control.aiEngineerEnabled;
- return process.env.BOTFORGE_AI_ENGINEER_ENABLED!=='false';
+ return process.env.BOTFORGE_AI_ENGINEER_ENABLED==='true';
 }
 
 async function setEnabled(enabled,actorId){
