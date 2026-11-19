@@ -15,7 +15,7 @@ test('AI Engineer creates a reviewed draft PR through the one-time approval work
     'BOTFORGE_DATA_FILE', 'DATABASE_URL', 'BOTFORGE_GITHUB_TOKEN',
     'BOTFORGE_GITHUB_WRITE_TOKEN', 'BOTFORGE_GITHUB_REPO',
     'BOTFORGE_GITHUB_BRANCH', 'BOTFORGE_ENGINEER_PROVIDER', 'OPENAI_API_KEY',
-    'BOTFORGE_ENGINEER_SANDBOX_IMAGE'
+    'BOTFORGE_ENGINEER_SANDBOX_IMAGE', 'BOTFORGE_ENGINEER_WRITE_LIMIT'
   ];
   const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
   const originalFetch = global.fetch;
@@ -47,6 +47,7 @@ test('AI Engineer creates a reviewed draft PR through the one-time approval work
   process.env.BOTFORGE_ENGINEER_PROVIDER = 'openai';
   process.env.OPENAI_API_KEY = 'provider-token-placeholder';
   process.env.BOTFORGE_ENGINEER_SANDBOX_IMAGE = 'node:22-alpine';
+  process.env.BOTFORGE_ENGINEER_WRITE_LIMIT = '20';
 
   // Replace Docker spawn with a deterministic successful syntax-check adapter.
   childProcess.spawn = (command, args) => {
