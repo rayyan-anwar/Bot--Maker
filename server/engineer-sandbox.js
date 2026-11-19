@@ -16,7 +16,7 @@ function sandboxImage(value){
  return image;
 }
 
-function dockerArgs(workspace,image,containerName){
+function dockerArgs(workspace,image,containerName='botforge-engineer-validation'){
  return [
   'run','--rm','--name',containerName,'--pull=never','--network=none','--read-only',
   '--memory=128m','--memory-swap=128m','--cpus=0.50','--pids-limit=32',
