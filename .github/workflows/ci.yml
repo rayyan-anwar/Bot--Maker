@@ -78,7 +78,7 @@ jobs:
           BOTFORGE_BACKUP_DIR: ${{ runner.temp }}/botforge-backups
         run: |
           sudo apt-get update
-          sudo apt-get install --yes postgresql-client
+          sudo apt-get install --yes postgresql-client-16
           npm run backup:postgres
           BACKUP_FILE="$(find "$BOTFORGE_BACKUP_DIR" -maxdepth 1 -type f -name 'botforge-*.dump' -print -quit)"
           test -n "$BACKUP_FILE"
