@@ -79,7 +79,7 @@ async function deleteBotAndData(botId){
   await client.query('BEGIN');
   const removed=await client.query("DELETE FROM botforge_records WHERE collection='bots' AND id=$1",[botId]);
   if(!removed.rowCount){await client.query('ROLLBACK');return false;}
-  for(const c of ['documents','messages','memory','usage'])await client.query("DELETE FROM botforge_records WHERE collection=$1 AND data->>'botId'=$2",[c,botId]);
+  for(const c of ['botVersions','documents','messages','memory','usage'])await client.query("DELETE FROM botforge_records WHERE collection=$1 AND data->>'botId'=$2",[c,botId]);
   await client.query('COMMIT');return true;
  }catch(e){try{await client.query('ROLLBACK');}catch(_){}throw e;}
  finally{client.release();}
