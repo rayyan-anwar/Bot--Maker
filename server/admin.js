@@ -32,7 +32,7 @@ async function findExistingEngineerPr(api,headers,repository,branch,baseBranch){
  return Array.isArray(items)?items.find(item=>item.head?.ref===branch&&item.base?.ref===baseBranch)||null:null;
 }
 async function recordCreatedEngineerPr(approvalId,actorId,branch,pr){
- return store.updateEngineerApproval(approvalId,actorId,{status:'created',leaseUntil:null,branch,pullRequestNumber:pr.number,url:pr.html_url,completedAt:new Date().toISOString()});
+ return store.updateEngineerApproval(approvalId,actorId,{status:'created',leaseUntil:null,branch,pullRequestNumber:pr.number,url:pr.html_url,merged:!!pr.merged,completedAt:new Date().toISOString()});
 }
 router.get('/plans',(req,res)=>res.json({plans:plans.getPlans()}));
 router.get('/engineer/control',async(req,res,next)=>{try{res.json({enabled:await engineerControl.isEnabled(),source:'persistent administrator control'});}catch(e){next(e);}});
@@ -94,7 +94,7 @@ router.post('/engineer/create-draft-pr',engineerWriteLimiter,requireEngineerEnab
   try{if(filePath.endsWith('.json'))JSON.parse(content);else new (require('node:vm').Script)(content,{filename:filePath});}catch(_){return res.status(422).json({error:'The proposed file failed syntax validation.'});}
   const approval=await store.getEngineerApproval(approvalId);
   if(!approval||approval.actorId!==req.user.id||approval.repository!==repository||approval.baseBranch!==baseBranch||approval.filePath!==filePath||approval.baseSha!==baseSha||approval.contentHash!==sha256(content)||approval.taskHash!==sha256(task))return res.status(404).json({error:'The approval does not match this administrator, repository, task or exact proposed content.'});
-  if(approval.status==='created')return res.status(200).json({ok:true,draft:true,reused:true,branch:approval.branch,pullRequestNumber:approval.pullRequestNumber,url:approval.url,merged:false,deployed:false});
+  if(approval.status==='created')return res.status(200).json({ok:true,draft:true,reused:true,branch:approval.branch,pullRequestNumber:approval.pullRequestNumber,url:approval.url,merged:!!approval.merged,deployed:false});
   if(approval.status==='failed')return res.status(409).json({error:'This approval attempt has failed. Generate a fresh proposal before retrying.'});
   if(approval.status==='pending'&&Date.parse(approval.expiresAt)<=Date.now())return res.status(410).json({error:'This proposal approval expired. Generate a fresh proposal.'});
   const readHeaders={accept:'application/vnd.github+json',authorization:'Bearer '+readToken,'x-github-api-version':'2022-11-28'};
@@ -110,7 +110,7 @@ router.post('/engineer/create-draft-pr',engineerWriteLimiter,requireEngineerEnab
   const refData=await refResponse.json(),headSha=refData.object?.sha;
   if(!/^[a-f0-9]{40}$/i.test(String(headSha||'')))return res.status(502).json({error:'GitHub returned an invalid base commit.'});
   const claim=await store.claimEngineerApproval(approvalId,req.user.id);
-  if(claim.state==='created')return res.status(200).json({ok:true,draft:true,reused:true,branch:claim.approval.branch,pullRequestNumber:claim.approval.pullRequestNumber,url:claim.approval.url,merged:false,deployed:false});
+  if(claim.state==='created')return res.status(200).json({ok:true,draft:true,reused:true,branch:claim.approval.branch,pullRequestNumber:claim.approval.pullRequestNumber,url:claim.approval.url,merged:!!claim.approval.merged,deployed:false});
   if(claim.state==='in_progress')return res.status(409).json({error:'This approval is already being processed. Wait for the current request to finish.'});
   if(claim.state==='expired')return res.status(410).json({error:'This proposal approval expired. Generate a fresh proposal.'});
   if(claim.state!=='claimed')return res.status(409).json({error:'This approval is no longer available. Generate a fresh proposal.'});
