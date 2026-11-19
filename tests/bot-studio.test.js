@@ -10,7 +10,6 @@ test('Bot Studio wizard has three complete steps and unique field IDs',()=>{
  assert.deepEqual(steps.map(match=>match[1]),['0','1','2']);
  const ids=[...html.matchAll(/\\bid="([^"]+)"/g)].map(match=>match[1]);
  assert.equal(ids.length,new Set(ids).size,'Dashboard element IDs must be unique');
- const step=(index)=>steps[Number(index)+1]?.[0]||steps.find(match=>match[1]===String(index))?.[0]||'';
  const identity=steps.find(match=>match[1]==='0')[0];
  const intelligence=steps.find(match=>match[1]==='1')[0];
  const access=steps.find(match=>match[1]==='2')[0];
