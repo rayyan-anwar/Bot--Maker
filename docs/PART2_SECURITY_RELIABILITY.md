@@ -17,16 +17,23 @@ This part hardens the existing BotForge implementation without changing the prod
 
 The Part 1 base already includes authentication throttling, account lockout, session-version revocation, same-host Origin checks, JSON body limits, security headers, bot ownership checks, usage reservations, upload throttling, ClamAV fail-closed behavior in production, bounded PDF parsing, PostgreSQL-backed rate-limit storage, and webhook event deduplication.
 
-These existing controls are not automatically re-certified by this part. New tests and current-head CI must pass.
+These code-path reviews are not a substitute for external operational verification. New regression tests and current-head CI must pass.
 
-## Remaining Part 2 work
+## Additional audit fixes
 
-- Expand authorization coverage to any remaining routes and verify owner access, public-resource behavior and non-disclosure semantics.
-- Review request validation and public/private data serialization.
-- Review provider timeout/error handling, quota reservation/release and spend controls.
-- Review upload cleanup, malware-scanner failure modes and document deletion behavior.
-- Review PostgreSQL transaction boundaries, webhook idempotency and backup/restore procedures.
-- Add or improve targeted regression tests for any defects found.
+- Razorpay paid entitlements now require an explicitly active subscription. Unknown, pending, paused, halted, cancelled and completed states resolve to the free plan; regression tests cover these states.
+- Stripe and Razorpay webhook claims now use a five-minute processing lease. Completed events remain deduplicated, in-flight duplicates receive a retryable conflict, failed processing releases the claim, and abandoned claims can be reclaimed after expiry.
+- Added local-store regression tests for webhook completion, duplicate delivery, concurrent processing, explicit release and expired-lease recovery.
+- Confirmed document uploads are owner-only, size-limited, ClamAV fail-closed in production, PDF-parsed in a resource-limited worker with an eight-second timeout, and temporary files are removed in a finally block.
+- Confirmed provider requests have bounded abort timeouts, public errors do not expose provider response bodies, usage reservations are released after failed chat generation, and chat-turn records plus quota consumption commit transactionally.
+- Confirmed backup/restore scripts use restrictive file permissions and require an explicit destructive-restore confirmation.
+
+## Remaining external verification
+
+- Run current-head CI after the latest webhook lease and entitlement changes.
+- Perform a real staging backup and restore rehearsal against a disposable PostgreSQL instance.
+- Exercise live Stripe/Razorpay sandbox events and real provider timeout behavior with test credentials.
+- Run browser E2E, load testing and an independent penetration/security review before production deployment.
 
 ## Verification boundaries
 
