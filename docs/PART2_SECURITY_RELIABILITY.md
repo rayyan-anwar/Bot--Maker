@@ -10,6 +10,8 @@ This part hardens the existing BotForge implementation without changing the prod
 - Added a regression test proving the configured per-account chat limit returns HTTP 429 after the allowed request.
 - Production cookie-authenticated mutations now require a same-host HTTPS Origin. Development and test environments continue to allow same-host HTTP for local use.
 - Added regression coverage for rejecting missing and HTTP origins in production while accepting a same-host HTTPS Origin.
+- Added cross-account regression coverage for private bot reads, edits, version history and rollback, documents, chat, bot memory, personal memory, usage summaries, billing-customer visibility and deletion.
+- Verified public bot serialization excludes private instructions when a non-owner reads a public bot.
 
 ## Existing controls reviewed
 
@@ -19,7 +21,7 @@ These existing controls are not automatically re-certified by this part. New tes
 
 ## Remaining Part 2 work
 
-- Route-by-route authorization and tenant-isolation regression coverage, including bot, document, chat, memory, usage and billing resources.
+- Expand authorization coverage to any remaining routes and verify owner access, public-resource behavior and non-disclosure semantics.
 - Review request validation and public/private data serialization.
 - Review provider timeout/error handling, quota reservation/release and spend controls.
 - Review upload cleanup, malware-scanner failure modes and document deletion behavior.
