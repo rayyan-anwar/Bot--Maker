@@ -32,3 +32,20 @@ test('AI Engineer path validator rejects traversal, absolute, encoded and Window
     42
   ]) assert.equal(isAllowedEngineerPath(value), false, String(value));
 });
+
+
+test('AI Engineer path validator rejects Unicode lookalikes and control-character bypass attempts', () => {
+  for (const value of [
+    'server／admin.js', // Fullwidth solidus
+    'server∕admin.js', // Division slash
+    'server/admіn.js', // Cyrillic i
+    'server/admin.js\\n',
+    'server/admin.js\\r',
+    'server/\\u0000admin.js',
+    'server/..\\u002fprivate.json',
+    'server/%252e%252e%252fsecrets.js',
+    'server\\u2215admin.js',
+    'server/admin.js/',
+    'server/' + 'a'.repeat(241) + '.js'
+  ]) assert.equal(isAllowedEngineerPath(value), false, JSON.stringify(value));
+});
