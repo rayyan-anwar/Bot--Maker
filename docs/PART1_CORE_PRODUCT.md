@@ -35,7 +35,7 @@ This part upgrades the existing BotForge MVP without replacing its existing auth
 ## Automated coverage added
 - Bot version creation, listing, restore, and version response metadata.
 - Offline retrieval metric behavior and invalid input.
-- Anthropic streaming token delivery and usage extraction.
+- Anthropic, OpenAI Responses API, and Gemini streaming token delivery and usage extraction, including CRLF-framed SSE input.
 - Authenticated SSE chat route integration with the mock provider, including persisted message verification.
 - Existing CI covers Node.js 18/20/22, PostgreSQL 16 integration, syntax/security checks, and Docker image build/smoke test.
 
