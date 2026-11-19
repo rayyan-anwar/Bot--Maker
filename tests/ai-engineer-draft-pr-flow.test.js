@@ -23,6 +23,7 @@ test('AI Engineer creates a reviewed draft PR through the one-time approval work
   const originalSource = "module.exports = { status: 'original' };\n";
   const proposedSource = "module.exports = { status: 'proposed' };\n";
   const fileSha = 'a'.repeat(40);
+  let liveFileSha = fileSha;
   const baseCommitSha = 'b'.repeat(40);
   const calls = [];
   let createdPrCount = 0;
@@ -75,7 +76,7 @@ test('AI Engineer creates a reviewed draft PR through the one-time approval work
     if (url.includes('/contents/server/auth.js?ref=main')) {
       return githubResponse(200, {
         type: 'file',
-        sha: fileSha,
+        sha: liveFileSha,
         content: Buffer.from(originalSource, 'utf8').toString('base64')
       });
     }
@@ -174,6 +175,17 @@ test('AI Engineer creates a reviewed draft PR through the one-time approval work
     approvalId: proposal.approvalId,
     confirm: true
   };
+  // Simulate a concurrent maintainer commit after proposal generation.
+  liveFileSha = 'e'.repeat(40);
+  const staleSource = await originalFetch(base + '/api/admin/engineer/create-draft-pr', {
+    method: 'POST', headers, body: JSON.stringify(approvalBody)
+  });
+  assert.equal(staleSource.status, 409);
+  assert.match((await staleSource.json()).error, /source file changed/i);
+  assert.equal(createdPrCount, 0, 'stale source SHA must not create a draft PR');
+  assert.equal(calls.some(call => call.url.startsWith('https://api.github.com/') && (call.method === 'POST' || call.method === 'PUT')), false, 'stale source SHA must not perform GitHub writes');
+  liveFileSha = fileSha;
+
   const tamperedApproval = await originalFetch(base + '/api/admin/engineer/create-draft-pr', {
     method: 'POST',
     headers,
