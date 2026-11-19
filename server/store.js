@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {Pool}=require('pg');
 const DB_PATH=process.env.BOTFORGE_DATA_FILE||path.join(__dirname,'..','data','db.json');
-const COLLECTIONS=['users','bots','botVersions','documents','messages','usage','memory','webhookEvents','settings','aiEngineerRuns'];
+const COLLECTIONS=['users','bots','botVersions','documents','messages','usage','memory','webhookEvents','settings','aiEngineerRuns','aiEngineerApprovals'];
 let cache=null,pool=null,initialized=false,initializationPromise=null;
 const localReservations=new Map();
 function emptyDB(){return Object.fromEntries(COLLECTIONS.map(k=>[k,[]]));}
@@ -24,7 +24,7 @@ async function initialize(){
    pool=new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSL==='disable'?false:{rejectUnauthorized:process.env.PGSSL_REJECT_UNAUTHORIZED!=='false'},max:Number(process.env.PG_POOL_MAX||10),connectionTimeoutMillis:5000,idleTimeoutMillis:30000});
    try{
     await pool.query('SELECT 1');
-    await pool.query("CREATE TABLE IF NOT EXISTS botforge_records (collection text NOT NULL CHECK(collection IN ('users','bots','botVersions','documents','messages','usage','memory','settings','aiEngineerRuns')), id uuid NOT NULL, data jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(collection,id))");
+    await pool.query("CREATE TABLE IF NOT EXISTS botforge_records (collection text NOT NULL CHECK(collection IN ('users','bots','botVersions','documents','messages','usage','memory','settings','aiEngineerRuns','aiEngineerApprovals')), id uuid NOT NULL, data jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(collection,id))");
     await pool.query('CREATE INDEX IF NOT EXISTS botforge_records_collection_idx ON botforge_records(collection)');
     await pool.query('ALTER TABLE botforge_records DROP CONSTRAINT IF EXISTS botforge_records_collection_check');
     await pool.query("ALTER TABLE botforge_records ADD CONSTRAINT botforge_records_collection_check CHECK(collection IN ('users','bots','botVersions','documents','messages','usage','memory','settings','aiEngineerRuns'))");
@@ -171,7 +171,39 @@ async function recordFailedLoginAttempt(userId,maxAttempts=3){
  return {attempts:result.rows[0].attempts,locked:!!result.rows[0].locked_at,lockedAt:result.rows[0].locked_at};
 }
 
+async function getEngineerApproval(id){
+ if(!isUuid(id))return null;
+ return findByIdAsync('aiEngineerApprovals',id);
+}
+async function claimEngineerApproval(id,actorId,leaseMs=5*60*1000){
+ if(!isUuid(id)||typeof actorId!=='string'||!actorId)return {state:'invalid',approval:null};
+ const now=Date.now(),leaseUntil=new Date(now+Math.max(30000,Math.min(leaseMs,10*60*1000))).toISOString();
+ if(!isPostgres()){
+  const current=findById('aiEngineerApprovals',id);
+  if(!current||current.actorId!==actorId)return {state:'invalid',approval:null};
+  if(current.status==='created')return {state:'created',approval:current};
+  if(current.status==='pending'&&Date.parse(current.expiresAt)<=now)return {state:'expired',approval:current};
+  if(current.status==='creating'&&Date.parse(current.leaseUntil)>now)return {state:'in_progress',approval:current};
+  if(!['pending','creating'].includes(current.status))return {state:'unavailable',approval:current};
+  const updated=updateById('aiEngineerApprovals',id,{status:'creating',leaseUntil,updatedAt:new Date(now).toISOString(),attempts:Number(current.attempts||0)+1});
+  return {state:'claimed',approval:updated};
+ }
+ await initialize();
+ const claimed=await pool.query("UPDATE botforge_records SET data=data || jsonb_build_object('status','creating','leaseUntil',$3::text,'updatedAt',$4::text,'attempts',COALESCE((data->>'attempts')::int,0)+1),updated_at=now() WHERE collection='aiEngineerApprovals' AND id=$1 AND data->>'actorId'=$2 AND ((data->>'status'='pending' AND NULLIF(data->>'expiresAt','')::timestamptz>now()) OR (data->>'status'='creating' AND NULLIF(data->>'leaseUntil','')::timestamptz<=now())) RETURNING data",[id,actorId,leaseUntil,new Date(now).toISOString()]);
+ if(claimed.rowCount)return {state:'claimed',approval:claimed.rows[0].data};
+ const current=await getEngineerApproval(id);
+ if(!current||current.actorId!==actorId)return {state:'invalid',approval:null};
+ if(current.status==='created')return {state:'created',approval:current};
+ if(current.status==='pending'&&Date.parse(current.expiresAt)<=now)return {state:'expired',approval:current};
+ if(current.status==='creating'&&Date.parse(current.leaseUntil)>now)return {state:'in_progress',approval:current};
+ return {state:'unavailable',approval:current};
+}
+async function updateEngineerApproval(id,actorId,patch){
+ const current=await getEngineerApproval(id);
+ if(!current||current.actorId!==actorId)return null;
+ return updateByIdAsync('aiEngineerApprovals',id,{...patch,updatedAt:new Date().toISOString()});
+}
 async function query(sql,values=[]){if(!isPostgres())throw new Error('Shared PostgreSQL storage is not configured.');await initialize();return pool.query(sql,values);}
 async function health(){if(!isPostgres())return {ok:true,database:'json-development'};try{await initialize();await pool.query('SELECT 1');return {ok:true,database:'postgres'};}catch(_){return {ok:false,database:'postgres'};}}
 async function close(){if(pool){await pool.end();pool=null;}initialized=false;}
-module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,recordFailedLoginAttempt,query,health,load,persist};
+module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,query,health,load,persist};
