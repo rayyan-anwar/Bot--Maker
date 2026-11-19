@@ -24,6 +24,23 @@ test('private bot resources are isolated between two authenticated accounts',asy
   return (response.headers.get('set-cookie')||'').split(';')[0];
  }
  const cookieA=await login('owner-a@example.test'),cookieB=await login('owner-b@example.test');
+ const userA=(await store.findManyAsync('users',{email:'owner-a@example.test'}))[0];
+ const userB=(await store.findManyAsync('users',{email:'owner-b@example.test'}))[0];
+ await store.insertAsync('usage',{id:uuidv4(),userId:userA.id,botId:null,provider:'mock',model:'mock',inputTokens:10,outputTokens:5,day:new Date().toISOString().slice(0,10),createdAt:new Date().toISOString()});
+ await store.insertAsync('memory',{id:uuidv4(),userId:userA.id,botId:null,kind:'profile',content:'Private account A memory',createdAt:new Date().toISOString()});
+ await store.updateByIdAsync('users',userA.id,{stripeCustomerId:'cus_private_owner_a'});
+ const usageB=await fetch(base+'/api/chat/usage/me',{headers:{cookie:cookieB}});
+ assert.equal(usageB.status,200);
+ assert.equal(JSON.stringify(await usageB.json()).includes('cus_private_owner_a'),false);
+ const memoryB=await fetch(base+'/api/chat/memory/me',{headers:{cookie:cookieB}});
+ assert.equal(memoryB.status,200);
+ assert.equal(JSON.stringify(await memoryB.json()).includes('Private account A memory'),false);
+ const billingB=await fetch(base+'/api/billing/plans',{headers:{cookie:cookieB}});
+ assert.equal(billingB.status,200);
+ assert.equal((await billingB.json()).hasBillingCustomer,false);
+ const billingA=await fetch(base+'/api/billing/plans',{headers:{cookie:cookieA}});
+ assert.equal(billingA.status,200);
+ assert.equal((await billingA.json()).hasBillingCustomer,true);
  const created=await fetch(base+'/api/bots',{method:'POST',headers:{cookie:cookieA,'content-type':'application/json'},body:JSON.stringify({name:'Private research bot',instructions:'Confidential owner-only instructions.'})});
  assert.equal(created.status,201);
  const bot=(await created.json()).bot;
