@@ -29,4 +29,4 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run Fortisni browser tests
-        run: npx playwright test --config=playwright.config.cjs
+        run: npx playwright test --config=playwright.config.cjs tests/browser/fortisni.spec.cjs
