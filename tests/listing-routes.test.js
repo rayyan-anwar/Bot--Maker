@@ -62,3 +62,18 @@ test('bot edits create immutable versions and owner can restore an earlier versi
  const latest=await fetch(base+'/api/bots/'+bot.id+'/versions',{headers:{cookie}});
  assert.deepEqual((await latest.json()).versions.map(v=>v.version),[3,2,1]);
 });
+
+test('deleting a bot also removes its version history',async()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-version-delete-'));
+ process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
+ const store=require('../server/store');
+ const {v4:uuidv4}=require('uuid');
+ const botId=uuidv4(),ownerId=uuidv4(),now=new Date().toISOString();
+ try{
+  await store.insertAsync('bots',{id:botId,ownerId,name:'Delete me',instructions:'Test',createdAt:now});
+  await store.insertAsync('botVersions',{id:uuidv4(),botId,ownerId,version:1,snapshot:{name:'Delete me'},createdAt:now});
+  assert.equal((await store.findManyAsync('botVersions',{botId})).length,1);
+  assert.equal(await store.deleteBotAndData(botId),true);
+  assert.deepEqual(await store.findManyAsync('botVersions',{botId}),[]);
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
