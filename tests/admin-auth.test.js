@@ -128,6 +128,12 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.equal(adminLogin.status,200);
  assert.equal((await adminLogin.json()).user.role,'admin');
  const adminCookie=adminLogin.headers.get('set-cookie');
+ const controlUrl=base+'/api/admin/engineer/control',adminHeaders={cookie:adminCookie,'content-type':'application/json'};
+ assert.equal((await fetch(controlUrl,{headers:{cookie:adminCookie}})).status,200);
+ assert.equal((await fetch(controlUrl,{method:'PUT',headers:adminHeaders,body:JSON.stringify({enabled:false})})).status,200);
+ assert.equal((await fetch(base+'/api/admin/engineer/diagnose-ci',{method:'POST',headers:adminHeaders,body:'{}'})).status,423);
+ assert.equal((await fetch(controlUrl,{method:'PUT',headers:adminHeaders,body:JSON.stringify({enabled:true})})).status,200);
+ assert.equal((await fetch(base+'/api/admin/engineer/audit',{headers:{cookie:adminCookie}})).status,200);
  assert.equal((await fetch(base+'/api/admin/engineer/diagnose-ci',{method:'POST',headers:{cookie:adminCookie,'content-type':'application/json'},body:'{}'})).status,503);
  assert.equal((await fetch(base+'/api/admin/engineer/propose-fix',{method:'POST',headers:{cookie:adminCookie,'content-type':'application/json'},body:JSON.stringify({path:'server/auth.js',task:'Review session handling'})})).status,503);
  assert.equal((await fetch(base+'/api/admin/engineer/create-draft-pr',{method:'POST',headers:{cookie:adminCookie,'content-type':'application/json'},body:JSON.stringify({path:'server/auth.js',task:'Review session handling',proposedContent:'module.exports={};',baseSha:'a'.repeat(40),confirm:true})})).status,503);
