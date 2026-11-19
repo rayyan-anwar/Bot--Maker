@@ -83,7 +83,7 @@ Use synthetic test accounts and non-sensitive documents only.
 ## 5. Backups and rollback
 
 - Enable managed PostgreSQL automated backups and point-in-time recovery where available.
-- Create an operator-side custom-format backup with `npm run backup:postgres` (requires PostgreSQL client tools and `DATABASE_URL`).
+- Create an operator-side custom-format backup with `npm run backup:postgres` (requires PostgreSQL client tools and `DATABASE_URL`). The CI workflow also rehearses backup and restore against a disposable PostgreSQL database on every run.
 - Restore only to an explicitly selected target database with `BACKUP_FILE=... CONFIRM_RESTORE=YES npm run restore:postgres`; verify the target connection before confirming.
 - Before every schema or release change, record a backup identifier and test restoration into a separate staging database.
 - Keep the previous application image/release available for rollback.
