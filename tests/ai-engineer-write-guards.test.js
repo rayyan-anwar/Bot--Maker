@@ -9,7 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 test('AI Engineer write endpoints enforce pause, explicit approval and patch boundaries before external calls', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'botforge-engineer-guards-'));
   const keys = [
-    'NODE_ENV', 'JWT_SECRET', 'BOTFORGE_ADMIN_EMAIL', 'BOTFORGE_SINGLE_ADMIN',
+    'NODE_ENV', 'JWT_SECRET', 'BOTFORGE_ADMIN_EMAIL', 'BOTFORGE_SINGLE_ADMIN', 'TRUST_PROXY',
     'BOTFORGE_DATA_FILE', 'DATABASE_URL', 'BOTFORGE_GITHUB_TOKEN',
     'BOTFORGE_GITHUB_WRITE_TOKEN', 'BOTFORGE_GITHUB_REPO',
     'BOTFORGE_GITHUB_BRANCH', 'BOTFORGE_ENGINEER_PROVIDER', 'OPENAI_API_KEY'
@@ -19,6 +19,7 @@ test('AI Engineer write endpoints enforce pause, explicit approval and patch bou
   process.env.JWT_SECRET = 'engineer-guard-test-secret-with-at-least-thirty-two-characters';
   process.env.BOTFORGE_ADMIN_EMAIL = 'engineer-owner@example.test';
   process.env.BOTFORGE_SINGLE_ADMIN = 'false';
+  process.env.TRUST_PROXY = '1';
   process.env.BOTFORGE_DATA_FILE = path.join(dir, 'db.json');
   delete process.env.DATABASE_URL;
   delete process.env.BOTFORGE_GITHUB_TOKEN;
@@ -66,11 +67,13 @@ test('AI Engineer write endpoints enforce pause, explicit approval and patch bou
   assert.ok(cookie && cookie.includes('session='));
   const headers = { cookie, 'content-type': 'application/json', origin: base };
 
+  let requestNumber = 0;
+  const requestHeaders = () => ({ ...headers, 'x-forwarded-for': '198.51.100.' + (++requestNumber) });
   const proposal = body => fetch(base + '/api/admin/engineer/propose-fix', {
-    method: 'POST', headers, body: JSON.stringify(body)
+    method: 'POST', headers: requestHeaders(), body: JSON.stringify(body)
   });
   const createDraft = body => fetch(base + '/api/admin/engineer/create-draft-pr', {
-    method: 'POST', headers, body: JSON.stringify(body)
+    method: 'POST', headers: requestHeaders(), body: JSON.stringify(body)
   });
 
   const paused = await proposal({ path: 'server/auth.js', task: 'Review session validation' });
