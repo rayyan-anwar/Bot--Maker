@@ -8,7 +8,7 @@ It does not inspect workflow logs, execute generated code on the application ser
 
 ## Administrator control and audit trail
 
-AI Engineer operations start paused when `BOTFORGE_AI_ENGINEER_ENABLED=false` is set and no saved administrator setting exists. An administrator can resume or pause CI diagnosis and AI patch operations from the admin dashboard. The saved control state is stored in the application database and takes precedence over the bootstrap environment default. If the control record cannot be read, the guarded operation fails closed.
+AI Engineer operations start paused by default when no saved administrator setting exists. Set `BOTFORGE_AI_ENGINEER_ENABLED=true` only for an explicit bootstrap enable; otherwise leave it false or unset. An administrator can resume or pause CI diagnosis and AI patch operations from the admin dashboard. The saved control state is stored in the application database and takes precedence over the bootstrap environment default. If the control record cannot be read, the guarded operation fails closed.
 
 The admin dashboard exposes the latest 100 operational audit events. Events record the administrator identifier, route, HTTP result, repository, optional permitted file path and timestamp. Raw prompts, source contents, proposed code, provider responses, API keys and GitHub tokens are not written to this audit stream. Up to 1,000 events are retained; older events are pruned. The audit stream is operational metadata, not an immutable compliance ledger.
 
