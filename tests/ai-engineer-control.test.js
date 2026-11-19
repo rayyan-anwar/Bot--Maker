@@ -14,7 +14,10 @@ test('AI Engineer kill switch persists across control reads and can be re-enable
  delete require.cache[controlPath];delete require.cache[storePath];
  const store=require('../server/store'),control=require('../server/engineer-control');
  try{
+  assert.equal(await control.isEnabled(),false);
+  process.env.BOTFORGE_AI_ENGINEER_ENABLED='true';
   assert.equal(await control.isEnabled(),true);
+  delete process.env.BOTFORGE_AI_ENGINEER_ENABLED;
   const disabled=await control.setEnabled(false,'admin-user');
   assert.equal(disabled.aiEngineerEnabled,false);
   assert.equal(await control.isEnabled(),false);
@@ -52,6 +55,59 @@ test('AI Engineer audit stores bounded operational metadata without prompt or cr
  }finally{
   await store.close();
   delete require.cache[controlPath];delete require.cache[storePath];
+  if(previousFile===undefined)delete process.env.BOTFORGE_DATA_FILE;else process.env.BOTFORGE_DATA_FILE=previousFile;
+  if(previousUrl===undefined)delete process.env.DATABASE_URL;else process.env.DATABASE_URL=previousUrl;
+  fs.rmSync(dir,{recursive:true,force:true});
+ }
+});
+
+test('AI Engineer approval can be claimed once and replay returns the same completed result',async()=>{
+ const crypto=require('node:crypto');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-engineer-approval-'));
+ const previousFile=process.env.BOTFORGE_DATA_FILE,previousUrl=process.env.DATABASE_URL;
+ delete process.env.DATABASE_URL;
+ process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
+ const storePath=require.resolve('../server/store');
+ delete require.cache[storePath];
+ const store=require('../server/store');
+ try{
+  const id=crypto.randomUUID(),expiresAt=new Date(Date.now()+60000).toISOString();
+  await store.insertAsync('aiEngineerApprovals',{id,actorId:'admin-one',repository:'owner/repo',filePath:'server/auth.js',baseSha:'a'.repeat(40),contentHash:'b'.repeat(64),taskHash:'c'.repeat(64),status:'pending',createdAt:new Date().toISOString(),expiresAt,attempts:0});
+  assert.equal((await store.claimEngineerApproval(id,'different-admin')).state,'invalid');
+  const first=await store.claimEngineerApproval(id,'admin-one');
+  assert.equal(first.state,'claimed');
+  assert.equal(first.approval.status,'creating');
+  assert.equal((await store.claimEngineerApproval(id,'admin-one')).state,'in_progress');
+  await store.updateEngineerApproval(id,'admin-one',{status:'created',leaseUntil:null,branch:'botforge-ai-fix/'+id,pullRequestNumber:42,url:'https://github.com/owner/repo/pull/42'});
+  const replay=await store.claimEngineerApproval(id,'admin-one');
+  assert.equal(replay.state,'created');
+  assert.equal(replay.approval.pullRequestNumber,42);
+  assert.equal(replay.approval.url,'https://github.com/owner/repo/pull/42');
+ }finally{
+  await store.close();
+  delete require.cache[storePath];
+  if(previousFile===undefined)delete process.env.BOTFORGE_DATA_FILE;else process.env.BOTFORGE_DATA_FILE=previousFile;
+  if(previousUrl===undefined)delete process.env.DATABASE_URL;else process.env.DATABASE_URL=previousUrl;
+  fs.rmSync(dir,{recursive:true,force:true});
+ }
+});
+
+test('expired AI Engineer proposals cannot be claimed',async()=>{
+ const crypto=require('node:crypto');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-engineer-expired-'));
+ const previousFile=process.env.BOTFORGE_DATA_FILE,previousUrl=process.env.DATABASE_URL;
+ delete process.env.DATABASE_URL;
+ process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
+ const storePath=require.resolve('../server/store');
+ delete require.cache[storePath];
+ const store=require('../server/store');
+ try{
+  const id=crypto.randomUUID();
+  await store.insertAsync('aiEngineerApprovals',{id,actorId:'admin-one',status:'pending',expiresAt:new Date(Date.now()-1000).toISOString()});
+  assert.equal((await store.claimEngineerApproval(id,'admin-one')).state,'expired');
+ }finally{
+  await store.close();
+  delete require.cache[storePath];
   if(previousFile===undefined)delete process.env.BOTFORGE_DATA_FILE;else process.env.BOTFORGE_DATA_FILE=previousFile;
   if(previousUrl===undefined)delete process.env.DATABASE_URL;else process.env.DATABASE_URL=previousUrl;
   fs.rmSync(dir,{recursive:true,force:true});
