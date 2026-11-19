@@ -75,19 +75,25 @@ jobs:
       - name: Rehearse PostgreSQL backup and restore on disposable databases
         env:
           DATABASE_URL: postgres://botforge:botforge_test_password@127.0.0.1:5432/botforge_test
+          RESTORE_DATABASE_URL: postgres://botforge:botforge_test_password@127.0.0.1:5432/botforge_restore_test
           BOTFORGE_BACKUP_DIR: ${{ runner.temp }}/botforge-backups
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes postgresql-client-16
-          npm run backup:postgres
-          BACKUP_FILE="$(find "$BOTFORGE_BACKUP_DIR" -maxdepth 1 -type f -name 'botforge-*.dump' -print -quit)"
-          test -n "$BACKUP_FILE"
-          chmod 600 "$BACKUP_FILE"
-          createdb --maintenance-db="$DATABASE_URL" botforge_restore_test
-          RESTORE_URL="postgres://botforge:botforge_test_password@127.0.0.1:5432/botforge_restore_test"
-          DATABASE_URL="$RESTORE_URL" BACKUP_FILE="$BACKUP_FILE" CONFIRM_RESTORE=YES npm run restore:postgres
-          test "$(psql "$RESTORE_URL" -Atc "SELECT to_regclass('public.users') IS NOT NULL")" = "t"
-          test "$(psql "$RESTORE_URL" -Atc "SELECT to_regclass('public.bots') IS NOT NULL")" = "t"
+          mkdir -p "$BOTFORGE_BACKUP_DIR"
+          docker run --rm --network host \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -e RESTORE_DATABASE_URL="$RESTORE_DATABASE_URL" \
+            -e BOTFORGE_BACKUP_DIR=/backups \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -v "$BOTFORGE_BACKUP_DIR:/backups" \
+            -w /workspace postgres:16 bash -euo pipefail -c '
+              bash scripts/backup-postgres.sh
+              BACKUP_FILE="$(find /backups -maxdepth 1 -type f -name "botforge-*.dump" -print -quit)"
+              test -n "$BACKUP_FILE"
+              createdb --maintenance-db="$DATABASE_URL" botforge_restore_test
+              DATABASE_URL="$RESTORE_DATABASE_URL" BACKUP_FILE="$BACKUP_FILE" CONFIRM_RESTORE=YES bash scripts/restore-postgres.sh
+              test "$(psql "$RESTORE_DATABASE_URL" -Atc "SELECT to_regclass('\''public.users'\'') IS NOT NULL")" = "t"
+              test "$(psql "$RESTORE_DATABASE_URL" -Atc "SELECT to_regclass('\''public.bots'\'') IS NOT NULL")" = "t"
+            '
 
   docker-build:
     name: Docker image build
