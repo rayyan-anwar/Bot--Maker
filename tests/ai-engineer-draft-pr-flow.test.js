@@ -174,6 +174,16 @@ test('AI Engineer creates a reviewed draft PR through the one-time approval work
     approvalId: proposal.approvalId,
     confirm: true
   };
+  const tamperedApproval = await originalFetch(base + '/api/admin/engineer/create-draft-pr', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ ...approvalBody, proposedContent: approvalBody.proposedContent + '// tampered\\n' })
+  });
+  assert.equal(tamperedApproval.status, 404);
+  assert.match((await tamperedApproval.json()).error, /does not match/);
+  assert.equal(createdPrCount, 0, 'tampered proposal must not create a GitHub draft PR');
+  assert.equal(calls.some(call => call.url.startsWith('https://api.github.com/') && (call.method === 'POST' || call.method === 'PUT')), false, 'tampered proposal must not perform GitHub writes');
+
   const created = await originalFetch(base + '/api/admin/engineer/create-draft-pr', {
     method: 'POST', headers, body: JSON.stringify(approvalBody)
   });
