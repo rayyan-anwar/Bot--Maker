@@ -30,6 +30,8 @@ async function initialize(){
     await pool.query("ALTER TABLE botforge_records ADD CONSTRAINT botforge_records_collection_check CHECK(collection IN ('users','bots','botVersions','documents','messages','usage','memory'))");
     await pool.query("CREATE INDEX IF NOT EXISTS botforge_records_user_reset_token_idx ON botforge_records((data->>'passwordResetTokenHash')) WHERE collection='users'");
     await pool.query('CREATE TABLE IF NOT EXISTS botforge_webhook_events (provider text NOT NULL, event_id text NOT NULL, received_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(provider,event_id))');
+    await pool.query('ALTER TABLE botforge_webhook_events ADD COLUMN IF NOT EXISTS processing_until timestamptz');
+    await pool.query('ALTER TABLE botforge_webhook_events ADD COLUMN IF NOT EXISTS processed_at timestamptz');
     await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS botforge_records_user_email_uidx ON botforge_records((lower(data->>'email'))) WHERE collection='users'");
     await pool.query('CREATE TABLE IF NOT EXISTS botforge_quota_reservations (id uuid PRIMARY KEY, user_id uuid NOT NULL, usage_day date NOT NULL, expires_at timestamptz NOT NULL)');
     await pool.query('CREATE INDEX IF NOT EXISTS botforge_quota_user_day_idx ON botforge_quota_reservations(user_id,usage_day,expires_at)');
@@ -127,13 +129,29 @@ async function usageStats(userId,day){
 }
 async function claimWebhookEvent(provider,eventId){
  if(!['stripe','razorpay'].includes(provider)||typeof eventId!=='string'||!eventId.trim()||eventId.length>255)throw new Error('Invalid webhook event identity.');
- if(!isPostgres()){const events=all('webhookEvents');if(events.some(x=>x.provider===provider&&x.eventId===eventId))return false;insert('webhookEvents',{id:require('node:crypto').randomUUID(),provider,eventId,receivedAt:new Date().toISOString()});return true;}
- await initialize();const r=await pool.query('INSERT INTO botforge_webhook_events(provider,event_id) VALUES($1,$2) ON CONFLICT(provider,event_id) DO NOTHING',[provider,eventId]);return r.rowCount===1;
+ if(!isPostgres()){
+  const events=all('webhookEvents'),existing=events.find(x=>x.provider===provider&&x.eventId===eventId),now=Date.now();
+  if(existing?.processedAt)return false;
+  if(existing?.processingUntil&&Date.parse(existing.processingUntil)>now){const error=new Error('Webhook event is already being processed.');error.status=409;throw error;}
+  if(existing){existing.processingUntil=new Date(now+5*60*1000).toISOString();persist();return true;}
+  insert('webhookEvents',{id:require('node:crypto').randomUUID(),provider,eventId,receivedAt:new Date().toISOString(),processingUntil:new Date(now+5*60*1000).toISOString(),processedAt:null});return true;
+ }
+ await initialize();
+ const claimed=await pool.query("INSERT INTO botforge_webhook_events(provider,event_id,processing_until) VALUES($1,$2,now()+interval '5 minutes') ON CONFLICT(provider,event_id) DO UPDATE SET processing_until=now()+interval '5 minutes' WHERE botforge_webhook_events.processed_at IS NULL AND (botforge_webhook_events.processing_until IS NULL OR botforge_webhook_events.processing_until<=now()) RETURNING event_id",[provider,eventId]);
+ if(claimed.rowCount===1)return true;
+ const existing=await pool.query('SELECT processed_at FROM botforge_webhook_events WHERE provider=$1 AND event_id=$2',[provider,eventId]);
+ if(existing.rows[0]?.processed_at)return false;
+ const error=new Error('Webhook event is already being processed.');error.status=409;throw error;
+}
+async function completeWebhookEvent(provider,eventId){
+ if(!['stripe','razorpay'].includes(provider)||typeof eventId!=='string'||!eventId)return;
+ if(!isPostgres()){const event=all('webhookEvents').find(x=>x.provider===provider&&x.eventId===eventId);if(!event)throw new Error('Webhook event claim was lost.');event.processedAt=new Date().toISOString();event.processingUntil=null;persist();return;}
+ await initialize();const result=await pool.query('UPDATE botforge_webhook_events SET processed_at=now(),processing_until=NULL WHERE provider=$1 AND event_id=$2 AND processed_at IS NULL',[provider,eventId]);if(result.rowCount!==1)throw new Error('Webhook event claim was lost.');
 }
 async function releaseWebhookEvent(provider,eventId){
  if(!['stripe','razorpay'].includes(provider)||typeof eventId!=='string'||!eventId)return;
  if(!isPostgres()){const db=load();db.webhookEvents=db.webhookEvents.filter(x=>!(x.provider===provider&&x.eventId===eventId));persist();return;}
- await initialize();await pool.query('DELETE FROM botforge_webhook_events WHERE provider=$1 AND event_id=$2',[provider,eventId]);
+ await initialize();await pool.query('DELETE FROM botforge_webhook_events WHERE provider=$1 AND event_id=$2 AND processed_at IS NULL',[provider,eventId]);
 }
 
 async function recordFailedLoginAttempt(userId,maxAttempts=3){
@@ -156,4 +174,4 @@ async function recordFailedLoginAttempt(userId,maxAttempts=3){
 async function query(sql,values=[]){if(!isPostgres())throw new Error('Shared PostgreSQL storage is not configured.');await initialize();return pool.query(sql,values);}
 async function health(){if(!isPostgres())return {ok:true,database:'json-development'};try{await initialize();await pool.query('SELECT 1');return {ok:true,database:'postgres'};}catch(_){return {ok:false,database:'postgres'};}}
 async function close(){if(pool){await pool.end();pool=null;}initialized=false;}
-module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,releaseWebhookEvent,recordFailedLoginAttempt,query,health,load,persist};
+module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,recordFailedLoginAttempt,query,health,load,persist};
