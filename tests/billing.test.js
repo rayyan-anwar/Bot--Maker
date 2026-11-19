@@ -27,3 +27,10 @@ test('Razorpay grants paid access only after subscription is active',()=>{
  assert.equal(isRazorpaySubscriptionActive('halted'),false);
  assert.equal(isRazorpaySubscriptionActive('cancelled'),false);
 });
+
+const {resolveRazorpayPlan}=require('../server/billing');
+test('Razorpay grants paid plan only for active subscriptions',()=>{
+ assert.equal(resolveRazorpayPlan('active','plus'),'plus');
+ for(const status of ['created','authenticated','pending','halted','paused','cancelled','completed','unknown'])assert.equal(resolveRazorpayPlan(status,'pro'),'free',status);
+ assert.equal(resolveRazorpayPlan('active','unknown'),'free');
+});
