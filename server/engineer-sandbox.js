@@ -3,6 +3,7 @@
 const fs=require('node:fs/promises');
 const os=require('node:os');
 const path=require('node:path');
+const crypto=require('node:crypto');
 const {spawn}=require('node:child_process');
 
 const MAX_SOURCE_BYTES=30000;
@@ -15,9 +16,9 @@ function sandboxImage(value){
  return image;
 }
 
-function dockerArgs(workspace,image){
+function dockerArgs(workspace,image,containerName){
  return [
-  'run','--rm','--pull=never','--network=none','--read-only',
+  'run','--rm','--name',containerName,'--pull=never','--network=none','--read-only',
   '--memory=128m','--memory-swap=128m','--cpus=0.50','--pids-limit=32',
   '--ulimit','nofile=64:64','--cap-drop=ALL','--security-opt=no-new-privileges',
   '--user=65534:65534','--tmpfs','/tmp:rw,noexec,nosuid,nodev,size=16m',
@@ -28,7 +29,7 @@ function dockerArgs(workspace,image){
 
 function dockerEnvironment(source){
  const env={};
- for(const key of ['PATH','HOME','DOCKER_HOST','DOCKER_CONTEXT','DOCKER_CONFIG','DOCKER_TLS_VERIFY','DOCKER_CERT_PATH']){
+ for(const key of ['PATH','HOME','DOCKER_HOST']){
   if(source[key])env[key]=source[key];
  }
  return env;
@@ -42,17 +43,18 @@ async function validateJavaScriptInSandbox(source,options={}){
  const root=options.tempRoot||os.tmpdir();
  const spawnProcess=options.spawnImpl||spawn;
  const env=dockerEnvironment(options.env||process.env);
+ const containerName='botforge-engineer-'+crypto.randomUUID();
  const directory=await fs.mkdtemp(path.join(root,'botforge-engineer-'));
  try{
-  await fs.chmod(directory,0o700);
+  await fs.chmod(directory,0o755);
   const file=path.join(directory,'proposal.js');
   await fs.writeFile(file,source,{encoding:'utf8',mode:0o400,flag:'wx'});
-  const args=dockerArgs(directory,image);
+  const args=dockerArgs(directory,image,containerName);
   const result=await new Promise((resolve,reject)=>{
    let settled=false;
    const child=spawnProcess('docker',args,{stdio:'ignore',env});
    const finish=(error,value)=>{if(settled)return;settled=true;clearTimeout(timer);if(error)reject(error);else resolve(value);};
-   const timer=setTimeout(()=>{try{child.kill('SIGKILL');}catch(_){}finish(new Error('Isolated patch validation timed out.'));},timeoutMs);
+   const timer=setTimeout(()=>{try{child.kill('SIGKILL');}catch(_){}try{const cleanup=spawnProcess('docker',['kill',containerName],{stdio:'ignore',env});cleanup.unref?.();}catch(_){}finish(new Error('Isolated patch validation timed out.'));},timeoutMs);
    child.once('error',()=>finish(new Error('Docker sandbox is unavailable. Configure a local Docker daemon and preload the approved Node image.')));
    child.once('close',(code,signal)=>finish(null,{code,signal}));
   });
