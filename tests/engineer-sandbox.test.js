@@ -14,7 +14,7 @@ function fakeSpawn(code=0){
  const spawnImpl=(command,args,options)=>{
   calls.push({command,args,options});
   const mount=args.find(value=>typeof value==='string'&&value.startsWith('type=bind,'));
-  if(mount){const source=mount.match(/src=([^,]+)/)[1];assert.equal(nodeFs.statSync(source).mode&0o777,0o755);assert.equal(nodeFs.statSync(path.join(source,'proposal.js')).mode&0o777,0o444);}
+  if(mount){const source=mount.match(/src=([^,]+)/)[1];assert.equal(nodeFs.statSync(source).mode&0o777,0o755);assert.equal(nodeFs.statSync(path.join(source,'proposal.js')).mode&0o777,0o400);}
   const child=new EventEmitter();
   child.kill=()=>{};
   queueMicrotask(()=>child.emit('close',code,null));
