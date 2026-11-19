@@ -6,25 +6,19 @@ const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'..','public','dashboard.html'),'utf8');
 
 test('Bot Studio wizard has three complete steps and unique field IDs',()=>{
- const steps=[...html.matchAll(/<section class="wizard-step" data-wizard-step="(\\d+)"[\\s\\S]*?<\\/section>/g)];
- assert.deepEqual(steps.map(match=>match[1]),['0','1','2']);
- const ids=[...html.matchAll(/\\bid="([^"]+)"/g)].map(match=>match[1]);
+ const markers=[0,1,2].map(n=>html.indexOf('data-wizard-step="'+n+'"'));
+ assert.ok(markers.every(index=>index>=0));
+ assert.ok(markers[0]<markers[1]&&markers[1]<markers[2]);
+ const steps=markers.map((start,index)=>html.slice(start,index===2?html.indexOf('</form>',start):markers[index+1]));
+ const ids=html.match(/id="[^"]+"/g)||[];
  assert.equal(ids.length,new Set(ids).size,'Dashboard element IDs must be unique');
- const identity=steps.find(match=>match[1]==='0')[0];
- const intelligence=steps.find(match=>match[1]==='1')[0];
- const access=steps.find(match=>match[1]==='2')[0];
- assert.match(identity,/id="bot-name"/);
- assert.match(identity,/id="bot-purpose"/);
- assert.match(identity,/id="bot-audience"/);
- assert.match(intelligence,/id="bot-provider"/);
- assert.match(intelligence,/id="bot-instructions"/);
- assert.match(access,/id="bot-welcome"/);
- assert.match(access,/id="bot-public"/);
- assert.match(access,/id="bot-preview"/);
+ for(const id of ['bot-name','bot-purpose','bot-audience'])assert.ok(steps[0].includes('id="'+id+'"'),id);
+ for(const id of ['bot-provider','bot-instructions'])assert.ok(steps[1].includes('id="'+id+'"'),id);
+ for(const id of ['bot-welcome','bot-public','bot-preview'])assert.ok(steps[2].includes('id="'+id+'"'),id);
 });
 
 test('Bot Studio wizard exposes progress, navigation, and final create controls',()=>{
  for(const id of ['wizard-progress','wizard-progress-bar','wizard-back','wizard-next','wizard-create','cancel-new-bot','new-bot-error']) {
-  assert.match(html,new RegExp('id="'+id+'"'));
+  assert.ok(html.includes('id="'+id+'"'),id);
  }
 });
