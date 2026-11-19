@@ -94,7 +94,7 @@ async function streamProviderResponse(response,provider,onToken){
   }
  };
  try{
-  while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let boundary;while((boundary=buffer.indexOf('\n\n'))>=0){const part=buffer.slice(0,boundary);buffer=buffer.slice(boundary+2);await consume(part);}}
+  while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let boundary;while((boundary=/\r?\n\r?\n/.exec(buffer))){const part=buffer.slice(0,boundary.index);buffer=buffer.slice(boundary.index+boundary[0].length);await consume(part);}}
   buffer+=decoder.decode();if(buffer.trim())await consume(buffer);
  }finally{reader.releaseLock();}
  if(!text.trim())throw new Error('The provider returned an empty response.');
