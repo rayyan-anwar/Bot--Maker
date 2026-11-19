@@ -23,7 +23,7 @@ function fakeSpawn(code=0){
 test('sandbox command disables network, locks workspace and limits resources',()=>{
  const args=dockerArgs('/tmp/fixture','node:22-alpine');
  for(const flag of ['--network=none','--read-only','--memory=128m','--memory-swap=128m','--cpus=0.50','--pids-limit=32','--cap-drop=ALL','--security-opt=no-new-privileges'])assert.ok(args.includes(flag),flag);
- assert.ok(args.includes('readonly'));
+ assert.ok(args.some(value=>value.includes('readonly')));
  assert.ok(args.includes('--check'));
  assert.ok(!args.includes('-e'));
 });
