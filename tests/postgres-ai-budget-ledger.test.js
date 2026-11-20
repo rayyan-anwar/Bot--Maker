@@ -107,3 +107,34 @@ test('parallel reservations serialize by request key across clients', {skip:!pro
   await Promise.all([a.end(),b.end(),setup.end()]);
  }
 });
+
+test('global emergency stop blocks new AI budget reservations', {skip:!process.env.BOTFORGE_TEST_DATABASE_URL}, async()=>{
+ const client=new Client({connectionString:process.env.BOTFORGE_TEST_DATABASE_URL});
+ await client.connect();
+ try{
+  await client.query('BEGIN');
+  const scope=(await client.query(
+   `INSERT INTO ai_budget_scopes(scope_type,scope_key,currency,limit_amount,window_start,window_end)
+    VALUES('global',$1,'USD',5,NOW()-INTERVAL '1 minute',NOW()+INTERVAL '1 hour') RETURNING id`,
+   ['emergency-stop-test-'+Date.now()]
+  )).rows[0].id;
+  await client.query('UPDATE ai_budget_controls SET emergency_stop=TRUE WHERE id=1');
+  await client.query('SAVEPOINT blocked_reservation');
+  await assert.rejects(client.query(
+   'SELECT botforge_reserve_ai_budget($1,$2,$3,$4,$5,$6,$7,NULL)',
+   ['blocked-'+Date.now(),scope,'test-model','test-price-v1',100,100,1]
+  ),/AI emergency stop is enabled/);
+  await client.query('ROLLBACK TO SAVEPOINT blocked_reservation');
+  await client.query('RELEASE SAVEPOINT blocked_reservation');
+  await client.query('UPDATE ai_budget_controls SET emergency_stop=FALSE WHERE id=1');
+  const id=(await client.query(
+   'SELECT botforge_reserve_ai_budget($1,$2,$3,$4,$5,$6,$7,NULL) AS id',
+   ['allowed-'+Date.now(),scope,'test-model','test-price-v1',100,100,1]
+  )).rows[0].id;
+  assert.ok(id,'reservation should work after emergency stop is disabled');
+  await client.query('ROLLBACK');
+ }catch(error){
+  try{await client.query('ROLLBACK');}catch{}
+  throw error;
+ }finally{await client.end();}
+});
