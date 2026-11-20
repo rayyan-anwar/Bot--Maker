@@ -26,23 +26,10 @@ BEGIN
      OR p_output_token_cap IS NULL OR p_output_token_cap<0 THEN
     RAISE EXCEPTION 'reservation amount and token caps must be non-negative';
   END IF;
-  IF p_expires_at IS NOT NULL AND p_expires_at<=NOW() THEN
-    RAISE EXCEPTION 'reservation expiry must be in the future';
-  END IF;
-
   PERFORM pg_advisory_xact_lock(hashtextextended(p_request_key,0));
-  SELECT emergency_stop INTO v_emergency_stop
-    FROM ai_budget_controls WHERE id=1 FOR SHARE;
-  IF COALESCE(v_emergency_stop,FALSE) THEN
-    RAISE EXCEPTION 'AI emergency stop is enabled';
-  END IF;
-
-  SELECT * INTO v_scope FROM ai_budget_scopes WHERE id=p_scope_id FOR UPDATE;
-  IF NOT FOUND THEN RAISE EXCEPTION 'budget scope not found'; END IF;
-  IF NOW()<v_scope.window_start OR NOW()>=v_scope.window_end THEN
-    RAISE EXCEPTION 'budget scope window is not active';
-  END IF;
-
+  -- An exact retry returns the original reservation even if the emergency stop
+  -- was enabled or its scope window has since closed. The advisory lock makes
+  -- this lookup safe against concurrent requests using the same key.
   SELECT * INTO v_existing FROM ai_budget_reservations WHERE request_key=p_request_key;
   IF FOUND THEN
     IF v_existing.scope_id IS DISTINCT FROM p_scope_id
@@ -55,6 +42,20 @@ BEGIN
       RAISE EXCEPTION 'idempotency key reused with different reservation parameters';
     END IF;
     RETURN v_existing.id;
+  END IF;
+
+  -- Lock the singleton control row so emergency-stop changes serialize with
+  -- creation of new reservations.
+  SELECT emergency_stop INTO v_emergency_stop
+    FROM ai_budget_controls WHERE id=1 FOR SHARE;
+  IF COALESCE(v_emergency_stop,FALSE) THEN
+    RAISE EXCEPTION 'AI emergency stop is enabled';
+  END IF;
+
+  SELECT * INTO v_scope FROM ai_budget_scopes WHERE id=p_scope_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'budget scope not found'; END IF;
+  IF NOW()<v_scope.window_start OR NOW()>=v_scope.window_end THEN
+    RAISE EXCEPTION 'budget scope window is not active';
   END IF;
 
   IF v_scope.reserved_amount+v_scope.spent_amount+p_amount>v_scope.limit_amount THEN
