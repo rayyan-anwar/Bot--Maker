@@ -191,4 +191,51 @@ router.patch('/ai-budget/scopes/:scopeId',async(req,res,next)=>{
 });
 router.get('/users',async(req,res,next)=>{try{const q=String(req.query.q||'').trim().toLowerCase().slice(0,120),users=(await store.allAsync('users')).filter(u=>!q||String(u.email||'').toLowerCase().includes(q)).slice(0,100).map(u=>({id:u.id,email:u.email,name:u.name,plan:plans.getPlanName(u)}));res.json({users});}catch(e){next(e);}});
 router.put('/users/:userId/plan',async(req,res,next)=>{try{const {plan}=req.body||{},available=plans.getPlans();if(typeof plan!=='string'||!Object.prototype.hasOwnProperty.call(available,plan))return res.status(400).json({error:'Select a configured plan.'});const user=await store.findByIdAsync('users',req.params.userId);if(!user)return res.status(404).json({error:'User not found.'});const updated=await store.updateByIdAsync('users',user.id,{plan});res.json({user:{id:updated.id,email:updated.email,plan:plans.getPlanName(updated),dailyMessageLimit:plans.getDailyLimit(updated)}});}catch(e){next(e);}});
+// Read-only, bounded AI budget observability. These routes never expose prompts or credentials.
+router.get('/ai-budget/summary',async(req,res,next)=>{
+ try{
+  if(!store.isPostgres())return res.status(503).json({error:'AI budget controls require PostgreSQL storage.'});
+  const result=await store.query(
+   `SELECT currency,COUNT(*)::int AS scopes,
+    SUM(limit_amount)::numeric(20,8) AS limit_amount,
+    SUM(reserved_amount)::numeric(20,8) AS reserved_amount,
+    SUM(spent_amount)::numeric(20,8) AS spent_amount,
+    SUM(GREATEST(0,limit_amount-reserved_amount-spent_amount))::numeric(20,8) AS available_amount
+    FROM ai_budget_scopes GROUP BY currency ORDER BY currency`
+  );
+  const pending=await store.query(`SELECT COUNT(*)::int AS count,COALESCE(SUM(reserved_amount),0)::numeric(20,8) AS amount FROM ai_budget_reservations WHERE state='reserved'`);
+  res.json({generatedAt:new Date().toISOString(),totals:result.rows,pendingReservations:pending.rows[0]});
+ }catch(e){next(e);}
+});
+router.get('/ai-budget/reservations',async(req,res,next)=>{
+ try{
+  if(!store.isPostgres())return res.status(503).json({error:'AI budget controls require PostgreSQL storage.'});
+  const allowed=new Set(['reserved','settled','released','expired']);
+  const state=String(req.query.state||'reserved');
+  if(!allowed.has(state))return res.status(400).json({error:'state must be reserved, settled, released or expired.'});
+  const limitRaw=req.query.limit===undefined?'50':String(req.query.limit);
+  if(!/^\\d{1,3}$/.test(limitRaw)||Number(limitRaw)<1||Number(limitRaw)>100)return res.status(400).json({error:'limit must be an integer from 1 to 100.'});
+  const result=await store.query(
+   `SELECT id,request_key,scope_id,model_id,pricing_version,input_token_cap,output_token_cap,
+    reserved_amount,actual_amount,state,provider_request_id,created_at,settled_at,released_at,expires_at
+    FROM ai_budget_reservations WHERE state=$1 ORDER BY created_at DESC LIMIT $2`,[state,Number(limitRaw)]
+  );
+  res.json({state,items:result.rows});
+ }catch(e){next(e);}
+});
+router.get('/ai-budget/ledger',async(req,res,next)=>{
+ try{
+  if(!store.isPostgres())return res.status(503).json({error:'AI budget controls require PostgreSQL storage.'});
+  const limitRaw=req.query.limit===undefined?'50':String(req.query.limit);
+  if(!/^\\d{1,3}$/.test(limitRaw)||Number(limitRaw)<1||Number(limitRaw)>100)return res.status(400).json({error:'limit must be an integer from 1 to 100.'});
+  const scopeId=req.query.scopeId===undefined?null:String(req.query.scopeId);
+  if(scopeId!==null&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(scopeId))return res.status(400).json({error:'scopeId must be a valid UUID.'});
+  const result=await store.query(
+   `SELECT id,reservation_id,scope_id,event_type,amount_delta,currency,request_key,metadata_redacted,created_at
+    FROM ai_budget_ledger_entries WHERE ($1::uuid IS NULL OR scope_id=$1::uuid)
+    ORDER BY created_at DESC LIMIT $2`,[scopeId,Number(limitRaw)]
+  );
+  res.json({items:result.rows});
+ }catch(e){next(e);}
+});
 module.exports={router};
