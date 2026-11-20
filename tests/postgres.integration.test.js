@@ -69,6 +69,22 @@ test('PostgreSQL integration: shared rate limits, atomic login lockout and quota
    assert.equal(replay.approval.pullRequestNumber,84);
    await store.deleteByIdAsync('aiEngineerApprovals',approvalId);
   });
+  await t.test('concurrent knowledge base inserts obey per-bot document and character limits',async()=>{
+   const botId=crypto.randomUUID(),docs=Array.from({length:8},(_,i)=>({id:crypto.randomUUID(),botId,contentHash:crypto.createHash('sha256').update('knowledge-'+i).digest('hex'),characterCount:5,chunks:[{id:crypto.randomUUID(),text:'doc-'+i}],filename:'doc-'+i+'.txt'}));
+   try{
+    const results=await Promise.all(docs.map(doc=>store.insertDocumentWithinCapacity(doc,{maxDocuments:3,maxCharacters:100})));
+    assert.equal(results.filter(result=>result.inserted).length,3);
+    assert.equal(results.filter(result=>result.reason==='document_limit').length,5);
+   }finally{for(const doc of docs)await store.deleteByIdAsync('documents',doc.id);}
+  });
+  await t.test('concurrent duplicate knowledge uploads are accepted only once',async()=>{
+   const botId=crypto.randomUUID(),contentHash=crypto.createHash('sha256').update('same knowledge').digest('hex'),docs=Array.from({length:8},(_,i)=>({id:crypto.randomUUID(),botId,contentHash,characterCount:14,chunks:[{id:crypto.randomUUID(),text:'same knowledge'}],filename:'duplicate-'+i+'.txt'}));
+   try{
+    const results=await Promise.all(docs.map(doc=>store.insertDocumentWithinCapacity(doc,{maxDocuments:10,maxCharacters:1000})));
+    assert.equal(results.filter(result=>result.inserted).length,1);
+    assert.equal(results.filter(result=>result.reason==='duplicate').length,7);
+   }finally{for(const doc of docs)await store.deleteByIdAsync('documents',doc.id);}
+  });
   await t.test('concurrent quota reservations never exceed the daily limit',async()=>{
    const day=new Date().toISOString().slice(0,10);
    const results=await Promise.all(Array.from({length:8},async()=>{
