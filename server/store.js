@@ -208,8 +208,9 @@ async function consumeSocialOAuthState(stateHash,userId,platform,now=new Date())
  if(!isPostgres()){
   const rows=all('socialOAuthStates'),index=rows.findIndex(row=>row.stateHash===stateHash);
   if(index<0)return null;
-  const [record]=rows.splice(index,1);persist();
-  return record.userId===userId&&record.platform===platform&&Date.parse(record.expiresAt)>now.getTime()?record:null;
+  const record=rows[index];
+  if(record.userId!==userId||record.platform!==platform||Date.parse(record.expiresAt)<=now.getTime())return null;
+  rows.splice(index,1);persist();return record;
  }
  await initialize();
  const result=await pool.query("DELETE FROM botforge_records WHERE collection='socialOAuthStates' AND data->>'stateHash'=$1 AND data->>'userId'=$2 AND data->>'platform'=$3 AND (data->>'expiresAt')::timestamptz>$4 RETURNING data",[stateHash,userId,platform,now]);
