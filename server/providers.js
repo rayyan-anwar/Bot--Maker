@@ -5,11 +5,11 @@ const PROVIDERS = {
   anthropic: {
     keyEnv: 'ANTHROPIC_API_KEY',
     defaultModel: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5',
-    async generate({ model, system, messages, maxTokens, signal }) {
+    async generate({ model, system, messages, maxTokens, temperature, signal }) {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST', signal,
         headers: { 'content-type':'application/json', 'x-api-key':process.env.ANTHROPIC_API_KEY, 'anthropic-version':'2023-06-01' },
-        body: JSON.stringify({ model, max_tokens:maxTokens, system, messages })
+        body: JSON.stringify({ model, max_tokens:maxTokens, temperature, system, messages })
       });
       const data = await safeJson(response);
       if (!response.ok) throw providerError('Anthropic', response.status, data);
@@ -35,10 +35,10 @@ const PROVIDERS = {
   gemini: {
     keyEnv:'GOOGLE_GEMINI_API_KEY',
     defaultModel:process.env.GEMINI_MODEL || 'gemini-3.8-flash',
-    async generate({model,system,messages,maxTokens,signal}) {
+    async generate({model,system,messages,maxTokens,temperature,signal}) {
       const url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent';
       const contents=messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
-      const response=await fetch(url,{method:'POST',signal,headers:{'content-type':'application/json','x-goog-api-key':process.env.GOOGLE_GEMINI_API_KEY},body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents,generationConfig:{maxOutputTokens:maxTokens}})});
+      const response=await fetch(url,{method:'POST',signal,headers:{'content-type':'application/json','x-goog-api-key':process.env.GOOGLE_GEMINI_API_KEY},body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents,generationConfig:{maxOutputTokens:maxTokens,temperature}})});
       const data=await safeJson(response);
       if(!response.ok) throw providerError('Google Gemini',response.status,data);
       return {text:(data.candidates?.[0]?.content?.parts || []).map(p=>p.text || '').join(''),inputTokens:data.usageMetadata?.promptTokenCount || 0,outputTokens:data.usageMetadata?.candidatesTokenCount || 0};
@@ -56,7 +56,7 @@ function providerError(name,status,data) {
   error.providerMessage=String(message).slice(0,300);
   return error;
 }
-async function generate({provider='anthropic',model,system,messages,maxTokens=1024,timeoutMs=45000}) {
+async function generate({provider='anthropic',model,system,messages,maxTokens=1024,temperature,timeoutMs=45000}) {
   const adapter=PROVIDERS[provider];
   if(!adapter) throw new Error('Unsupported AI provider.');
   if(provider==='mock'){
@@ -100,14 +100,14 @@ async function streamProviderResponse(response,provider,onToken){
  if(!text.trim())throw new Error('The provider returned an empty response.');
  return {text,inputTokens,outputTokens};
 }
-async function generateStream({provider='anthropic',model,system,messages,maxTokens=1024,onToken=()=>{},timeoutMs=60000}){
- if(provider==='mock'){const result=await generate({provider,model,system,messages,maxTokens});for(const word of result.text.match(/\S+\s*/g)||[])await onToken(word);return result;}
+async function generateStream({provider='anthropic',model,system,messages,maxTokens=1024,temperature,onToken=()=>{},timeoutMs=60000}){
+ if(provider==='mock'){const result=await generate({provider,model,system,messages,maxTokens,temperature});for(const word of result.text.match(/\S+\s*/g)||[])await onToken(word);return result;}
  const adapter=PROVIDERS[provider];if(!adapter)throw new Error('Unsupported AI provider.');
  if(!process.env[adapter.keyEnv])throw new Error('The selected AI provider is not configured on this server.');
  const actualModel=model||adapter.defaultModel;let response;
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
  try{
-  if(provider==='anthropic')response=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',signal:controller.signal,headers:{'content-type':'application/json','x-api-key':process.env.ANTHROPIC_API_KEY,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:actualModel,max_tokens:maxTokens,system,messages,stream:true})});
+  if(provider==='anthropic')response=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',signal:controller.signal,headers:{'content-type':'application/json','x-api-key':process.env.ANTHROPIC_API_KEY,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:actualModel,max_tokens:maxTokens,temperature,system,messages,stream:true})});
   else if(provider==='openai'){const input=[{role:'system',content:[{type:'input_text',text:system}]},...messages.map(m=>({role:m.role,content:[{type:'input_text',text:m.content}]}))];response=await fetch('https://api.openai.com/v1/responses',{method:'POST',signal:controller.signal,headers:{'content-type':'application/json',authorization:'Bearer '+process.env.OPENAI_API_KEY},body:JSON.stringify({model:actualModel,max_output_tokens:maxTokens,input,stream:true})});}
   else {const url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(actualModel)+':streamGenerateContent?alt=sse';const contents=messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));response=await fetch(url,{method:'POST',signal:controller.signal,headers:{'content-type':'application/json','x-goog-api-key':process.env.GOOGLE_GEMINI_API_KEY},body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents,generationConfig:{maxOutputTokens:maxTokens}})});}
   return await streamProviderResponse(response,provider,onToken);
