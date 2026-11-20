@@ -1,0 +1,10 @@
+'use strict';
+const test=require('node:test');const assert=require('node:assert/strict');
+const {analyzeText,getReaction,STATES}=require('../server/fortisni-engine');
+test('classifies positive English and Hindi input',()=>{assert.equal(analyzeText('That is amazing!').emotion,'joy');assert.equal(analyzeText('धन्यवाद').emotion,'joy');});
+test('recognizes sadness and anger without mirroring',()=>{assert.equal(getReaction('I feel lonely').emotion,'sadness');assert.match(getReaction('I am furious').guidance,/Stay calm/);});
+test('questions trigger attentive curiosity',()=>{const r=analyzeText('How does this work?');assert.equal(r.emotion,'curiosity');assert.equal(r.state,'attentive');assert.equal(r.question,true);});
+test('context can set thinking and speaking state',()=>{assert.equal(analyzeText('hello',{isTyping:true}).state,'thinking');assert.equal(analyzeText('hello',{isSpeaking:true}).state,'speaking');});
+test('empty text is idle and low intensity',()=>{const r=analyzeText('');assert.equal(r.state,'idle');assert.equal(r.intensity,0.15);});
+test('only declared animation states are emitted',()=>{for(const text of ['happy','sad','angry','afraid','why','hello'])assert.ok(STATES.has(analyzeText(text).animation));});
+test('prior state transition is reported',()=>{assert.equal(analyzeText('thank you',{state:'idle'}).transition,'transition');});
