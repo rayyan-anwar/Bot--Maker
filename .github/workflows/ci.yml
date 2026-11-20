@@ -72,6 +72,10 @@ jobs:
         env:
           BOTFORGE_TEST_DATABASE_URL: postgres://botforge:botforge_test_password@127.0.0.1:5432/botforge_test
         run: node --test tests/postgres.integration.test.js
+      - name: Exercise PostgreSQL AI budget ledger lifecycle and idempotency
+        env:
+          BOTFORGE_TEST_DATABASE_URL: postgres://botforge:botforge_test_password@127.0.0.1:5432/botforge_test
+        run: node --test tests/postgres-ai-budget-ledger.test.js
       - name: Rehearse PostgreSQL backup and restore on disposable databases
         env:
           DATABASE_URL: postgres://botforge:botforge_test_password@127.0.0.1:5432/botforge_test
