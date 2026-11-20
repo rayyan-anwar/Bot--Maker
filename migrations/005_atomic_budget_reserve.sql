@@ -23,7 +23,7 @@ BEGIN
     RAISE EXCEPTION 'reservation amount and token caps must be non-negative';
   END IF;
 
-  SELECT * INTO v_scope FROM ai_budget_scopes WHERE id=p_scope_id FOR UPDATE;
+  -- Serialize globally by request key before locking the budget scope. This avoids\n  -- cross-scope races on the unique reservation key and keeps lock order stable.\n  PERFORM pg_advisory_xact_lock(hashtextextended(p_request_key,0));\n\n  SELECT * INTO v_scope FROM ai_budget_scopes WHERE id=p_scope_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'budget scope not found'; END IF;
   IF NOW() < v_scope.window_start OR NOW() >= v_scope.window_end THEN
     RAISE EXCEPTION 'budget scope window is not active';
