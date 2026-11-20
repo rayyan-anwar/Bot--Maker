@@ -72,3 +72,20 @@ test('offline RAG evaluation reports misses and validates input',()=>{
  assert.equal(metrics.recallAtK,0);assert.equal(metrics.meanReciprocalRank,0);
  assert.throws(()=>evaluateRetrieval(docs,[],0),TypeError);
 });
+
+
+test('BM25 retrieval prioritizes focused chunks and avoids duplicate chunk text',()=>{
+ const docs=[
+  {id:'d1',filename:'long.txt',chunks:[{id:'long',text:'refund policy returns customer support service contact details and additional unrelated material'}]},
+  {id:'d2',filename:'focused.txt',chunks:[{id:'focused',text:'refund policy returns'},{id:'duplicate',text:'refund policy returns'}]}
+ ];
+ const rows=topChunks(docs,'refund policy returns',4);
+ assert.equal(rows[0].chunkId,'focused');
+ assert.equal(rows.filter(row=>row.text==='refund policy returns').length,1);
+});
+
+test('retrieval ignores malformed document records and validates result limits',()=>{
+ const docs=[null,{filename:'bad',chunks:null},{filename:'good',chunks:[null,{text:'secure account recovery steps'}]}];
+ assert.equal(topChunks(docs,'account recovery',2).length,1);
+ assert.deepEqual(topChunks(docs,'account recovery',0),[]);
+});
