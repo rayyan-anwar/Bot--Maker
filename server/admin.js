@@ -13,6 +13,7 @@ const {PostgresRateLimitStore}=require('./rate-limit-store');
 const {requireAuth,isAdminEmail}=require('./auth');
 const router=express.Router();
 const securityScanLimiter=rateLimit({windowMs:60*1000,limit:5,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'Security scan rate limit reached. Try again in a minute.'}});
+const aiBudgetWriteLimiter=rateLimit({windowMs:60*1000,limit:10,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'AI budget write limit reached. Try again in a minute.'},...(store.isPostgres()?{store:new PostgresRateLimitStore('ai-budget-write',store.query)}:{})});
 const engineerWriteLimiter=rateLimit({windowMs:60*1000,limit:Number.isInteger(Number(process.env.BOTFORGE_ENGINEER_WRITE_LIMIT))&&Number(process.env.BOTFORGE_ENGINEER_WRITE_LIMIT)>=1?Number(process.env.BOTFORGE_ENGINEER_WRITE_LIMIT):5,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'AI Engineer rate limit reached. Try again in a minute.'},...(store.isPostgres()?{store:new PostgresRateLimitStore('ai-engineer-write',store.query)}:{})});
 router.use(requireAuth,(req,res,next)=>{if(!isAdminEmail(req.user.email))return res.status(403).json({error:'Administrator access is not enabled for this account.'});next();});
 router.use('/engineer',(req,res,next)=>{
@@ -163,7 +164,7 @@ router.get('/ai-budget/control',async(req,res,next)=>{
   res.json({emergencyStop:result.rows[0].emergency_stop,updatedAt:result.rows[0].updated_at,updatedBy:result.rows[0].updated_by});
  }catch(e){next(e);}
 });
-router.put('/ai-budget/control',async(req,res,next)=>{
+router.put('/ai-budget/control',aiBudgetWriteLimiter,async(req,res,next)=>{
  try{
   if(!store.isPostgres())return res.status(503).json({error:'AI budget controls require PostgreSQL storage.'});
   if(typeof req.body?.emergencyStop!=='boolean')return res.status(400).json({error:'emergencyStop must be a boolean.'});
@@ -179,7 +180,7 @@ router.get('/ai-budget/scopes',async(req,res,next)=>{
   res.json({scopes:result.rows});
  }catch(e){next(e);}
 });
-router.patch('/ai-budget/scopes/:scopeId',async(req,res,next)=>{
+router.patch('/ai-budget/scopes/:scopeId',aiBudgetWriteLimiter,async(req,res,next)=>{
  try{
   if(!store.isPostgres())return res.status(503).json({error:'AI budget controls require PostgreSQL storage.'});
   const limit=req.body?.limitAmount;
@@ -223,7 +224,7 @@ router.get('/ai-budget/reservations',async(req,res,next)=>{
   res.json({state,items:result.rows});
  }catch(e){next(e);}
 });
-router.post('/ai-budget/reservations/:reservationId/settle',async(req,res,next)=>{
+router.post('/ai-budget/reservations/:reservationId/settle',aiBudgetWriteLimiter,async(req,res,next)=>{
  try{
   if(!store.isPostgres())return res.status(503).json({error:'AI budget controls require PostgreSQL storage.'});
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.params.reservationId))return res.status(400).json({error:'Invalid reservation ID.'});
