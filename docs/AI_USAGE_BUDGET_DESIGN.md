@@ -1,6 +1,6 @@
 # AI usage, token and cost budget design
 
-**Status:** Design proposal. This document does not change runtime behavior, set plan prices, or enable provider billing controls.
+**Status:** Partially implemented. PostgreSQL reservation, settlement, release, reconciliation and emergency-stop functions are present; the runtime path remains opt-in and requires explicit server-side pricing and budget configuration. This document does not set plan prices or authorize live spending.
 
 ## Current baseline
 
@@ -122,3 +122,12 @@ Do not display fabricated currency costs when pricing is unknown.
 - Retention period and financial reporting requirements.
 
 No provider prices or commercial limits are invented by this design. Production budgets must be approved before live provider calls are enabled.
+
+
+## Implemented operational controls (follow-up)
+
+- Admin-only read endpoints expose currency-level budget totals, bounded reservation listings and bounded ledger listings. They do not return prompts, provider credentials or generated content.
+- An admin-only manual settlement endpoint accepts a verified provider request ID and a decimal actual-cost amount. It delegates to the transactional settlement function, which rejects amounts above the reserved ceiling and leaves the reservation open for reconciliation.
+- Open reservations have a partial expiry index for bounded operational review. Expired reservations are deliberately not auto-released: a process crash can occur after a provider accepted a billable request. Operators must verify provider billing before closing a hold.
+- PostgreSQL integration tests now assert that an over-reservation settlement attempt leaves the reservation in the reserved state and preserves its held amount.
+- The admin budget endpoints fail closed when PostgreSQL is not active. No live provider spend is enabled by these changes.
