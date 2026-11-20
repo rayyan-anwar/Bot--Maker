@@ -103,10 +103,10 @@ test('hybrid retrieval validates result limits and malformed corpora',async()=>{
 
 
 test('chunkText prefers sentence boundaries while retaining overlap',()=>{
- const chunks=chunkText('Alpha beta gamma. Delta epsilon zeta. Eta theta iota.',6,2);
- assert.equal(chunks[0],'Alpha beta gamma.');
- assert.ok(chunks[1].startsWith('gamma. Delta'));
- assert.ok(chunks.join(' ').includes('iota.'));
+ const chunks=chunkText('Alpha beta gamma delta. Epsilon zeta eta theta. Iota kappa.',6,2);
+ assert.equal(chunks[0],'Alpha beta gamma delta.');
+ assert.ok(chunks[1].startsWith('gamma delta. Epsilon'));
+ assert.ok(chunks.join(' ').includes('kappa.'));
 });
 
 test('chunkText keeps hard size bounds when no sentence boundary exists',()=>{
