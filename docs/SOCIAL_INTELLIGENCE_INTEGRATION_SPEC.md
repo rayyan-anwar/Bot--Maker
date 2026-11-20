@@ -4,7 +4,7 @@
 
 BotForge Social Intelligence is an opt-in workspace for analytics and publishing through official platform APIs. It must never scrape private pages, bypass authentication, automate browser sessions to imitate users, or request a user's platform password.
 
-## Initial adapter contract
+## Implemented security foundation\n\nThe repository now includes persistent, one-time OAuth state records in the shared store, S256 PKCE verifier/challenge generation, authenticated platform and state-initiation endpoints, and AES-256-GCM token-envelope encryption helpers. The encryption key is supplied through `BOTFORGE_SOCIAL_TOKEN_ENCRYPTION_KEY` as a base64-encoded 32-byte secret. The API intentionally does not advertise live OAuth or publishing until provider callback, token exchange, persistent connection lifecycle and app approvals are completed.\n\n## Initial adapter contract
 
 Each platform adapter must implement:
 - `getAuthorizationUrl({ state, redirectUri, scopes })`
@@ -49,4 +49,4 @@ Unique key: platform + platformAccountId + userId. All queries must include user
 
 ## Not yet live
 
-No platform OAuth credentials, app review approvals, token encryption key/KMS, or customer-connected social accounts are assumed to exist in this repository environment. The adapter contract is a build specification, not a claim of live connectivity.
+No platform OAuth credentials, app review approvals, configured token encryption key/KMS, or customer-connected social accounts are assumed to exist in this repository environment. Encryption helpers exist, but production KMS-backed key rotation and a complete connection lifecycle remain unimplemented. The adapter contract is not a claim of live connectivity.
