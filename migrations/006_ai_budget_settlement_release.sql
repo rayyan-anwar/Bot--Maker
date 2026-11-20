@@ -25,8 +25,11 @@ BEGIN
   SELECT * INTO v_res FROM ai_budget_reservations WHERE id=p_reservation_id FOR UPDATE;
 
   IF v_res.state='settled' THEN
-    IF v_res.actual_amount=p_actual_amount THEN RETURN 'settled'; END IF;
-    RAISE EXCEPTION 'reservation already settled with a different amount';
+    IF v_res.actual_amount=p_actual_amount
+       AND (p_provider_request_id IS NULL OR v_res.provider_request_id=p_provider_request_id) THEN
+      RETURN 'settled';
+    END IF;
+    RAISE EXCEPTION 'reservation already settled with conflicting amount or provider request id';
   END IF;
   IF v_res.state<>'reserved' THEN
     RAISE EXCEPTION 'only reserved items can be settled';
