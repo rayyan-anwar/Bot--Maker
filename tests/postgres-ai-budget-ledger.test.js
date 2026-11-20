@@ -33,6 +33,10 @@ test('PostgreSQL AI budget ledger transitions, idempotency and reconciliation', 
   assert.ok(reservation);
   assert.ok(duplicate);
 
+  await expectPgError('SELECT botforge_settle_ai_budget($1,$2,$3)',[reservation,4.1,'provider-overage-test'],/actual amount exceeds reservation/);
+  const stillReserved=(await client.query('SELECT state,reserved_amount FROM ai_budget_reservations WHERE id=$1',[reservation])).rows[0];
+  assert.equal(stillReserved.state,'reserved','overage must leave the hold open for reconciliation');
+  assert.equal(Number(stillReserved.reserved_amount),4);
   await client.query('SELECT botforge_settle_ai_budget($1,$2,$3)',[reservation,2.5,'provider-test-1']);
   const settled=(await client.query('SELECT state,actual_amount FROM ai_budget_reservations WHERE id=$1',[reservation])).rows[0];
   assert.equal(settled.state,'settled');
