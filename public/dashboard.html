@@ -151,13 +151,17 @@
   loadProfileMemory().catch(()=>{profileMemoryList.textContent='Personal memory is temporarily unavailable.';});
 
   function botCard(bot, isOwn) {
-    const tag = isOwn ? (bot.isPublic ? 'Public' : 'Private') : 'Public · by someone else';
+    const tag = isOwn ? (bot.isPublic ? 'Public' : 'Private') : 'Public · shared';
+    const publishControl = isOwn ? '<button type="button" class="bot-publish-toggle" data-bot-id="'+encodeURIComponent(bot.id)+'" data-published="'+(bot.isPublic?'true':'false')+'">'+(bot.isPublic?'Unpublish':'Publish')+'</button>' : '';
     return `
-      <a class="bot-card" href="/bot.html?id=${encodeURIComponent(bot.id)}">
-        <h3>${escapeHtml(bot.name)}</h3>
-        <p>${escapeHtml(bot.description || 'No description yet.')}</p>
-        <span class="tag">${tag}</span>
-      </a>`;
+      <div class="bot-card-wrap">
+        <a class="bot-card" href="/bot.html?id=${encodeURIComponent(bot.id)}">
+          <h3>${escapeHtml(bot.name)}</h3>
+          <p>${escapeHtml(bot.description || 'No description yet.')}</p>
+          <span class="tag">${tag}</span>
+        </a>
+        ${publishControl}
+      </div>`;
   }
 
   async function loadBots() {
@@ -167,12 +171,24 @@
     document.getElementById('my-bots-empty').style.display = mine.length ? 'none' : 'block';
 
     const { bots: pub } = await api('/bots/public');
-    const theirs = pub.filter((b) => b.ownerId !== user.id);
+    const theirs = pub;
     const pubEl = document.getElementById('public-bots');
     pubEl.innerHTML = theirs.map((b) => botCard(b, false)).join('');
     document.getElementById('public-bots-empty').style.display = theirs.length ? 'none' : 'block';
   }
   loadBots();
+  document.getElementById('my-bots').addEventListener('click', async (event) => {
+    const button=event.target.closest('.bot-publish-toggle');
+    if(!button)return;
+    event.preventDefault();event.stopPropagation();
+    button.disabled=true;
+    try{
+      const id=decodeURIComponent(button.dataset.botId);
+      await api('/bots/'+encodeURIComponent(id)+'/'+(button.dataset.published==='true'?'unpublish':'publish'),{method:'POST'});
+      await loadBots();
+    }catch(error){window.alert(error.message);}
+    finally{button.disabled=false;}
+  });
   api('/chat/providers').then(({providers})=>{
     const select=document.getElementById('bot-provider');
     providers.forEach(provider=>{
