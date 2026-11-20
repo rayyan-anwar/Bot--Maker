@@ -14,6 +14,27 @@ function getPlatforms(){
  return Object.entries(PLATFORMS).map(([id,p])=>({id,label:p.label,configured:!!process.env[p.env],capabilities:[...p.capabilities],publishingAvailable:false,liveOAuthAvailable:false,requiresAppReview:p.requiresAppReview}));
 }
 function hash(value){return crypto.createHash('sha256').update(value).digest('hex');}
+function tokenEncryptionKey(){
+ const encoded=process.env.BOTFORGE_SOCIAL_TOKEN_ENCRYPTION_KEY;
+ if(typeof encoded!=='string'||!/^[A-Za-z0-9+/]{43}=$/.test(encoded))throw new Error('BOTFORGE_SOCIAL_TOKEN_ENCRYPTION_KEY must be a base64-encoded 32-byte key.');
+ const key=Buffer.from(encoded,'base64');
+ if(key.length!==32||key.toString('base64')!==encoded)throw new Error('BOTFORGE_SOCIAL_TOKEN_ENCRYPTION_KEY must be a base64-encoded 32-byte key.');
+ return key;
+}
+function encryptToken(token){
+ if(typeof token!=='string'||!token||token.length>16384)throw new TypeError('A non-empty token of at most 16384 characters is required.');
+ const iv=crypto.randomBytes(12),cipher=crypto.createCipheriv('aes-256-gcm',tokenEncryptionKey(),iv);
+ const ciphertext=Buffer.concat([cipher.update(token,'utf8'),cipher.final()]);
+ return {version:1,algorithm:'A256GCM',iv:iv.toString('base64url'),ciphertext:ciphertext.toString('base64url'),tag:cipher.getAuthTag().toString('base64url')};
+}
+function decryptToken(envelope){
+ if(!envelope||envelope.version!==1||envelope.algorithm!=='A256GCM'||typeof envelope.iv!=='string'||typeof envelope.ciphertext!=='string'||typeof envelope.tag!=='string')throw new TypeError('Invalid encrypted token envelope.');
+ try{
+  const decipher=crypto.createDecipheriv('aes-256-gcm',tokenEncryptionKey(),Buffer.from(envelope.iv,'base64url'));
+  decipher.setAuthTag(Buffer.from(envelope.tag,'base64url'));
+  return Buffer.concat([decipher.update(Buffer.from(envelope.ciphertext,'base64url')),decipher.final()]).toString('utf8');
+ }catch(_){throw new Error('Unable to decrypt social token envelope. Check the encryption key and stored data.');}
+}
 function createPkcePair(){
  const verifier=crypto.randomBytes(32).toString('base64url');
  const challenge=crypto.createHash('sha256').update(verifier).digest('base64url');
@@ -37,4 +58,4 @@ async function consumeOAuthState(state,userId,platform,now=new Date()){
  if(!record)return null;
  return {userId:record.userId,platform:record.platform,codeVerifier:record.codeVerifier};
 }
-module.exports={PLATFORMS,getPlatforms,createOAuthState,consumeOAuthState,createPkcePair,STATE_TTL_MS};
+module.exports={PLATFORMS,getPlatforms,createOAuthState,consumeOAuthState,createPkcePair,encryptToken,decryptToken,STATE_TTL_MS};
