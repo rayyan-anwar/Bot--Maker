@@ -4,6 +4,7 @@ const store=require('./store');
 const plans=require('./plans');
 const {requireAuth}=require('./auth');
 const router=express.Router(),webhookRouter=express.Router(),razorpayWebhookRouter=express.Router();
+function validEventId(value){return typeof value==='string'&&!!value.trim()&&value===value.trim()&&value.length<=255;}
 function safeEqualHex(expected,provided){if(typeof expected!=='string'||typeof provided!=='string'||! /^[a-f0-9]{64}$/i.test(expected)||! /^[a-f0-9]{64}$/i.test(provided))return false;try{const a=Buffer.from(expected,'hex'),b=Buffer.from(provided,'hex');return a.length===b.length&&crypto.timingSafeEqual(a,b);}catch(_){return false;}}
 function signatureValid(raw,header,secret){
  if(!Buffer.isBuffer(raw)||typeof header!=='string'||!secret||header.length>4096)return false;
@@ -61,7 +62,7 @@ router.post('/razorpay/checkout',requireAuth,async(req,res,next)=>{try{
 webhookRouter.post('/',express.raw({type:'application/json',limit:'256kb'}),async(req,res)=>{
  const secret=process.env.STRIPE_WEBHOOK_SECRET,header=req.get('stripe-signature');if(!signatureValid(req.body,header,secret))return res.status(400).json({error:'Invalid webhook signature.'});
  let event;try{event=JSON.parse(req.body.toString('utf8'));}catch(_){return res.status(400).json({error:'Invalid webhook payload.'});}
- const eventId=event.id;if(typeof eventId!=='string'||!eventId.trim()||eventId!==eventId.trim()||eventId.length>255)return res.status(400).json({error:'Webhook event ID is required.'});
+ const eventId=event.id;if(!validEventId(eventId))return res.status(400).json({error:'Webhook event ID is required.'});
  let claimed=false;
  try{
   claimed=await store.claimWebhookEvent('stripe',eventId);if(!claimed)return res.json({received:true,duplicate:true});
@@ -81,7 +82,7 @@ webhookRouter.post('/',express.raw({type:'application/json',limit:'256kb'}),asyn
 razorpayWebhookRouter.post('/',express.raw({type:'application/json',limit:'256kb'}),async(req,res)=>{
  if(!razorpaySignatureValid(req.body,req.get('x-razorpay-signature'),process.env.RAZORPAY_WEBHOOK_SECRET))return res.status(400).json({error:'Invalid Razorpay webhook signature.'});
  let event;try{event=JSON.parse(req.body.toString('utf8'));}catch(_){return res.status(400).json({error:'Invalid webhook payload.'});}
- const eventId=req.get('x-razorpay-event-id');if(typeof eventId!=='string'||!eventId.trim()||eventId!==eventId.trim()||eventId.length>255)return res.status(400).json({error:'Razorpay event ID header is required.'});
+ const eventId=req.get('x-razorpay-event-id');if(!validEventId(eventId))return res.status(400).json({error:'Razorpay event ID header is required.'});
  let claimed=false;
  try{
   claimed=await store.claimWebhookEvent('razorpay',eventId);if(!claimed)return res.json({received:true,duplicate:true});
@@ -90,4 +91,4 @@ razorpayWebhookRouter.post('/',express.raw({type:'application/json',limit:'256kb
   return res.json({received:true});
  }catch(error){if(claimed)await store.releaseWebhookEvent('razorpay',eventId).catch(()=>{});console.error('Razorpay webhook processing failed:',error.message);return res.status(500).json({error:'Webhook processing failed.'});}
 });
-module.exports={router,webhookRouter,razorpayWebhookRouter,signatureValid,razorpaySignatureValid,isRazorpaySubscriptionActive,resolveRazorpayPlan};
+module.exports={router,webhookRouter,razorpayWebhookRouter,signatureValid,razorpaySignatureValid,validEventId,isRazorpaySubscriptionActive,resolveRazorpayPlan};
