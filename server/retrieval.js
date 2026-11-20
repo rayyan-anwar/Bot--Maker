@@ -39,40 +39,69 @@ function chunkText(text, size = 220, overlap = 40) {
 }
 
 /** Score how relevant a chunk is to a query using simple word overlap. */
-function scoreChunk(chunkTokenCounts, queryTokens) {
+function scoreChunk(chunkTokenCounts, queryTokens, documentFrequency, totalChunks, chunkLength, averageLength) {
   let score = 0;
+  const k1 = 1.2, b = 0.75;
   for (const qt of queryTokens) {
-    score += chunkTokenCounts.get(qt) || 0;
+    const frequency = chunkTokenCounts.get(qt) || 0;
+    if (!frequency) continue;
+    const df = documentFrequency.get(qt) || 0;
+    const idf = Math.log(1 + (totalChunks - df + 0.5) / (df + 0.5));
+    const lengthNorm = 1 - b + b * (chunkLength / (averageLength || 1));
+    score += idf * (frequency * (k1 + 1)) / (frequency + k1 * lengthNorm);
   }
   return score;
 }
 
 /**
- * Given a bot's documents (each with pre-split chunks) and a user message,
- * return the top-K most relevant chunks of text, each tagged with the
- * filename it came from.
+ * Retrieve distinct, relevant chunks using BM25-style lexical ranking.
+ * Malformed records are ignored so one damaged document cannot break chat.
  */
 function topChunks(documents, query, k = 4) {
-  const queryTokens = tokenize(query);
-  if (queryTokens.length === 0) return [];
+  if (!Number.isInteger(k) || k < 1) return [];
+  const queryTokens = [...new Set(tokenize(query))];
+  if (queryTokens.length === 0 || !Array.isArray(documents)) return [];
 
-  const scored = [];
+  const corpus = [];
+  const documentFrequency = new Map();
+  let totalWords = 0;
   for (const doc of documents) {
+    if (!doc || !Array.isArray(doc.chunks)) continue;
     for (const chunk of doc.chunks) {
+      if (!chunk || typeof chunk.text !== 'string' || !chunk.text.trim()) continue;
       const tokens = tokenize(chunk.text);
+      if (!tokens.length) continue;
       const counts = new Map();
-      for (const t of tokens) counts.set(t, (counts.get(t) || 0) + 1);
-      const score = scoreChunk(counts, queryTokens);
-      if (score > 0) {
-        scored.push({ text: chunk.text, filename: doc.filename, documentId: doc.id, chunkId: chunk.id, score });
-      }
+      for (const token of tokens) counts.set(token, (counts.get(token) || 0) + 1);
+      for (const token of new Set(tokens)) documentFrequency.set(token, (documentFrequency.get(token) || 0) + 1);
+      totalWords += tokens.length;
+      corpus.push({ doc, chunk, counts, length: tokens.length, tokens });
     }
   }
-
-  scored.sort((a, b) => b.score - a.score || String(a.filename).localeCompare(String(b.filename)) || String(a.chunkId).localeCompare(String(b.chunkId)));
+  if (!corpus.length) return [];
+  const averageLength = totalWords / corpus.length;
+  const scored = [];
+  const seen = new Set();
+  for (const item of corpus) {
+    const score = scoreChunk(item.counts, queryTokens, documentFrequency, corpus.length, item.length, averageLength);
+    if (score <= 0) continue;
+    const normalizedText = item.chunk.text.replace(/\\s+/g, ' ').trim().toLocaleLowerCase();
+    const identity = String(item.doc.id || item.doc.filename || '') + '\\u0000' + normalizedText;
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    scored.push({
+      text: item.chunk.text,
+      filename: typeof item.doc.filename === 'string' ? item.doc.filename : 'Untitled document',
+      documentId: item.doc.id || null,
+      chunkId: item.chunk.id || null,
+      score
+    });
+  }
+  scored.sort((a, b) => b.score - a.score ||
+    String(a.filename).localeCompare(String(b.filename)) ||
+    String(a.chunkId || '').localeCompare(String(b.chunkId || '')));
   return scored.slice(0, k);
 }
-
 
 function cosineSimilarity(a,b){
  if(!Array.isArray(a)||!Array.isArray(b)||a.length!==b.length||!a.length)return 0;
@@ -81,18 +110,20 @@ function cosineSimilarity(a,b){
  return aa&&bb?dot/(Math.sqrt(aa)*Math.sqrt(bb)):0;
 }
 async function topChunksHybrid(documents,query,k=4){
- const keyword=topChunks(documents,query,Math.max(k,documents.reduce((n,d)=>n+(d.chunks||[]).length,0)));
+ const keyword=topChunks(documents,query,Math.max(k,documents.reduce((n,d)=>n+(Array.isArray(d?.chunks)?d.chunks.length:0),0)));
  const embeddings=require('./embeddings');
  if(!embeddings.enabled())return keyword.slice(0,k);
  try{
   const [queryVector]=await embeddings.embedTexts([query]);
+  const lexicalScores=new Map(keyword.map(item=>[item.chunkId,item.score]));
   const candidates=[];
-  for(const doc of documents)for(const chunk of doc.chunks||[]){
+  for(const doc of documents)for(const chunk of Array.isArray(doc?.chunks)?doc.chunks:[]){
+   if(!chunk||typeof chunk.text!=='string')continue;
    const semantic=cosineSimilarity(queryVector,chunk.embedding);
-   const lexical=keyword.find(item=>item.chunkId===chunk.id)?.score||0;
+   const lexical=lexicalScores.get(chunk.id)||0;
    if(semantic>0||lexical>0)candidates.push({text:chunk.text,filename:doc.filename,documentId:doc.id,chunkId:chunk.id,score:semantic*0.75+(lexical?Math.min(lexical/8,1)*0.25:0),semanticScore:semantic,keywordScore:lexical});
   }
-  candidates.sort((a,b)=>b.score-a.score);
+  candidates.sort((a,b)=>b.score-a.score||String(a.filename).localeCompare(String(b.filename))||String(a.chunkId).localeCompare(String(b.chunkId)));
   return candidates.slice(0,k);
  }catch(error){return keyword.slice(0,k);}
 }
