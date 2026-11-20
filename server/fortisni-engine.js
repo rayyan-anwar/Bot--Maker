@@ -1,11 +1,11 @@
 'use strict';
 const RULES=[
- {emotion:'joy',state:'celebrating',intensity:0.72,patterns:[/\b(thank you|thanks|awesome|great|happy|love it|excellent|perfect|amazing|good job)\b/i,/\b(शुक्रिया|धन्यवाद|बहुत अच्छा|खुश|बढ़िया)\b/]},
- {emotion:'sadness',state:'comforting',intensity:0.68,patterns:[/\b(sad|depressed|lonely|grief|heartbroken|upset|miss you)\b/i,/\b(दुखी|उदास|अकेला|दर्द|परेशान)\b/]},
- {emotion:'anger',state:'calming',intensity:0.75,patterns:[/\b(angry|furious|hate|frustrated|annoyed|rage)\b/i,/\b(गुस्सा|नाराज़|चिढ़|क्रोधित)\b/]},
- {emotion:'fear',state:'reassuring',intensity:0.66,patterns:[/\b(scared|afraid|anxious|worried|panic|nervous)\b/i,/\b(डर|घबर|चिंता|चिंतित)\b/]},
- {emotion:'curiosity',state:'attentive',intensity:0.52,patterns:[/\b(why|how|what is|explain|tell me|curious|wonder)\b/i,/\b(क्यों|कैसे|क्या है|समझाओ|बताओ)\b/]},
- {emotion:'affection',state:'warm',intensity:0.62,patterns:[/\b(miss you|love you|dear|buddy|best friend)\b/i,/\b(याद|प्यार|दोस्त)\b/]},
+ {emotion:'joy',state:'celebrating',intensity:0.72,patterns:[/\b(thank you|thanks|awesome|great|happy|love it|excellent|perfect|amazing|good job)\b/i,/(शुक्रिया|धन्यवाद|बहुत अच्छा|खुश|बढ़िया)/]},
+ {emotion:'sadness',state:'comforting',intensity:0.68,patterns:[/\b(sad|depressed|lonely|grief|heartbroken|upset|miss you)\b/i,/(दुखी|उदास|अकेला|दर्द|परेशान)/]},
+ {emotion:'anger',state:'calming',intensity:0.75,patterns:[/\b(angry|furious|hate|frustrated|annoyed|rage)\b/i,/(गुस्सा|नाराज़|चिढ़|क्रोधित)/]},
+ {emotion:'fear',state:'reassuring',intensity:0.66,patterns:[/\b(scared|afraid|anxious|worried|panic|nervous)\b/i,/(डर|घबर|चिंता|चिंतित)/]},
+ {emotion:'curiosity',state:'attentive',intensity:0.52,patterns:[/\b(why|how|what is|explain|tell me|curious|wonder)\b/i,/(क्यों|कैसे|क्या है|समझाओ|बताओ)/]},
+ {emotion:'affection',state:'warm',intensity:0.62,patterns:[/\b(miss you|love you|dear|buddy|best friend)\b/i,/(याद|प्यार|दोस्त)/]},
  {emotion:'neutral',state:'idle',intensity:0.25,patterns:[]}
 ];
 const STATES=new Set(['idle','celebrating','comforting','calming','reassuring','attentive','warm','thinking','speaking']);
