@@ -45,6 +45,7 @@ test('administrator-only bot and document listing routes require the configured 
  const publicPayload=(await publicDetail.json()).bot;
  assert.equal(publicPayload.name,'Test bot');
  assert.equal(Object.hasOwn(publicPayload,'instructions'),false);
+ assert.equal(Object.hasOwn(publicPayload,'ownerId'),false);
  const visitorEdit=await fetch(base+'/api/bots/'+bot.id,{method:'PUT',headers:{cookie:visitorCookie,'content-type':'application/json'},body:JSON.stringify({name:'Hijacked'})});
  assert.equal(visitorEdit.status,403);
  const visitorDelete=await fetch(base+'/api/bots/'+bot.id,{method:'DELETE',headers:{cookie:visitorCookie}});
