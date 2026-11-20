@@ -15,7 +15,7 @@ function tokenize(text) {
   return (String(text).toLocaleLowerCase().match(/[\p{L}\p{M}\p{N}']+/gu) || []).filter((w) => w.length > 1 && !STOPWORDS.has(w));
 }
 
-/** Split a long text into overlapping chunks of roughly `size` words. */
+/** Split text into overlapping, sentence-aware chunks of roughly `size` words. */
 function chunkText(text, size = 220, overlap = 40) {
   if (typeof text !== 'string') throw new TypeError('Document text must be a string.');
   if (!Number.isInteger(size) || size < 1) throw new RangeError('Chunk size must be a positive integer.');
@@ -25,10 +25,20 @@ function chunkText(text, size = 220, overlap = 40) {
   const chunks = [];
   let start = 0;
   while (start < words.length) {
-    const end = Math.min(start + size, words.length);
+    const targetEnd = Math.min(start + size, words.length);
+    let end = targetEnd;
+    if (targetEnd < words.length) {
+      const earliestBoundary = start + Math.max(1, Math.floor(size * 0.65));
+      for (let i = targetEnd - 1; i >= earliestBoundary; i--) {
+        if (/[.!?][”’"')\]]?$/.test(words[i])) {
+          end = i + 1;
+          break;
+        }
+      }
+    }
     chunks.push(words.slice(start, end).join(' '));
     if (end === words.length) break;
-    start = end - overlap;
+    start = Math.max(start + 1, end - overlap);
   }
   return chunks;
 }
