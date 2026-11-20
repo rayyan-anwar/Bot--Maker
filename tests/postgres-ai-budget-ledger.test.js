@@ -138,3 +138,39 @@ test('global emergency stop blocks new AI budget reservations', {skip:!process.e
   throw error;
  }finally{await client.end();}
 });
+
+
+test('exact reservation retries remain idempotent during emergency stop and after scope window closes', {skip:!process.env.BOTFORGE_TEST_DATABASE_URL}, async()=>{
+ const client=new Client({connectionString:process.env.BOTFORGE_TEST_DATABASE_URL});
+ await client.connect();
+ try{
+  await client.query('BEGIN');
+  const scope=(await client.query(
+   `INSERT INTO ai_budget_scopes(scope_type,scope_key,currency,limit_amount,window_start,window_end)
+    VALUES('global',$1,'USD',5,NOW()-INTERVAL '1 minute',NOW()+INTERVAL '1 hour') RETURNING id`,
+   ['retry-after-stop-'+Date.now()]
+  )).rows[0].id;
+  const key='stable-retry-'+Date.now();
+  const args=[key,scope,'test-model','test-price-v1',100,100,1];
+  const original=(await client.query(
+   'SELECT botforge_reserve_ai_budget($1,$2,$3,$4,$5,$6,$7,NULL) AS id',args
+  )).rows[0].id;
+
+  await client.query('UPDATE ai_budget_controls SET emergency_stop=TRUE WHERE id=1');
+  const retryDuringStop=(await client.query(
+   'SELECT botforge_reserve_ai_budget($1,$2,$3,$4,$5,$6,$7,NULL) AS id',args
+  )).rows[0].id;
+  assert.equal(retryDuringStop,original,'exact retry should return original reservation during emergency stop');
+
+  await client.query('UPDATE ai_budget_controls SET emergency_stop=FALSE WHERE id=1');
+  await client.query("UPDATE ai_budget_scopes SET window_end=NOW()-INTERVAL '1 second' WHERE id=$1",[scope]);
+  const retryAfterWindow=(await client.query(
+   'SELECT botforge_reserve_ai_budget($1,$2,$3,$4,$5,$6,$7,NULL) AS id',args
+  )).rows[0].id;
+  assert.equal(retryAfterWindow,original,'exact retry should return original reservation after scope window closes');
+  await client.query('ROLLBACK');
+ }catch(error){
+  try{await client.query('ROLLBACK');}catch{}
+  throw error;
+ }finally{await client.end();}
+});
