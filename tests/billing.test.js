@@ -60,7 +60,7 @@ test('Razorpay grants paid plan only for active subscriptions',()=>{
 
 
 test('payment webhook event IDs reject control characters and payloads must be JSON objects',()=>{
- for(const value of ['evt_123\\n','evt_123\\r','evt_123\\u0000','evt_123\\u007f'])assert.equal(validEventId(value),false,JSON.stringify(value));
+ for(const value of ['evt_123'+String.fromCharCode(10),'evt_123'+String.fromCharCode(13),'evt_123'+String.fromCharCode(0),'evt_123'+String.fromCharCode(127)])assert.equal(validEventId(value),false,JSON.stringify(value));
  assert.equal(validEventId('evt_safe-123'),true);
  for(const value of [null,undefined,[], 'event', 42, true])assert.equal(validWebhookPayload(value),false);
  for(const value of [{id:'evt_1'}, {event:'subscription.activated'}])assert.equal(validWebhookPayload(value),true);
