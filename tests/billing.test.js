@@ -9,6 +9,17 @@ test('Stripe webhook signature validates raw body and rejects tampering',()=>{
  assert.equal(signatureValid(body,'t='+timestamp+',v1='+digest,''),false);
 });
 
+test('Stripe webhook accepts any valid v1 signature and rejects ambiguous timestamps',()=>{
+ const secret='whsec_test_secret',timestamp=Math.floor(Date.now()/1000),body=Buffer.from('{"id":"evt_multiple"}');
+ const digest=crypto.createHmac('sha256',secret).update(String(timestamp)+'.').update(body).digest('hex');
+ const invalid='0'.repeat(64);
+ assert.equal(signatureValid(body,'t='+timestamp+',v1='+invalid+',v1='+digest,secret),true);
+ assert.equal(signatureValid(body,'t='+timestamp+',t='+timestamp+',v1='+digest,secret),false);
+ assert.equal(signatureValid(body,'t='+timestamp+',v1=not-hex',secret),false);
+ assert.equal(signatureValid(body,'t='+timestamp+',v1='+digest+',v1=bad',secret),true);
+ assert.equal(signatureValid(body,'t='+timestamp+',v1='+digest+'x'.repeat(5000),secret),false);
+});
+
 const {razorpaySignatureValid}=require('../server/billing');
 test('Razorpay webhook signature validates raw body and rejects tampering',()=>{
  const secret='razorpay_test_webhook_secret',body=Buffer.from(JSON.stringify({event:'subscription.activated'}));
