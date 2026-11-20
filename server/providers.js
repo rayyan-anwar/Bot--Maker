@@ -19,7 +19,7 @@ const PROVIDERS = {
   openai: {
     keyEnv: 'OPENAI_API_KEY',
     defaultModel: process.env.OPENAI_MODEL || 'gpt-5.5',
-    async generate({ model, system, messages, maxTokens, signal }) {
+    async generate({ model, system, messages, maxTokens, temperature, signal }) {
       const input=[{role:'system',content:[{type:'input_text',text:system}]},...messages.map(m=>({role:m.role,content:[{type:'input_text',text:m.content}]}))];
       const response = await fetch('https://api.openai.com/v1/responses', {
         method:'POST', signal,
