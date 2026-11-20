@@ -7,6 +7,7 @@ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-social-oauth-'));
 process.env.NODE_ENV='test';
 process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
 delete process.env.DATABASE_URL;
+process.env.BOTFORGE_SOCIAL_TOKEN_ENCRYPTION_KEY=require('node:crypto').randomBytes(32).toString('base64');
 const social=require('../server/social-intelligence');
 test.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
 
@@ -45,4 +46,26 @@ test('PKCE uses S256 and platform catalogue never exposes credentials',()=>{
   assert.equal(row.publishingAvailable,false);
   assert.equal(Object.hasOwn(row,'clientSecret'),false);
  }
+});
+
+
+test('social access tokens use authenticated AES-256-GCM envelopes',()=>{
+ const plaintext='access-token-never-store-in-plaintext';
+ const envelope=social.encryptToken(plaintext);
+ assert.equal(envelope.algorithm,'A256GCM');
+ assert.equal(envelope.version,1);
+ assert.equal(JSON.stringify(envelope).includes(plaintext),false);
+ assert.equal(social.decryptToken(envelope),plaintext);
+ const tampered={...envelope,ciphertext:Buffer.from('tampered').toString('base64url')};
+ assert.throws(()=>social.decryptToken(tampered),/Unable to decrypt/);
+});
+
+test('social token encryption fails closed when key is missing or malformed',()=>{
+ const original=process.env.BOTFORGE_SOCIAL_TOKEN_ENCRYPTION_KEY;
+ try{
+  delete process.env.BOTFORGE_SOCIAL_TOKEN_ENCRYPTION_KEY;
+  assert.throws(()=>social.encryptToken('secret'),/must be a base64-encoded 32-byte key/);
+  process.env.BOTFORGE_SOCIAL_TOKEN_ENCRYPTION_KEY='not-a-key';
+  assert.throws(()=>social.encryptToken('secret'),/must be a base64-encoded 32-byte key/);
+ }finally{process.env.BOTFORGE_SOCIAL_TOKEN_ENCRYPTION_KEY=original;}
 });
