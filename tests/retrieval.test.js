@@ -84,6 +84,15 @@ test('BM25 retrieval prioritizes focused chunks and avoids duplicate chunk text'
  assert.equal(rows.filter(row=>row.text==='refund policy returns').length,1);
 });
 
+test('BM25 deduplicates equivalent whitespace across chunks',()=>{
+ const docs=[{id:'d',filename:'notes.txt',chunks:[
+  {id:'a',text:'refund policy\\ncustomer returns'},
+  {id:'b',text:'refund   policy customer returns'}
+ ]}];
+ const rows=topChunks(docs,'refund policy customer returns',5);
+ assert.equal(rows.length,1);
+});
+
 test('retrieval ignores malformed document records and validates result limits',()=>{
  const docs=[null,{filename:'bad',chunks:null},{filename:'good',chunks:[null,{text:'secure account recovery steps'}]}];
  assert.equal(topChunks(docs,'account recovery',2).length,1);
