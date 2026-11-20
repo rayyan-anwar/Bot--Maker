@@ -30,3 +30,11 @@ test('saved bot version snapshots reject malformed or unsupported configurations
  assert.equal(validateBotSnapshot(valid),true);
  for(const snapshot of [null,[],{...valid,name:''},{...valid,instructions:'x'.repeat(6001)},{...valid,provider:'unknown'},{...valid,temperature:3},{...valid,maxTokens:64},{...valid,responseStyle:'unsafe'},{...valid,safetyMode:'off'},{...valid,isPublic:'yes'}])assert.equal(validateBotSnapshot(snapshot),false);
 });
+
+
+test('Bot Studio dashboard exposes owner publish and unpublish controls',()=>{
+ assert.match(html,/class="bot-publish-toggle"/);
+ assert.match(html,/data-published=/);
+ assert.match(html,/api\('\/bots\/'\+encodeURIComponent\(id\)\+\'\/\'/);
+ assert.match(html,/const theirs = pub;/);
+});
