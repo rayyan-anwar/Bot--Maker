@@ -61,6 +61,8 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.equal(signup.status,201);
  const cookie=signup.headers.get('set-cookie');
  assert.ok(cookie&&cookie.includes('session='));
+ assert.match(cookie,/HttpOnly/i);
+ assert.match(cookie,/SameSite=Strict/i);
  const me=await fetch(base+'/api/auth/me',{headers:{cookie}});
  assert.equal(me.status,200);
  assert.equal((await me.json()).user.role,'user');
