@@ -1,4 +1,16 @@
 const test=require('node:test');const assert=require('node:assert/strict');const crypto=require('node:crypto');
+const {validEventId}=require('../server/billing');
+test('payment webhook event IDs reject blank, padded and oversized values',()=>{
+ assert.equal(validEventId('evt_123'),true);
+ assert.equal(validEventId('evt_'),true);
+ assert.equal(validEventId(''),false);
+ assert.equal(validEventId('   '),false);
+ assert.equal(validEventId(' evt_123'),false);
+ assert.equal(validEventId('evt_123 '),false);
+ assert.equal(validEventId('x'.repeat(256)),false);
+ assert.equal(validEventId(null),false);
+});
+
 const {signatureValid}=require('../server/billing');
 test('Stripe webhook signature validates raw body and rejects tampering',()=>{
  const secret='whsec_test_secret',timestamp=Math.floor(Date.now()/1000),body=Buffer.from(JSON.stringify({id:'evt_test'}));
