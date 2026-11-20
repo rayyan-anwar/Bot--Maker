@@ -33,6 +33,30 @@ test('administrator-only bot and document listing routes require the configured 
  const docs=await fetch(base+'/api/documents/'+bot.id,{headers:{cookie}});
  assert.equal(docs.status,200);
  assert.deepEqual((await docs.json()).documents,[]);
+
+ // A second account may view a public bot's safe metadata, but never its
+ // private instructions or owner-only mutation endpoints.
+ await store.insertAsync('users',{id:uuidv4(),email:'visitor@example.com',name:'Visitor',passwordHash:await bcrypt.hash('visitor-password-123',10),createdAt:new Date().toISOString()});
+ const visitorLogin=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'visitor@example.com',password:'visitor-password-123'})});
+ assert.equal(visitorLogin.status,200);
+ const visitorCookie=(visitorLogin.headers.get('set-cookie')||'').split(';')[0];
+ const publicDetail=await fetch(base+'/api/bots/'+bot.id,{headers:{cookie:visitorCookie}});
+ assert.equal(publicDetail.status,200);
+ const publicPayload=(await publicDetail.json()).bot;
+ assert.equal(publicPayload.name,'Test bot');
+ assert.equal(Object.hasOwn(publicPayload,'instructions'),false);
+ const visitorEdit=await fetch(base+'/api/bots/'+bot.id,{method:'PUT',headers:{cookie:visitorCookie,'content-type':'application/json'},body:JSON.stringify({name:'Hijacked'})});
+ assert.equal(visitorEdit.status,403);
+ const visitorDelete=await fetch(base+'/api/bots/'+bot.id,{method:'DELETE',headers:{cookie:visitorCookie}});
+ assert.equal(visitorDelete.status,403);
+ const privateBot=await fetch(base+'/api/bots',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({name:'Private bot',instructions:'Never expose these instructions.',isPublic:false})});
+ assert.equal(privateBot.status,201);
+ const privateId=(await privateBot.json()).bot.id;
+ const privateDetail=await fetch(base+'/api/bots/'+privateId,{headers:{cookie:visitorCookie}});
+ assert.equal(privateDetail.status,403);
+ const publicList=await fetch(base+'/api/bots/public',{headers:{cookie:visitorCookie}});
+ assert.equal(publicList.status,200);
+ assert.deepEqual((await publicList.json()).bots.map(item=>item.id),[bot.id]);
 });
 
 
