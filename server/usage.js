@@ -18,9 +18,9 @@ async function reserveAiBudget({provider,model,system,messages,maxTokens=1024}){
  if(!scope.rowCount)throw Object.assign(new Error('Configured AI budget scope does not exist.'),{status:503});
  const normalizedCurrency=String(pricing.currency||'USD').trim().toUpperCase();
  if(scope.rows[0].currency.trim()!==normalizedCurrency)throw Object.assign(new Error('AI pricing currency does not match the configured budget scope.'),{status:503});
- // Character count is a conservative input-token cap, avoiding under-reserving
- // when provider-specific tokenization is unavailable before the request.
- const inputTokenCap=[system,...(messages||[]).map(m=>m.content||'')].reduce((n,value)=>n+String(value).length,0);
+ // Tokenization is provider/model-specific. Use a 4x character allowance as a
+ // deliberately conservative preflight ceiling; actual usage settles the hold.
+ const inputTokenCap=[system,...(messages||[]).map(m=>m.content||'')].reduce((n,value)=>n+String(value).length,0)*4;
  if(!Number.isSafeInteger(inputTokenCap)||!Number.isSafeInteger(maxTokens)||maxTokens<1||maxTokens>32768)throw Object.assign(new Error('AI request token allowance is invalid.'),{status:400});
  const estimate=reserveEstimate({maxInputTokens:inputTokenCap,maxOutputTokens:maxTokens,pricing});
  if(!estimate.known||!Number.isFinite(estimate.cost))throw Object.assign(new Error('AI request cost cannot be estimated safely. Request blocked.'),{status:503});
