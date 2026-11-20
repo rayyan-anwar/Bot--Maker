@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {Pool}=require('pg');
 const DB_PATH=process.env.BOTFORGE_DATA_FILE||path.join(__dirname,'..','data','db.json');
-const COLLECTIONS=['users','bots','botVersions','documents','messages','usage','memory','webhookEvents','settings','aiEngineerRuns','aiEngineerApprovals'];
+const COLLECTIONS=['users','bots','botVersions','documents','messages','usage','memory','webhookEvents','settings','aiEngineerRuns','aiEngineerApprovals','socialOAuthStates'];
 let cache=null,pool=null,initialized=false,initializationPromise=null;
 const localReservations=new Map();
 function emptyDB(){return Object.fromEntries(COLLECTIONS.map(k=>[k,[]]));}
@@ -24,7 +24,7 @@ async function initialize(){
    pool=new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSL==='disable'?false:{rejectUnauthorized:process.env.PGSSL_REJECT_UNAUTHORIZED!=='false'},max:Number(process.env.PG_POOL_MAX||10),connectionTimeoutMillis:5000,idleTimeoutMillis:30000});
    try{
     await pool.query('SELECT 1');
-    await pool.query("CREATE TABLE IF NOT EXISTS botforge_records (collection text NOT NULL CHECK(collection IN ('users','bots','botVersions','documents','messages','usage','memory','settings','aiEngineerRuns','aiEngineerApprovals')), id uuid NOT NULL, data jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(collection,id))");
+    await pool.query("CREATE TABLE IF NOT EXISTS botforge_records (collection text NOT NULL CHECK(collection IN ('users','bots','botVersions','documents','messages','usage','memory','settings','aiEngineerRuns','aiEngineerApprovals','socialOAuthStates')), id uuid NOT NULL, data jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(collection,id))");
     await pool.query('CREATE INDEX IF NOT EXISTS botforge_records_collection_idx ON botforge_records(collection)');
     await pool.query('ALTER TABLE botforge_records DROP CONSTRAINT IF EXISTS botforge_records_collection_check');
     await pool.query("ALTER TABLE botforge_records ADD CONSTRAINT botforge_records_collection_check CHECK(collection IN ('users','bots','botVersions','documents','messages','usage','memory','settings','aiEngineerRuns','aiEngineerApprovals'))");
@@ -203,7 +203,19 @@ async function updateEngineerApproval(id,actorId,patch){
  if(!current||current.actorId!==actorId)return null;
  return updateByIdAsync('aiEngineerApprovals',id,{...patch,updatedAt:new Date().toISOString()});
 }
+async function consumeSocialOAuthState(stateHash,userId,platform,now=new Date()){
+ if(typeof stateHash!=='string'||typeof userId!=='string'||typeof platform!=='string')return null;
+ if(!isPostgres()){
+  const rows=all('socialOAuthStates'),index=rows.findIndex(row=>row.stateHash===stateHash);
+  if(index<0)return null;
+  const [record]=rows.splice(index,1);persist();
+  return record.userId===userId&&record.platform===platform&&Date.parse(record.expiresAt)>now.getTime()?record:null;
+ }
+ await initialize();
+ const result=await pool.query("DELETE FROM botforge_records WHERE collection='socialOAuthStates' AND data->>'stateHash'=$1 AND data->>'userId'=$2 AND data->>'platform'=$3 AND (data->>'expiresAt')::timestamptz>$4 RETURNING data",[stateHash,userId,platform,now]);
+ return result.rowCount?result.rows[0].data:null;
+}
 async function query(sql,values=[]){if(!isPostgres())throw new Error('Shared PostgreSQL storage is not configured.');await initialize();return pool.query(sql,values);}
 async function health(){if(!isPostgres())return {ok:true,database:'json-development'};try{await initialize();await pool.query('SELECT 1');return {ok:true,database:'postgres'};}catch(_){return {ok:false,database:'postgres'};}}
 async function close(){if(pool){await pool.end();pool=null;}initialized=false;}
-module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,query,health,load,persist};
+module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,consumeSocialOAuthState,query,health,load,persist};
