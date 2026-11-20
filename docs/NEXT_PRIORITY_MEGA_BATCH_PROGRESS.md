@@ -41,3 +41,12 @@ The staging smoke command is implemented, but no real staging URL was supplied o
 
 - Upload capacity and duplicate checks now run under a per-bot PostgreSQL advisory transaction lock, preventing concurrent requests from exceeding configured limits or inserting the same extracted content more than once. JSON development storage performs the same checks in one synchronous critical section.
 - Added PostgreSQL integration coverage for concurrent capacity and duplicate-upload races. CI for this latest integration-test commit is pending.
+
+
+## AI budget operations follow-up
+
+- Added bounded admin-only AI budget summary, reservation inspection and ledger inspection endpoints.
+- Added manual settlement for a reservation using a verified provider request ID and exact decimal actual-cost input. The database settlement function remains authoritative and refuses settlement above the reserved ceiling.
+- Added a partial PostgreSQL expiry index for open reservations. No automatic release job is enabled because an expired reservation may still represent a billable provider call after an application crash.
+- Added rate limiting for admin AI budget mutations and integration coverage for over-reservation attempts retaining the original hold.
+- Added CI coverage that verifies admin budget routes fail closed when PostgreSQL is unavailable. Latest CI for the final rate-limit commit is pending.
