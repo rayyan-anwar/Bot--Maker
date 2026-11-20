@@ -22,3 +22,11 @@ test('Bot Studio wizard exposes progress, navigation, and final create controls'
   assert.ok(html.includes('id="'+id+'"'),id);
  }
 });
+
+
+test('saved bot version snapshots reject malformed or unsupported configurations',()=>{
+ const {validateBotSnapshot}=require('../server/bots');
+ const valid={name:'Support bot',instructions:'Help customers safely.',description:'Support',provider:'openai',model:null,isPublic:false,purpose:'Support',audience:'Customers',welcomeMessage:'How can I help?',temperature:0.7,maxTokens:1024,responseStyle:'balanced',safetyMode:'standard'};
+ assert.equal(validateBotSnapshot(valid),true);
+ for(const snapshot of [null,[],{...valid,name:''},{...valid,instructions:'x'.repeat(6001)},{...valid,provider:'unknown'},{...valid,temperature:3},{...valid,maxTokens:64},{...valid,responseStyle:'unsafe'},{...valid,safetyMode:'off'},{...valid,isPublic:'yes'}])assert.equal(validateBotSnapshot(snapshot),false);
+});
