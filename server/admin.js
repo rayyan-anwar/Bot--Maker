@@ -154,6 +154,41 @@ router.post('/engineer/create-draft-pr',engineerWriteLimiter,requireEngineerEnab
   res.status(201).json({ok:true,draft:true,reused:false,branch:newBranch,pullRequestNumber:data.number,url:data.html_url,merged:false,deployed:false});
  }catch(e){next(e);}
 });
+// PostgreSQL AI budget controls. Admin router is already authenticated and admin-only.
+router.get('/ai-budget/control',async(req,res,next)=>{
+ try{
+  if(!store.isPostgres())return res.status(503).json({error:'AI budget controls require PostgreSQL storage.'});
+  const result=await store.query('SELECT emergency_stop,updated_at,updated_by FROM ai_budget_controls WHERE id=1');
+  if(!result.rowCount)return res.status(503).json({error:'AI budget control row is not initialized. Apply migrations 008 and 009.'});
+  res.json({emergencyStop:result.rows[0].emergency_stop,updatedAt:result.rows[0].updated_at,updatedBy:result.rows[0].updated_by});
+ }catch(e){next(e);}
+});
+router.put('/ai-budget/control',async(req,res,next)=>{
+ try{
+  if(!store.isPostgres())return res.status(503).json({error:'AI budget controls require PostgreSQL storage.'});
+  if(typeof req.body?.emergencyStop!=='boolean')return res.status(400).json({error:'emergencyStop must be a boolean.'});
+  const result=await store.query('UPDATE ai_budget_controls SET emergency_stop=$1,updated_at=NOW(),updated_by=$2 WHERE id=1 RETURNING emergency_stop,updated_at,updated_by',[req.body.emergencyStop,String(req.user?.id||'admin').slice(0,200)]);
+  if(!result.rowCount)return res.status(503).json({error:'AI budget control row is not initialized. Apply migrations 008 and 009.'});
+  res.json({emergencyStop:result.rows[0].emergency_stop,updatedAt:result.rows[0].updated_at,updatedBy:result.rows[0].updated_by});
+ }catch(e){next(e);}
+});
+router.get('/ai-budget/scopes',async(req,res,next)=>{
+ try{
+  if(!store.isPostgres())return res.status(503).json({error:'AI budget controls require PostgreSQL storage.'});
+  const result=await store.query('SELECT id,scope_type,scope_key,currency,limit_amount,reserved_amount,spent_amount,window_start,window_end,updated_at FROM ai_budget_scopes ORDER BY updated_at DESC LIMIT 200');
+  res.json({scopes:result.rows});
+ }catch(e){next(e);}
+});
+router.patch('/ai-budget/scopes/:scopeId',async(req,res,next)=>{
+ try{
+  if(!store.isPostgres())return res.status(503).json({error:'AI budget controls require PostgreSQL storage.'});
+  const limit=req.body?.limitAmount;
+  if(typeof limit!=='number'||!Number.isFinite(limit)||limit<0||limit>1000000000)return res.status(400).json({error:'limitAmount must be a finite number from 0 to 1,000,000,000.'});
+  const result=await store.query('UPDATE ai_budget_scopes SET limit_amount=$1,updated_at=NOW() WHERE id=$2::uuid AND $1 >= reserved_amount+spent_amount RETURNING id,scope_type,scope_key,currency,limit_amount,reserved_amount,spent_amount,window_start,window_end,updated_at',[limit,req.params.scopeId]);
+  if(!result.rowCount)return res.status(409).json({error:'Scope not found or limit is below already reserved plus spent amount.'});
+  res.json({scope:result.rows[0]});
+ }catch(e){if(e.code==='22P02')return res.status(400).json({error:'Invalid scope ID.'});next(e);}
+});
 router.get('/users',async(req,res,next)=>{try{const q=String(req.query.q||'').trim().toLowerCase().slice(0,120),users=(await store.allAsync('users')).filter(u=>!q||String(u.email||'').toLowerCase().includes(q)).slice(0,100).map(u=>({id:u.id,email:u.email,name:u.name,plan:plans.getPlanName(u)}));res.json({users});}catch(e){next(e);}});
 router.put('/users/:userId/plan',async(req,res,next)=>{try{const {plan}=req.body||{},available=plans.getPlans();if(typeof plan!=='string'||!Object.prototype.hasOwnProperty.call(available,plan))return res.status(400).json({error:'Select a configured plan.'});const user=await store.findByIdAsync('users',req.params.userId);if(!user)return res.status(404).json({error:'User not found.'});const updated=await store.updateByIdAsync('users',user.id,{plan});res.json({user:{id:updated.id,email:updated.email,plan:plans.getPlanName(updated),dailyMessageLimit:plans.getDailyLimit(updated)}});}catch(e){next(e);}});
 module.exports={router};
