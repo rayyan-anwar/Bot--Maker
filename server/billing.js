@@ -16,7 +16,7 @@ function signatureValid(raw,header,secret){
   if(key==='t')timestamps.push(value);
   else if(key==='v1')signatures.push(value);
  }
- if(timestamps.length!==1||!/^\\d{1,12}$/.test(timestamps[0])||!signatures.length)return false;
+ if(timestamps.length!==1||!/^\d{1,12}$/.test(timestamps[0])||!signatures.length)return false;
  const timestamp=Number(timestamps[0]);
  if(!Number.isSafeInteger(timestamp)||Math.abs(Date.now()/1000-timestamp)>300)return false;
  const expected=crypto.createHmac('sha256',secret).update(String(timestamp)+'.').update(raw).digest('hex');
