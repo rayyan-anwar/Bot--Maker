@@ -93,3 +93,13 @@ test('Fortisni session resets emotional continuity for explicit work and assista
   assert.equal(session.reset(), 'idle');
   assert.deepEqual(session.snapshot(), { state: 'idle', neutralTurns: 0 });
 });
+
+
+test('Fortisni styles provide distinct expressions and respect reduced motion', () => {
+  const css = fs.readFileSync(path.join(__dirname, '../public/css/fortisni.css'), 'utf8');
+  for (const state of ['happy', 'sad', 'concerned', 'curious', 'confused', 'angry', 'grateful']) {
+    assert.match(css, new RegExp('data-state="' + state + '"'));
+  }
+  assert.match(css, /@keyframes fortisni-blink/);
+  assert.match(css, /prefers-reduced-motion:reduce/);
+});
