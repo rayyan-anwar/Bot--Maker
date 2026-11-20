@@ -6,11 +6,11 @@ async function main(){
  const client=new Client({connectionString:process.env.BOTFORGE_TEST_DATABASE_URL});
  await client.connect();
  try{
-  for(const name of ['001_initial_schema.sql','002_runtime_records.sql','003_oauth_and_profile_memory.sql','004_ai_budget_ledger.sql']){
+  for(const name of ['001_initial_schema.sql','002_runtime_records.sql','003_oauth_and_profile_memory.sql','004_ai_budget_ledger.sql','005_atomic_budget_reserve.sql']){
    const sql=fs.readFileSync(path.join(__dirname,'..','migrations',name),'utf8');
    await client.query(sql);
   }
-  process.stdout.write('PostgreSQL test migrations applied.\n');
+  process.stdout.write('PostgreSQL test migrations applied.\\n');
  }finally{await client.end();}
 }
-main().catch(error=>{process.stderr.write('Test migration failed: '+error.message+'\n');process.exitCode=1;});
+main().catch(error=>{process.stderr.write('Test migration failed: '+error.message+'\\n');process.exitCode=1;});
