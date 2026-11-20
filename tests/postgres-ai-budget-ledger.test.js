@@ -72,3 +72,38 @@ test('PostgreSQL AI budget ledger transitions, idempotency and reconciliation', 
   throw error;
  }finally{await client.end();}
 });
+
+test('parallel reservations serialize by request key across clients', {skip:!process.env.BOTFORGE_TEST_DATABASE_URL}, async()=>{
+ const a=new Client({connectionString:process.env.BOTFORGE_TEST_DATABASE_URL});
+ const b=new Client({connectionString:process.env.BOTFORGE_TEST_DATABASE_URL});
+ const setup=new Client({connectionString:process.env.BOTFORGE_TEST_DATABASE_URL});
+ await Promise.all([a.connect(),b.connect(),setup.connect()]);
+ let scopeA,scopeB;
+ const key='concurrent-reserve-'+Date.now();
+ try{
+  const insertScope=async(scopeKey)=> (await setup.query(
+   `INSERT INTO ai_budget_scopes(scope_type,scope_key,currency,limit_amount,window_start,window_end)
+    VALUES('global',$1,'USD',5,NOW()-INTERVAL '1 minute',NOW()+INTERVAL '1 hour') RETURNING id`,
+   [scopeKey]
+  )).rows[0].id;
+  scopeA=await insertScope('concurrency-a-'+Date.now());
+  scopeB=await insertScope('concurrency-b-'+Date.now());
+  const reserve=(client,scope)=>client.query(
+   'SELECT botforge_reserve_ai_budget($1,$2,$3,$4,$5,$6,$7,NULL) AS id',
+   [key,scope,'test-model','test-price-v1',1000,1000,2]
+  );
+  const sameScope=await Promise.all([reserve(a,scopeA),reserve(b,scopeA)]);
+  assert.equal(sameScope[0].rows[0].id,sameScope[1].rows[0].id,'parallel retries should return same reservation');
+  await assert.rejects(reserve(b,scopeB),/idempotency key reused with different reservation parameters/);
+  const counts=await setup.query('SELECT reserved_amount FROM ai_budget_scopes WHERE id=$1',[scopeA]);
+  assert.equal(Number(counts.rows[0].reserved_amount),2,'budget should reserve only once');
+ }finally{
+  if(scopeA||scopeB){
+   const ids=[scopeA,scopeB].filter(Boolean);
+   await setup.query('DELETE FROM ai_budget_ledger_entries WHERE scope_id=ANY($1::uuid[])',[ids]);
+   await setup.query('DELETE FROM ai_budget_reservations WHERE scope_id=ANY($1::uuid[])',[ids]);
+   await setup.query('DELETE FROM ai_budget_scopes WHERE id=ANY($1::uuid[])',[ids]);
+  }
+  await Promise.all([a.end(),b.end(),setup.end()]);
+ }
+});
