@@ -147,3 +147,20 @@ test('knowledge base enforces per-bot document count and total text capacity',()
  assert.equal(getDocumentCapacityError(nearLimit,'x'),null);
  assert.throws(()=>getDocumentCapacityError([],null),TypeError);
 });
+
+
+test('knowledge document storage atomically enforces per-bot duplicate and capacity guards',async()=>{
+ const store=require('../server/store'),{v4:uuidv4}=require('uuid'),botId=uuidv4();
+ const first={id:uuidv4(),botId,contentHash:documentContentHash('alpha'),characterCount:5,chunks:[{id:uuidv4(),text:'alpha'}],filename:'alpha.txt'};
+ const inserted=await store.insertDocumentWithinCapacity(first,{maxDocuments:2,maxCharacters:10});
+ assert.equal(inserted.inserted,true);
+ const duplicate=await store.insertDocumentWithinCapacity({...first,id:uuidv4()},{maxDocuments:2,maxCharacters:10});
+ assert.equal(duplicate.inserted,false);assert.equal(duplicate.reason,'duplicate');assert.equal(duplicate.document.id,first.id);
+ const second={id:uuidv4(),botId,contentHash:documentContentHash('bravo'),characterCount:5,chunks:[{id:uuidv4(),text:'bravo'}],filename:'bravo.txt'};
+ assert.equal((await store.insertDocumentWithinCapacity(second,{maxDocuments:2,maxCharacters:10})).inserted,true);
+ const countLimit=await store.insertDocumentWithinCapacity({...second,id:uuidv4(),contentHash:documentContentHash('charlie')},{maxDocuments:2,maxCharacters:100});
+ assert.equal(countLimit.reason,'document_limit');
+ const otherBot=uuidv4(),textLimit=await store.insertDocumentWithinCapacity({...second,id:uuidv4(),botId:otherBot,contentHash:documentContentHash('123456') ,characterCount:6,chunks:[{text:'123456'}]},{maxDocuments:2,maxCharacters:5});
+ assert.equal(textLimit.reason,'character_limit');
+ for(const doc of [first,second])await store.deleteByIdAsync('documents',doc.id);
+});
