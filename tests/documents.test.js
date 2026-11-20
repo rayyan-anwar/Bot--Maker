@@ -109,3 +109,18 @@ test('text extraction rejects a PDF signature with a non-PDF extension',async()=
   await assert.rejects(()=>extractText(file,'misnamed.md'),/does not match/);
  });
 });
+
+
+test('public document metadata does not count malformed vectors as indexed',()=>{
+ const result=publicDoc({id:'doc-vectors',chunks:[
+  {text:'valid',embedding:[0.1,0.2]},
+  {text:'nan',embedding:[0.1,Number.NaN]},
+  {text:'string',embedding:[0.1,'0.2']},
+  {text:'empty',embedding:[]},
+  {text:'missing'}
+ ]});
+ assert.equal(result.chunkCount,5);
+ assert.equal(result.indexedChunkCount,1);
+ assert.equal(result.semanticSearchAvailable,false);
+});
+
