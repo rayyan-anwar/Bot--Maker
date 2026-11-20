@@ -113,3 +113,25 @@ test('expired AI Engineer proposals cannot be claimed',async()=>{
   fs.rmSync(dir,{recursive:true,force:true});
  }
 });
+
+
+test('AI Engineer audit accepts only canonical repository paths',async()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-engineer-path-audit-'));
+ const previousFile=process.env.BOTFORGE_DATA_FILE,previousUrl=process.env.DATABASE_URL;
+ delete process.env.DATABASE_URL;process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
+ const storePath=require.resolve('../server/store'),controlPath=require.resolve('../server/engineer-control');
+ delete require.cache[controlPath];delete require.cache[storePath];
+ const store=require('../server/store'),control=require('../server/engineer-control');
+ try{
+  for(const filePath of ['server/auth.js','tests/auth.test.js'])await control.appendAudit({actorId:'admin',method:'POST',route:'/engineer/propose-fix',statusCode:200,filePath});
+  for(const filePath of ['server/../secrets.js','server\\\\auth.js','server/%2e%2e/secrets.js','public/app.js','server/notes.ts'])await control.appendAudit({actorId:'admin',method:'POST',route:'/engineer/propose-fix',statusCode:200,filePath});
+  const rows=await control.listAudit(20);
+  assert.equal(rows.filter(row=>row.filePath!==null).length,2);
+  assert.deepEqual(rows.filter(row=>row.filePath).map(row=>row.filePath).sort(),['server/auth.js','tests/auth.test.js']);
+ }finally{
+  await store.close();delete require.cache[controlPath];delete require.cache[storePath];
+  if(previousFile===undefined)delete process.env.BOTFORGE_DATA_FILE;else process.env.BOTFORGE_DATA_FILE=previousFile;
+  if(previousUrl===undefined)delete process.env.DATABASE_URL;else process.env.DATABASE_URL=previousUrl;
+  fs.rmSync(dir,{recursive:true,force:true});
+ }
+});
