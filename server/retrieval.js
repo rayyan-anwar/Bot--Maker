@@ -115,13 +115,14 @@ async function topChunksHybrid(documents,query,k=4){
  if(!embeddings.enabled())return keyword.slice(0,k);
  try{
   const [queryVector]=await embeddings.embedTexts([query]);
-  const lexicalScores=new Map(keyword.map(item=>[item.chunkId,item.score]));
+  const lexicalScores=new Map(keyword.filter(item=>item.chunkId).map(item=>[item.chunkId,item.score]));
+  const maxLexicalScore=Math.max(0,...lexicalScores.values());
   const candidates=[];
   for(const doc of documents)for(const chunk of Array.isArray(doc?.chunks)?doc.chunks:[]){
    if(!chunk||typeof chunk.text!=='string')continue;
    const semantic=cosineSimilarity(queryVector,chunk.embedding);
    const lexical=lexicalScores.get(chunk.id)||0;
-   if(semantic>0||lexical>0)candidates.push({text:chunk.text,filename:doc.filename,documentId:doc.id,chunkId:chunk.id,score:semantic*0.75+(lexical?Math.min(lexical/8,1)*0.25:0),semanticScore:semantic,keywordScore:lexical});
+   if(semantic>0||lexical>0)candidates.push({text:chunk.text,filename:doc.filename,documentId:doc.id,chunkId:chunk.id,score:semantic*0.75+(lexical&&maxLexicalScore?lexical/maxLexicalScore*0.25:0),semanticScore:semantic,keywordScore:lexical});
   }
   candidates.sort((a,b)=>b.score-a.score||String(a.filename).localeCompare(String(b.filename))||String(a.chunkId).localeCompare(String(b.chunkId)));
   return candidates.slice(0,k);
