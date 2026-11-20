@@ -19,6 +19,14 @@ test('single-administrator startup requires a valid owner email',()=>{
   assert.equal(validateSingleAdminConfig(),true);
   process.env.BOTFORGE_ADMIN_EMAIL='owner+tag@example.co.in';
   assert.equal(validateSingleAdminConfig(),true);
+  process.env.NODE_ENV='production';
+  process.env.BOTFORGE_ADMIN_EMAIL='owner@example.com';
+  process.env.JWT_SECRET='';
+  assert.throws(()=>validateSingleAdminConfig(),/JWT_SECRET must contain at least 32 characters/);
+  process.env.JWT_SECRET='short-secret';
+  assert.throws(()=>validateSingleAdminConfig(),/JWT_SECRET must contain at least 32 characters/);
+  process.env.JWT_SECRET='production-test-secret-with-more-than-thirty-two-characters';
+  assert.equal(validateSingleAdminConfig(),true);
  }finally{if(previousEnv===undefined)delete process.env.NODE_ENV;else process.env.NODE_ENV=previousEnv;if(previousFlag===undefined)delete process.env.BOTFORGE_SINGLE_ADMIN;else process.env.BOTFORGE_SINGLE_ADMIN=previousFlag;if(previousEmail===undefined)delete process.env.BOTFORGE_ADMIN_EMAIL;else process.env.BOTFORGE_ADMIN_EMAIL=previousEmail;if(previousJwt===undefined)delete process.env.JWT_SECRET;else process.env.JWT_SECRET=previousJwt;delete require.cache[require.resolve('../server/index')];}
 });
 
