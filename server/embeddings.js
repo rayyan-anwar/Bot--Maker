@@ -11,8 +11,13 @@ async function embedTexts(inputs){
    const response=await fetch('https://api.openai.com/v1/embeddings',{method:'POST',signal:controller.signal,headers:{'content-type':'application/json',authorization:'Bearer '+process.env.OPENAI_API_KEY},body:JSON.stringify({model:MODEL,input:batch,encoding_format:'float'})});
    let data={};try{data=await response.json();}catch(_){}
    if(!response.ok)throw new Error('Embedding provider request failed ('+response.status+').');
-   const rows=(data.data||[]).slice().sort((a,b)=>a.index-b.index);
-   if(rows.length!==batch.length||rows.some(row=>!Array.isArray(row.embedding)||!row.embedding.length||row.embedding.some(value=>!Number.isFinite(value))))throw new Error('Embedding provider returned an invalid vector batch.');
+   const rows=data&&Array.isArray(data.data)?data.data.slice():[];
+   if(rows.length!==batch.length||rows.some(row=>!row||!Number.isInteger(row.index)||row.index<0||row.index>=batch.length||!Array.isArray(row.embedding)||!row.embedding.length||row.embedding.some(value=>!Number.isFinite(value))))throw new Error('Embedding provider returned an invalid vector batch.');
+   const indices=new Set(rows.map(row=>row.index));
+   if(indices.size!==batch.length)throw new Error('Embedding provider returned duplicate vector indexes.');
+   rows.sort((a,b)=>a.index-b.index);
+   const dimensions=rows[0].embedding.length;
+   if(rows.some(row=>row.embedding.length!==dimensions)||vectors.length&&vectors[0].length!==dimensions)throw new Error('Embedding provider returned inconsistent vector dimensions.');
    vectors.push(...rows.map(row=>row.embedding));
   }catch(error){
    if(error.name==='AbortError')throw new Error('Embedding provider request timed out.');
