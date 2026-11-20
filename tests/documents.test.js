@@ -7,7 +7,7 @@ const suiteDir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-doc-suite-'));
 process.env.NODE_ENV='test';
 process.env.JWT_SECRET='upload-limit-test-secret-with-at-least-thirty-two-characters';
 process.env.BOTFORGE_DATA_FILE=path.join(suiteDir,'db.json');
-const {extractText,publicDoc}=require('../server/documents');
+const {extractText,publicDoc,getDocumentCapacityError,documentContentHash,MAX_DOCUMENTS_PER_BOT,MAX_DOCUMENT_TEXT_PER_BOT}=require('../server/documents');
 
 async function withFile(name,bytes,fn){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-doc-'));
@@ -124,3 +124,26 @@ test('public document metadata does not count malformed vectors as indexed',()=>
  assert.equal(result.semanticSearchAvailable,false);
 });
 
+
+
+test('knowledge base content hash is stable and changes with document content',()=>{
+ assert.equal(documentContentHash('same content'),documentContentHash('same content'));
+ assert.notEqual(documentContentHash('same content'),documentContentHash('different content'));
+ assert.throws(()=>documentContentHash(null),TypeError);
+});
+
+test('knowledge base rejects duplicate documents by exact extracted content',()=>{
+ const hash=documentContentHash('duplicate body');
+ const existing=[{id:'existing-doc',contentHash:hash}];
+ assert.equal(existing.find(doc=>doc.contentHash===documentContentHash('duplicate body')).id,'existing-doc');
+ assert.equal(existing.find(doc=>doc.contentHash===documentContentHash('different body')),undefined);
+});
+
+test('knowledge base enforces per-bot document count and total text capacity',()=>{
+ const fifty=Array.from({length:MAX_DOCUMENTS_PER_BOT},(_,i)=>({chunks:[{text:'x'}]}));
+ assert.match(getDocumentCapacityError(fifty,'new'),/50-document limit/);
+ const nearLimit=[{chunks:[{text:'x'.repeat(MAX_DOCUMENT_TEXT_PER_BOT-1)}]}];
+ assert.match(getDocumentCapacityError(nearLimit,'xx'),/5-million-character/);
+ assert.equal(getDocumentCapacityError(nearLimit,'x'),null);
+ assert.throws(()=>getDocumentCapacityError([],null),TypeError);
+});
