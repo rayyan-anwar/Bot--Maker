@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "BotForge",
+  "short_name": "BotForge",
+  "description": "Build, train and deploy AI assistants.",
+  "lang": "en",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#101827",
+  "theme_color": "#101827",
+  "categories": [
+    "business",
+    "productivity",
+    "developer"
+  ],
+  "icons": [
+    {
+      "src": "/images/botforge-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
