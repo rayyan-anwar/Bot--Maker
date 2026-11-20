@@ -10,7 +10,9 @@ process.env.BOTFORGE_ADMIN_EMAIL='social-owner@example.test';
 process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
 delete process.env.DATABASE_URL;
 const {start,shutdown}=require('../server/index');
+process.env.BOTFORGE_SOCIAL_TOKEN_ENCRYPTION_KEY=require('node:crypto').randomBytes(32).toString('base64');
 const store=require('../server/store');
+const social=require('../server/social-intelligence');
 const bcrypt=require('bcryptjs');
 const {v4:uuidv4}=require('uuid');
 let server,base,cookie;
@@ -48,4 +50,19 @@ test('authenticated user can list safe platform capabilities and create a PKCE s
 test('unsupported platform cannot create an OAuth state',async()=>{
  const response=await fetch(base+'/api/social/unknown/oauth/state',{method:'POST',headers:{cookie}});
  assert.equal(response.status,404);
+});
+
+
+test('social connection listing and disconnect are scoped to the authenticated account',async()=>{
+ const user=(await store.findManyAsync('users',{email:'social-owner@example.test'}))[0];
+ const connection=await social.connectAccount({userId:user.id,platform:'linkedin',platformAccountId:'org-42',displayName:'Example organization',scopes:['organization.read'],accessToken:'integration-secret-token'});
+ const listed=await fetch(base+'/api/social/connections',{headers:{cookie}});
+ assert.equal(listed.status,200);
+ assert.equal((await listed.json()).connections[0].id,connection.id);
+ const denied=await fetch(base+'/api/social/connections/'+uuidv4(),{method:'DELETE',headers:{cookie}});
+ assert.equal(denied.status,404);
+ const removed=await fetch(base+'/api/social/connections/'+connection.id,{method:'DELETE',headers:{cookie}});
+ assert.equal(removed.status,200);
+ assert.equal((await removed.json()).ok,true);
+ assert.deepEqual(await social.listConnections(user.id),[]);
 });
