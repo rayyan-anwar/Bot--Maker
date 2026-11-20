@@ -24,7 +24,7 @@ const PROVIDERS = {
       const response = await fetch('https://api.openai.com/v1/responses', {
         method:'POST', signal,
         headers:{'content-type':'application/json', authorization:'Bearer '+process.env.OPENAI_API_KEY},
-        body:JSON.stringify({model, max_output_tokens:maxTokens, input})
+        body:JSON.stringify({model, max_output_tokens:maxTokens, temperature, input})
       });
       const data=await safeJson(response);
       if(!response.ok) throw providerError('OpenAI',response.status,data);
@@ -108,8 +108,8 @@ async function generateStream({provider='anthropic',model,system,messages,maxTok
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
  try{
   if(provider==='anthropic')response=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',signal:controller.signal,headers:{'content-type':'application/json','x-api-key':process.env.ANTHROPIC_API_KEY,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:actualModel,max_tokens:maxTokens,temperature,system,messages,stream:true})});
-  else if(provider==='openai'){const input=[{role:'system',content:[{type:'input_text',text:system}]},...messages.map(m=>({role:m.role,content:[{type:'input_text',text:m.content}]}))];response=await fetch('https://api.openai.com/v1/responses',{method:'POST',signal:controller.signal,headers:{'content-type':'application/json',authorization:'Bearer '+process.env.OPENAI_API_KEY},body:JSON.stringify({model:actualModel,max_output_tokens:maxTokens,input,stream:true})});}
-  else {const url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(actualModel)+':streamGenerateContent?alt=sse';const contents=messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));response=await fetch(url,{method:'POST',signal:controller.signal,headers:{'content-type':'application/json','x-goog-api-key':process.env.GOOGLE_GEMINI_API_KEY},body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents,generationConfig:{maxOutputTokens:maxTokens}})});}
+  else if(provider==='openai'){const input=[{role:'system',content:[{type:'input_text',text:system}]},...messages.map(m=>({role:m.role,content:[{type:'input_text',text:m.content}]}))];response=await fetch('https://api.openai.com/v1/responses',{method:'POST',signal:controller.signal,headers:{'content-type':'application/json',authorization:'Bearer '+process.env.OPENAI_API_KEY},body:JSON.stringify({model:actualModel,max_output_tokens:maxTokens,temperature,input,stream:true})});}
+  else {const url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(actualModel)+':streamGenerateContent?alt=sse';const contents=messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));response=await fetch(url,{method:'POST',signal:controller.signal,headers:{'content-type':'application/json','x-goog-api-key':process.env.GOOGLE_GEMINI_API_KEY},body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents,generationConfig:{maxOutputTokens:maxTokens,temperature}})});}
   return await streamProviderResponse(response,provider,onToken);
  }catch(error){if(error.name==='AbortError')throw new Error('The AI provider timed out. Please try again.');throw error;}finally{clearTimeout(timer);}
 }
