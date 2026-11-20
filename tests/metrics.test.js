@@ -11,3 +11,11 @@ test('metrics output uses Prometheus text exposition',()=>{
  assert.match(output,/botforge_http_requests_total/);
  assert.match(output,/botforge_process_uptime_seconds/);
 });
+
+
+test('metrics expose process memory gauges for production monitoring',()=>{
+ const output=metrics.render();
+ assert.match(output,/botforge_process_resident_memory_bytes [0-9]+/);
+ assert.match(output,/botforge_process_heap_used_bytes [0-9]+/);
+ assert.match(output,/botforge_process_heap_total_bytes [0-9]+/);
+});
