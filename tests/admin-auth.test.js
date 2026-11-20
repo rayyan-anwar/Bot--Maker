@@ -145,6 +145,14 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.equal(adminLogin.status,200);
  assert.equal((await adminLogin.json()).user.role,'admin');
  const adminCookie=adminLogin.headers.get('set-cookie');
+ const budgetSummary=await fetch(base+'/api/admin/ai-budget/summary',{headers:{cookie:adminCookie}});
+ assert.equal(budgetSummary.status,503,'budget observability must fail closed outside PostgreSQL');
+ const budgetReservations=await fetch(base+'/api/admin/ai-budget/reservations?state=reserved',{headers:{cookie:adminCookie}});
+ assert.equal(budgetReservations.status,503,'reservation inspection must require PostgreSQL');
+ const budgetLedger=await fetch(base+'/api/admin/ai-budget/ledger?limit=50',{headers:{cookie:adminCookie}});
+ assert.equal(budgetLedger.status,503,'ledger inspection must require PostgreSQL');
+ const budgetSettle=await fetch(base+'/api/admin/ai-budget/reservations/not-a-uuid/settle',{method:'POST',headers:{cookie:adminCookie,'content-type':'application/json'},body:JSON.stringify({actualAmount:'0.01',providerRequestId:'verified-provider-invoice-1'})});
+ assert.equal(budgetSettle.status,503,'manual settlement must require PostgreSQL');
  const controlUrl=base+'/api/admin/engineer/control',adminHeaders={cookie:adminCookie,'content-type':'application/json'};
  assert.equal((await fetch(controlUrl,{headers:{cookie:adminCookie}})).status,200);
  assert.equal((await fetch(controlUrl,{method:'PUT',headers:adminHeaders,body:JSON.stringify({enabled:false})})).status,200);
