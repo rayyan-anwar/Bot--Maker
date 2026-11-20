@@ -15,6 +15,10 @@ test('single-administrator startup requires a valid owner email',()=>{
   assert.throws(()=>validateSingleAdminConfig(),/BOTFORGE_ADMIN_EMAIL must be set/);
   process.env.BOTFORGE_ADMIN_EMAIL='not-an-email';
   assert.throws(()=>validateSingleAdminConfig(),/BOTFORGE_ADMIN_EMAIL must be set/);
+  process.env.BOTFORGE_ADMIN_EMAIL='owner @example.com';
+  assert.throws(()=>validateSingleAdminConfig(),/BOTFORGE_ADMIN_EMAIL must be set/);
+  process.env.BOTFORGE_ADMIN_EMAIL='a'.repeat(250)+'@example.com';
+  assert.throws(()=>validateSingleAdminConfig(),/BOTFORGE_ADMIN_EMAIL must be set/);
   process.env.BOTFORGE_ADMIN_EMAIL='owner@example.com';
   assert.equal(validateSingleAdminConfig(),true);
   process.env.BOTFORGE_ADMIN_EMAIL='owner+tag@example.co.in';
