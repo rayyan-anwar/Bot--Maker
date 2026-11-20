@@ -14,14 +14,16 @@ test('PostgreSQL AI budget ledger transitions and reconciliation', {skip:!proces
   );
   const scopeId=scopeResult.rows[0].id;
 
+  const settleKey='req-settle-'+Date.now();
   const reservation=(await client.query(
    'SELECT botforge_reserve_ai_budget($1,$2,$3,$4,$5,$6,$7,NULL) AS id',
-   ['req-settle-'+Date.now(),scopeId,'test-model','test-price-v1',1000,1000,4]
+   [settleKey,scopeId,'test-model','test-price-v1',1000,1000,4]
   )).rows[0].id;
   const duplicate=(await client.query(
    'SELECT botforge_reserve_ai_budget($1,$2,$3,$4,$5,$6,$7,NULL) AS id',
-   ['req-settle-'+Date.now(),scopeId,'test-model','test-price-v1',1000,1000,4]
+   [settleKey,scopeId,'test-model','test-price-v1',1000,1000,4]
   )).rows[0].id;
+  assert.equal(duplicate,reservation);
   // The same idempotency key is checked separately below using the stable key.
   assert.ok(reservation);
   assert.ok(duplicate);
