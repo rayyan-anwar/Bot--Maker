@@ -1,9 +1,10 @@
 'use strict';
 
 const crypto=require('node:crypto');
+const {v4:uuidv4}=require('uuid');
+const store=require('./store');
 const STATE_TTL_MS=10*60*1000;
 const MAX_PENDING_STATES=10000;
-const pending=new Map();
 const PLATFORMS=Object.freeze({
  instagram:{label:'Instagram',env:'BOTFORGE_INSTAGRAM_CLIENT_ID',capabilities:['profile','insights','media.read'],requiresAppReview:true},
  youtube:{label:'YouTube',env:'BOTFORGE_YOUTUBE_CLIENT_ID',capabilities:['profile','analytics','videos.read'],requiresAppReview:true},
@@ -12,25 +13,28 @@ const PLATFORMS=Object.freeze({
 function getPlatforms(){
  return Object.entries(PLATFORMS).map(([id,p])=>({id,label:p.label,configured:!!process.env[p.env],capabilities:[...p.capabilities],publishingAvailable:false,liveOAuthAvailable:false,requiresAppReview:p.requiresAppReview}));
 }
-function createOAuthState(userId,platform,now=Date.now()){
+function hash(value){return crypto.createHash('sha256').update(value).digest('hex');}
+function createPkcePair(){
+ const verifier=crypto.randomBytes(32).toString('base64url');
+ const challenge=crypto.createHash('sha256').update(verifier).digest('base64url');
+ return {verifier,challenge,method:'S256'};
+}
+async function createOAuthState(userId,platform,now=new Date()){
  if(typeof userId!=='string'||!userId.trim()||userId.length>128)throw new TypeError('A valid authenticated user ID is required.');
  if(!Object.prototype.hasOwnProperty.call(PLATFORMS,platform))throw new TypeError('Unsupported social platform.');
- if(pending.size>=MAX_PENDING_STATES)for(const [key,value] of pending)if(value.expiresAt<=now)pending.delete(key);
- if(pending.size>=MAX_PENDING_STATES)throw new Error('Too many pending social authorization attempts.');
- const state=crypto.randomBytes(32).toString('base64url');
- pending.set(state,{userId,platform,createdAt:now,expiresAt:now+STATE_TTL_MS});
- return {state,expiresAt:now+STATE_TTL_MS};
+ if(!(now instanceof Date)||!Number.isFinite(now.getTime()))throw new TypeError('A valid creation time is required.');
+ const existing=await store.findManyAsync('socialOAuthStates');
+ const expired=existing.filter(row=>!row.expiresAt||Date.parse(row.expiresAt)<=now.getTime());
+ for(const row of expired)await store.deleteByIdAsync('socialOAuthStates',row.id);
+ if(existing.length-expired.length>=MAX_PENDING_STATES)throw new Error('Too many pending social authorization attempts.');
+ const state=crypto.randomBytes(32).toString('base64url'),pkce=createPkcePair(),expiresAt=new Date(now.getTime()+STATE_TTL_MS);
+ await store.insertAsync('socialOAuthStates',{id:uuidv4(),stateHash:hash(state),userId,platform,codeVerifier:pkce.verifier,createdAt:now.toISOString(),expiresAt:expiresAt.toISOString()});
+ return {state,codeChallenge:pkce.challenge,codeChallengeMethod:pkce.method,expiresAt:expiresAt.toISOString()};
 }
-function consumeOAuthState(state,userId,platform,now=Date.now()){
- if(typeof state!=='string'||state.length!==43||typeof userId!=='string')return false;
- const record=pending.get(state);
- if(!record)return false;
- pending.delete(state);
- return record.expiresAt>now&&record.userId===userId&&record.platform===platform;
+async function consumeOAuthState(state,userId,platform,now=new Date()){
+ if(typeof state!=='string'||state.length!==43||typeof userId!=='string'||!(now instanceof Date)||!Number.isFinite(now.getTime()))return null;
+ const record=await store.consumeSocialOAuthState(hash(state),userId,platform,now);
+ if(!record)return null;
+ return {userId:record.userId,platform:record.platform,codeVerifier:record.codeVerifier};
 }
-function pendingStateCount(){return pending.size;}
-function clearExpiredStates(now=Date.now()){
- let removed=0;for(const [key,value] of pending)if(value.expiresAt<=now){pending.delete(key);removed++;}
- return removed;
-}
-module.exports={PLATFORMS,getPlatforms,createOAuthState,consumeOAuthState,pendingStateCount,clearExpiredStates,STATE_TTL_MS};
+module.exports={PLATFORMS,getPlatforms,createOAuthState,consumeOAuthState,createPkcePair,STATE_TTL_MS};
