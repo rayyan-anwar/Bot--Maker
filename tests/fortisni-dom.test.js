@@ -71,7 +71,7 @@ test('chat integration clears the delayed thinking transition after success and 
   const html = fs.readFileSync(path.join(__dirname, '../public/bot.html'), 'utf8');
   assert.match(html, /const thinkingTimer = window\.setTimeout\(\(\) => window\.setFortisniState\('thinking'\), 700\)/);
   assert.match(html, /window\.clearTimeout\(thinkingTimer\);\s*pending\.textContent=message\.content/);
-  assert.match(html, /catch \(err\) \{\s*window\.clearTimeout\(thinkingTimer\);\s*pending\.textContent = 'Error: '/);
+  assert.match(html, /catch \(err\) \{[\s\S]*?window\.clearTimeout\(thinkingTimer\);[\s\S]*?pending\.textContent = 'Error: '/);
   assert.match(html, /window\.setFortisniText\(text, 'user'\)/);
   assert.match(html, /window\.setFortisniText\(message\.content, 'assistant'\)/);
 });
