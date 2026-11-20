@@ -41,7 +41,7 @@ test('embedding batches preserve input order and reject cross-batch dimension dr
   assert.equal(calls,2);assert.equal(result.length,65);
   assert.deepEqual(result[0],[0,0]);assert.deepEqual(result[63],[63,63]);assert.deepEqual(result[64],[100,100]);
   calls=0;
-  global.fetch=async()=>{const index=calls++;return {ok:true,status:200,json:async()=>({data:[{index:0,embedding:index===0?[0.1,0.2]:[0.1,0.2,0.3]}]})};};
+  global.fetch=async(_url,options)=>{const index=calls++,batch=JSON.parse(options.body).input;return {ok:true,status:200,json:async()=>({data:batch.map((_,i)=>({index:i,embedding:index===0?[0.1,0.2]:[0.1,0.2,0.3]}))})};};
   await assert.rejects(embeddings.embedTexts(Array.from({length:65},(_,i)=>'batch '+i)),/inconsistent vector dimensions/);
  }finally{
   if(previous.enabled===undefined)delete process.env.BOTFORGE_EMBEDDINGS_ENABLED;else process.env.BOTFORGE_EMBEDDINGS_ENABLED=previous.enabled;
