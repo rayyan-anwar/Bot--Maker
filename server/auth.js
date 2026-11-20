@@ -108,7 +108,7 @@ router.post('/password/reset',async(req,res,next)=>{
   if(!/^[a-f0-9]{64}$/.test(token)||typeof password!=='string'||password.length<10||password.length>128)return res.status(400).json({error:'Enter a valid reset link and a password of 10–128 characters.'});
   const hash=crypto.createHash('sha256').update(token).digest('hex');
   const candidate=await store.findUserByPasswordResetTokenHash(hash);
-  if(candidate&&(!candidate.passwordResetExpiresAt||Date.parse(candidate.passwordResetExpiresAt)<=Date.now()))return res.status(400).json({error:'This password reset link is invalid or expired. Request a new one.'});
+  if(candidate&&(!candidate.passwordResetExpiresAt||!Number.isFinite(Date.parse(candidate.passwordResetExpiresAt))||Date.parse(candidate.passwordResetExpiresAt)<=Date.now()))return res.status(400).json({error:'This password reset link is invalid or expired. Request a new one.'});
   if(!candidate||isAdminEmail(candidate.email))return res.status(400).json({error:'This password reset link is invalid or expired. Request a new one.'});
   const updated=await store.consumePasswordResetToken(hash,{passwordHash:await bcrypt.hash(password,12),failedLoginAttempts:0,lockedAt:null,passwordResetTokenHash:null,passwordResetExpiresAt:null,sessionVersion:Number(candidate.sessionVersion||0)+1,passwordChangedAt:new Date().toISOString()});
   if(!updated)return res.status(400).json({error:'This password reset link is invalid or expired. Request a new one.'});
