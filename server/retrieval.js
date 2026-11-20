@@ -90,8 +90,8 @@ function topChunks(documents, query, k = 4) {
   for (const item of corpus) {
     const score = scoreChunk(item.counts, queryTokens, documentFrequency, corpus.length, item.length, averageLength);
     if (score <= 0) continue;
-    const normalizedText = item.chunk.text.replace(/\\s+/g, ' ').trim().toLocaleLowerCase();
-    const identity = String(item.doc.id || item.doc.filename || '') + '\\u0000' + normalizedText;
+    const normalizedText = item.chunk.text.replace(/\s+/g, ' ').trim().toLocaleLowerCase();
+    const identity = String(item.doc.id || item.doc.filename || '') + '\u0000' + normalizedText;
     if (seen.has(identity)) continue;
     seen.add(identity);
     scored.push({
