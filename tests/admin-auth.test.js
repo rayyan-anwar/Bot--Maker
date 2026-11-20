@@ -86,6 +86,9 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  const crypto=require('node:crypto'),store=require('../server/store');
  const resetToken='a'.repeat(64),resetHash=crypto.createHash('sha256').update(resetToken).digest('hex');
  const customer=(await store.findManyAsync('users',{email:'customer@example.com'}))[0];
+ const malformedExpiryToken='e'.repeat(64),malformedExpiryHash=crypto.createHash('sha256').update(malformedExpiryToken).digest('hex');
+ await store.updateByIdAsync('users',customer.id,{passwordResetTokenHash:malformedExpiryHash,passwordResetExpiresAt:'not-a-date'});
+ assert.equal((await post('/api/auth/password/reset',{token:malformedExpiryToken,password:'malformed-expiry-password-123'})).status,400);
  await store.updateByIdAsync('users',customer.id,{passwordResetTokenHash:resetHash,passwordResetExpiresAt:new Date(Date.now()+60000).toISOString()});
  const reset=await post('/api/auth/password/reset',{token:resetToken,password:'new-customer-password-456'});
  assert.equal(reset.status,200);
