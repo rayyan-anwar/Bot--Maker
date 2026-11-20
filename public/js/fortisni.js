@@ -66,6 +66,7 @@
         neutralTurns = 0;
         return current;
       },
+      set(state) { current = Object.prototype.hasOwnProperty.call(STATES, state) ? state : 'idle'; neutralTurns = 0; return current; },
       reset() { current = 'idle'; neutralTurns = 0; return current; },
       snapshot() { return { state: current, neutralTurns }; }
     };
@@ -78,6 +79,7 @@
     host.innerHTML = '<svg class="fortisni-avatar" viewBox="0 0 100 100" role="img" aria-label="Fortisni, BotForge AI companion"><defs><linearGradient id="fortisniHair" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f7f4ff"/><stop offset=".55" stop-color="#b8b5ff"/><stop offset="1" stop-color="#7d8cff"/></linearGradient><linearGradient id="fortisniHood" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#24294d"/><stop offset="1" stop-color="#10152c"/></linearGradient></defs><ellipse cx="50" cy="91" rx="30" ry="5" fill="#7185ff" opacity=".2"/><path d="M18 91 Q18 65 50 65 Q82 65 82 91Z" fill="url(#fortisniHood)" stroke="#6577ff" stroke-width="2"/><path d="M35 72 Q50 83 65 72" fill="none" stroke="#9ca8ff" stroke-width="3"/><path d="M24 42 Q19 10 49 9 Q81 8 77 44 L70 59 Q51 74 30 58Z" fill="url(#fortisniHair)" stroke="#8b91ff" stroke-width="2"/><path d="M27 34 Q9 25 23 12 Q26 24 39 18 Q51 -1 63 15 Q82 12 79 32 Q67 24 59 29 Q43 18 27 34Z" fill="url(#fortisniHair)" stroke="#9b9cff" stroke-width="2"/><path d="M22 31 Q12 31 15 48 Q17 59 28 56 M78 31 Q89 31 86 48 Q84 59 73 56" fill="none" stroke="#48cfff" stroke-width="5"/><path class="fortisni-brows" d="M35 39 L46 42 M56 42 L67 39" fill="none" stroke="#343a76" stroke-width="2.5" stroke-linecap="round"/><path d="M35 45 Q41 40 46 45 M56 45 Q62 40 67 45" fill="none" stroke="#343a76" stroke-width="3" stroke-linecap="round" class="fortisni-eyes"/><ellipse cx="50" cy="55" rx="5" ry="3" fill="#ec8eb7" opacity=".6"/><path class="fortisni-mouth" d="M45 59 Q50 65 56 59" fill="none" stroke="#9a477c" stroke-width="2.5" stroke-linecap="round"/><circle class="fortisni-aura" cx="84" cy="43" r="7" fill="#202c61" stroke="#48cfff" stroke-width="2"/><text x="84" y="46" text-anchor="middle" font-size="8" font-weight="bold" fill="#fff">B</text></svg><div class="fortisni-copy"><div class="fortisni-name">Fortisni <span class="fortisni-label">· BotForge companion</span></div><div class="fortisni-status" role="status" aria-live="polite" aria-atomic="true"></div></div>';
 
     const status = host.querySelector('.fortisni-status');
+    const session = createSession();
     const STATE_ALIASES = {
       celebrating: 'excited', comforting: 'sad', calming: 'concerned',
       reassuring: 'concerned', attentive: 'curious', warm: 'grateful'
@@ -87,6 +89,7 @@
       const mapped = STATE_ALIASES[requested] || requested;
       const safeState = Object.prototype.hasOwnProperty.call(STATES, mapped) ? mapped : 'idle';
       const previous = host.dataset.state || 'idle';
+      session.set(safeState);
       host.dataset.previousState = previous;
       host.dataset.state = safeState;
       host.dataset.emotion = requested;
@@ -96,7 +99,7 @@
     }
 
     function setText(value, source) {
-      const state = classifyText(value, source);
+      const state = session.next(value, source);
       setState(state);
       return state;
     }
@@ -110,5 +113,5 @@
     return { setState, setText, host };
   }
 
-  return { STATES, classifyText, mount };
+  return { STATES, classifyText, createSession, mount };
 });
