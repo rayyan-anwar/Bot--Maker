@@ -4,14 +4,22 @@ const store=require('./store');
 const plans=require('./plans');
 const {requireAuth}=require('./auth');
 const router=express.Router(),webhookRouter=express.Router(),razorpayWebhookRouter=express.Router();
-function safeEqualHex(expected,provided){try{const a=Buffer.from(expected,'hex'),b=Buffer.from(provided,'hex');return a.length===b.length&&a.length>0&&crypto.timingSafeEqual(a,b);}catch(_){return false;}}
+function safeEqualHex(expected,provided){if(typeof expected!=='string'||typeof provided!=='string'||! /^[a-f0-9]{64}$/i.test(expected)||! /^[a-f0-9]{64}$/i.test(provided))return false;try{const a=Buffer.from(expected,'hex'),b=Buffer.from(provided,'hex');return a.length===b.length&&crypto.timingSafeEqual(a,b);}catch(_){return false;}}
 function signatureValid(raw,header,secret){
- if(!Buffer.isBuffer(raw)||typeof header!=='string'||!secret)return false;
- const parts=Object.fromEntries(header.split(',').map(part=>part.split('=').map(x=>x.trim())));
- const timestamp=Number(parts.t),signature=parts.v1;
- if(!Number.isFinite(timestamp)||!signature||Math.abs(Date.now()/1000-timestamp)>300)return false;
+ if(!Buffer.isBuffer(raw)||typeof header!=='string'||!secret||header.length>4096)return false;
+ const timestamps=[],signatures=[];
+ for(const part of header.split(',')){
+  const separator=part.indexOf('=');
+  if(separator<1)continue;
+  const key=part.slice(0,separator).trim(),value=part.slice(separator+1).trim();
+  if(key==='t')timestamps.push(value);
+  else if(key==='v1')signatures.push(value);
+ }
+ if(timestamps.length!==1||!/^\\d{1,12}$/.test(timestamps[0])||!signatures.length)return false;
+ const timestamp=Number(timestamps[0]);
+ if(!Number.isSafeInteger(timestamp)||Math.abs(Date.now()/1000-timestamp)>300)return false;
  const expected=crypto.createHmac('sha256',secret).update(String(timestamp)+'.').update(raw).digest('hex');
- return safeEqualHex(expected,signature);
+ return signatures.some(signature=>safeEqualHex(expected,signature));
 }
 function razorpaySignatureValid(raw,header,secret){
  if(!Buffer.isBuffer(raw)||typeof header!=='string'||!secret)return false;
