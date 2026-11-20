@@ -6,7 +6,7 @@ Percentages below are engineering estimates, not test coverage or a claim of pro
 
 | Priority | Estimated completion | Evidence in repository | Remaining gate |
 |---|---:|---|---|
-| Social Intelligence OAuth foundation | 25% | Platform capability catalogue, short-lived single-use state bound to user/platform, tests, official-API security specification | Persistent shared state, OAuth callbacks, PKCE, encrypted token vault/KMS, app credentials and platform review |
+| Social Intelligence OAuth foundation | 45% | Authenticated platform/state APIs, persistent single-use user/platform-bound state, S256 PKCE, AES-256-GCM token envelopes, owner-scoped encrypted connection lifecycle, unit/API/PostgreSQL tests | Provider-specific authorization URLs/callbacks, token exchange/refresh/revocation, KMS-backed rotation, app credentials and platform review |
 | AI Engineer approval-to-draft-PR | 75% | Admin-only control, kill switch, audit, allowlisted paths, isolated Docker syntax validation, one-time approval and draft PR flow tests | Real least-privilege GitHub app/token, real Docker staging, failure/replay drills |
 | Knowledge Base citations | 75% | Unicode chunking, BM25/hybrid retrieval, stable document/chunk IDs, citation source deduplication and tests | Golden dataset evaluation, grounded-answer scoring, malware scanner staging and deletion tests |
 | Fortisni UI and accessibility | 70% | Emotion engine, session continuity, chat lifecycle, visual state styles, browser tests and reduced-motion styling | Full device/browser QA, keyboard/screen-reader review and production visual review |
@@ -26,7 +26,7 @@ Percentages below are engineering estimates, not test coverage or a claim of pro
 
 ## Important limitations
 
-Social OAuth is not live. The state store is process-local and is not suitable for multi-instance production use; replace it with a shared persistent, TTL-backed store before enabling real OAuth callbacks. No platform secrets, KMS, app approvals, production hosting or managed database credentials are assumed.
+Social OAuth is not live. Persistent state and encrypted connection storage now use the shared application store, but provider-specific authorization/callback/token exchange and revocation are not yet implemented. AES-256-GCM requires BOTFORGE_SOCIAL_TOKEN_ENCRYPTION_KEY; production should source and rotate this key through a managed KMS/secret manager. No platform app approvals or customer-connected accounts are assumed.
 
 AI Engineer tests use mocked GitHub and Docker adapters. Passing tests validate workflow logic, not a real external GitHub PR or hardened production container.
 
