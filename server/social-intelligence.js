@@ -58,4 +58,41 @@ async function consumeOAuthState(state,userId,platform,now=new Date()){
  if(!record)return null;
  return {userId:record.userId,platform:record.platform,codeVerifier:record.codeVerifier};
 }
-module.exports={PLATFORMS,getPlatforms,createOAuthState,consumeOAuthState,createPkcePair,encryptToken,decryptToken,STATE_TTL_MS};
+function publicConnection(row){
+ return {id:row.id,platform:row.platform,platformAccountId:row.platformAccountId,displayName:row.displayName,scopes:[...row.scopes],tokenExpiresAt:row.tokenExpiresAt||null,status:row.status,connectedAt:row.connectedAt,updatedAt:row.updatedAt};
+}
+async function connectAccount(input){
+ if(!input||typeof input!=='object'||typeof input.userId!=='string'||!input.userId.trim()||input.userId.length>128)throw new TypeError('A valid user ID is required.');
+ if(!Object.prototype.hasOwnProperty.call(PLATFORMS,input.platform))throw new TypeError('Unsupported social platform.');
+ for(const [key,max] of [['platformAccountId',256],['displayName',120],['accessToken',16384]])if(typeof input[key]!=='string'||!input[key].trim()||input[key].length>max)throw new TypeError('Invalid social connection '+key+'.');
+ if(input.refreshToken!==undefined&&input.refreshToken!==null&&(typeof input.refreshToken!=='string'||input.refreshToken.length>16384))throw new TypeError('Invalid social refresh token.');
+ if(!Array.isArray(input.scopes)||input.scopes.length>50||input.scopes.some(scope=>typeof scope!=='string'||!scope.trim()||scope.length>100))throw new TypeError('Invalid granted social scopes.');
+ const tokenExpiresAt=input.tokenExpiresAt||null;
+ if(tokenExpiresAt!==null&&(!Number.isFinite(Date.parse(tokenExpiresAt))))throw new TypeError('Invalid token expiry timestamp.');
+ const existing=await store.findManyAsync('socialConnections',{userId:input.userId});
+ const current=existing.find(row=>row.platform===input.platform&&row.platformAccountId===input.platformAccountId);
+ const now=new Date().toISOString(),patch={userId:input.userId,platform:input.platform,platformAccountId:input.platformAccountId,displayName:input.displayName.trim(),scopes:[...new Set(input.scopes)],accessTokenEnvelope:encryptToken(input.accessToken),refreshTokenEnvelope:input.refreshToken?encryptToken(input.refreshToken):null,tokenExpiresAt,status:'connected',connectedAt:current?.connectedAt||now,updatedAt:now};
+ let saved;
+ if(current){saved=await store.updateByIdAsync('socialConnections',current.id,patch);}
+ else{saved={id:uuidv4(),...patch};await store.insertAsync('socialConnections',saved);}
+ return publicConnection(saved);
+}
+async function listConnections(userId){
+ if(typeof userId!=='string'||!userId.trim())throw new TypeError('A valid user ID is required.');
+ const rows=await store.findManyAsync('socialConnections',{userId});
+ return rows.filter(row=>row.status==='connected').map(publicConnection);
+}
+async function getConnectionCredentials(userId,connectionId){
+ if(typeof userId!=='string'||!userId.trim()||typeof connectionId!=='string')return null;
+ const row=await store.findByIdAsync('socialConnections',connectionId);
+ if(!row||row.userId!==userId||row.status!=='connected')return null;
+ return {accessToken:decryptToken(row.accessTokenEnvelope),refreshToken:row.refreshTokenEnvelope?decryptToken(row.refreshTokenEnvelope):null,platform:row.platform,platformAccountId:row.platformAccountId,scopes:[...row.scopes]};
+}
+async function disconnectConnection(userId,connectionId){
+ if(typeof userId!=='string'||!userId.trim()||typeof connectionId!=='string')return false;
+ const row=await store.findByIdAsync('socialConnections',connectionId);
+ if(!row||row.userId!==userId)return false;
+ await store.deleteByIdAsync('socialConnections',connectionId);
+ return true;
+}
+module.exports={PLATFORMS,getPlatforms,createOAuthState,consumeOAuthState,createPkcePair,encryptToken,decryptToken,connectAccount,listConnections,getConnectionCredentials,disconnectConnection,STATE_TTL_MS};
