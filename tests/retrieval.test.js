@@ -89,3 +89,14 @@ test('retrieval ignores malformed document records and validates result limits',
  assert.equal(topChunks(docs,'account recovery',2).length,1);
  assert.deepEqual(topChunks(docs,'account recovery',0),[]);
 });
+
+
+test('chunkText rejects non-string input explicitly',()=>{
+ assert.throws(()=>chunkText(null),TypeError);
+ assert.throws(()=>chunkText({text:'not a string'}),TypeError);
+});
+
+test('hybrid retrieval validates result limits and malformed corpora',async()=>{
+ assert.deepEqual(await topChunksHybrid(null,'query',2),[]);
+ assert.deepEqual(await topChunksHybrid([], 'query',0),[]);
+});
