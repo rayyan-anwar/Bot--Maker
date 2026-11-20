@@ -25,6 +25,22 @@ test('embedding responses reject duplicate indexes and inconsistent dimensions',
  }
 });
 
+test('embedding responses reject out-of-range indexes and missing data arrays',async()=>{
+ const previous={enabled:process.env.BOTFORGE_EMBEDDINGS_ENABLED,key:process.env.OPENAI_API_KEY,fetch:global.fetch};
+ process.env.BOTFORGE_EMBEDDINGS_ENABLED='true';process.env.OPENAI_API_KEY='test-only-key';
+ const embeddings=require('../server/embeddings');
+ try{
+  global.fetch=async()=>({ok:true,status:200,json:async()=>({data:[{index:1,embedding:[0.1,0.2]}]})});
+  await assert.rejects(embeddings.embedTexts(['one']),/invalid vector batch/);
+  global.fetch=async()=>({ok:true,status:200,json:async()=>({})});
+  await assert.rejects(embeddings.embedTexts(['one']),/invalid vector batch/);
+ }finally{
+  if(previous.enabled===undefined)delete process.env.BOTFORGE_EMBEDDINGS_ENABLED;else process.env.BOTFORGE_EMBEDDINGS_ENABLED=previous.enabled;
+  if(previous.key===undefined)delete process.env.OPENAI_API_KEY;else process.env.OPENAI_API_KEY=previous.key;
+  global.fetch=previous.fetch;
+ }
+});
+
 test('embedding requests have a bounded timeout and reject malformed vectors',async()=>{
  const previous={enabled:process.env.BOTFORGE_EMBEDDINGS_ENABLED,key:process.env.OPENAI_API_KEY,timeout:process.env.BOTFORGE_EMBEDDING_TIMEOUT_MS,fetch:global.fetch};
  process.env.BOTFORGE_EMBEDDINGS_ENABLED='true';
