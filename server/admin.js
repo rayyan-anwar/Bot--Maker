@@ -223,6 +223,21 @@ router.get('/ai-budget/reservations',async(req,res,next)=>{
   res.json({state,items:result.rows});
  }catch(e){next(e);}
 });
+router.post('/ai-budget/reservations/:reservationId/settle',async(req,res,next)=>{
+ try{
+  if(!store.isPostgres())return res.status(503).json({error:'AI budget controls require PostgreSQL storage.'});
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.params.reservationId))return res.status(400).json({error:'Invalid reservation ID.'});
+  const amount=req.body?.actualAmount,providerRequestId=String(req.body?.providerRequestId||'').trim();
+  if(typeof amount!=='string'||! /^(?:0|[1-9]\\d{0,8})(?:\\.\\d{1,8})?$/.test(amount))return res.status(400).json({error:'actualAmount must be a non-negative decimal string with up to 8 fractional digits.'});
+  if(!providerRequestId||providerRequestId.length>200)return res.status(400).json({error:'A verified providerRequestId of 1 to 200 characters is required.'});
+  const result=await store.query('SELECT botforge_settle_ai_budget($1::uuid,$2::numeric,$3) AS state',[req.params.reservationId,amount,providerRequestId]);
+  res.json({reservationId:req.params.reservationId,state:result.rows[0].state,manuallyReconciled:true});
+ }catch(e){
+  if(/reservation not found/.test(e.message))return res.status(404).json({error:'AI budget reservation not found.'});
+  if(/actual amount exceeds reservation|only reserved items|conflicting amount/.test(e.message))return res.status(409).json({error:'Reservation could not be settled. Check its current state and reserved amount.'});
+  next(e);
+ }
+});
 router.get('/ai-budget/ledger',async(req,res,next)=>{
  try{
   if(!store.isPostgres())return res.status(503).json({error:'AI budget controls require PostgreSQL storage.'});
