@@ -44,6 +44,33 @@
     return 'idle';
   }
 
+  function createSession(options) {
+    const settings = options || {};
+    const neutralGrace = Number.isInteger(settings.neutralGrace) ? Math.max(0, Math.min(3, settings.neutralGrace)) : 1;
+    let current = 'idle';
+    let neutralTurns = 0;
+    return {
+      next(value, source) {
+        const detected = classifyText(value, source);
+        if (detected === 'thinking' || detected === 'speaking' || detected === 'error') {
+          current = detected;
+          neutralTurns = 0;
+          return current;
+        }
+        if (detected === 'idle') {
+          neutralTurns += 1;
+          if (neutralTurns > neutralGrace) current = 'idle';
+          return current;
+        }
+        current = detected;
+        neutralTurns = 0;
+        return current;
+      },
+      reset() { current = 'idle'; neutralTurns = 0; return current; },
+      snapshot() { return { state: current, neutralTurns }; }
+    };
+  }
+
   function mount(doc) {
     const host = doc.getElementById('fortisni-companion');
     if (!host) return null;
