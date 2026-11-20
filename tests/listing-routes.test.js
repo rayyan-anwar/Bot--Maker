@@ -102,3 +102,32 @@ test('deleting a bot also removes its version history',async()=>{
   assert.deepEqual(await store.findManyAsync('botVersions',{botId}),[]);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+
+test('bot publishing and unpublishing is owner-only, validated, and versioned',async(t)=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-publish-'));
+ process.env.NODE_ENV='test';process.env.JWT_SECRET='publish-test-secret-with-at-least-thirty-two-characters';
+ process.env.BOTFORGE_ADMIN_EMAIL='publisher@example.test';process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');delete process.env.DATABASE_URL;
+ const {start,shutdown}=require('../server/index'),server=await start(0,'127.0.0.1');
+ t.after(async()=>{await shutdown();fs.rmSync(dir,{recursive:true,force:true});});
+ const base='http://127.0.0.1:'+server.address().port,bcrypt=require('bcryptjs'),{v4:uuidv4}=require('uuid'),store=require('../server/store');
+ for(const [email,password] of [['publisher@example.test','publisher-password-123'],['outsider@example.test','outsider-password-123']])await store.insertAsync('users',{id:uuidv4(),email,name:email,passwordHash:await bcrypt.hash(password,10),createdAt:new Date().toISOString()});
+ async function login(email,password){const r=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email,password})});assert.equal(r.status,200);return (r.headers.get('set-cookie')||'').split(';')[0];}
+ const owner=await login('publisher@example.test','publisher-password-123'),outsider=await login('outsider@example.test','outsider-password-123');
+ const created=await fetch(base+'/api/bots',{method:'POST',headers:{cookie:owner,'content-type':'application/json'},body:JSON.stringify({name:'Publishable bot',instructions:'Answer clearly.'})});
+ assert.equal(created.status,201);const bot=(await created.json()).bot;
+ const denied=await fetch(base+'/api/bots/'+bot.id+'/publish',{method:'POST',headers:{cookie:outsider}});
+ assert.equal(denied.status,403);
+ const published=await fetch(base+'/api/bots/'+bot.id+'/publish',{method:'POST',headers:{cookie:owner}});
+ assert.equal(published.status,200);assert.equal((await published.json()).published,true);
+ const publicDetail=await fetch(base+'/api/bots/'+bot.id,{headers:{cookie:outsider}});
+ assert.equal(publicDetail.status,200);assert.equal((await publicDetail.json()).bot.isPublic,true);
+ const history=await fetch(base+'/api/bots/'+bot.id+'/versions',{headers:{cookie:owner}});
+ assert.deepEqual((await history.json()).versions.map(v=>v.version),[2,1]);
+ const unpublished=await fetch(base+'/api/bots/'+bot.id+'/unpublish',{method:'POST',headers:{cookie:owner}});
+ assert.equal(unpublished.status,200);assert.equal((await unpublished.json()).published,false);
+ const hidden=await fetch(base+'/api/bots/'+bot.id,{headers:{cookie:outsider}});
+ assert.equal(hidden.status,403);
+ const finalHistory=await fetch(base+'/api/bots/'+bot.id+'/versions',{headers:{cookie:owner}});
+ assert.deepEqual((await finalHistory.json()).versions.map(v=>v.version),[3,2,1]);
+});
