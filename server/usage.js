@@ -31,6 +31,7 @@ async function reserveAiBudget({provider,model,system,messages,maxTokens=1024}){
 }
 async function settleAiBudget(reservation,result){
  if(!reservation)return null;
+ if(reservation.provider!=='mock'&&(!Number.isSafeInteger(result.inputTokens)||result.inputTokens<=0||!Number.isSafeInteger(result.outputTokens)||result.outputTokens<=0))throw new Error('Provider token usage is missing or invalid; budget reservation retained for reconciliation.');
  const actual=estimateCost({inputTokens:result.inputTokens,outputTokens:result.outputTokens,pricing:reservation.pricing});
  if(!actual.known)throw new Error('Actual AI usage could not be priced; budget reservation remains open for reconciliation.');
  const settled=await store.query('SELECT botforge_settle_ai_budget($1::uuid,$2::numeric,$3) AS state',
