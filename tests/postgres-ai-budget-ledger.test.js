@@ -5,6 +5,11 @@ const {Client}=require('pg');
 test('PostgreSQL AI budget ledger transitions, idempotency and reconciliation', {skip:!process.env.BOTFORGE_TEST_DATABASE_URL}, async()=>{
  const client=new Client({connectionString:process.env.BOTFORGE_TEST_DATABASE_URL});
  await client.connect();
+ const expectPgError=async(sql,args,pattern)=>{
+  await client.query('SAVEPOINT expected_error');
+  try{ await assert.rejects(client.query(sql,args),pattern); }
+  finally{ await client.query('ROLLBACK TO SAVEPOINT expected_error'); await client.query('RELEASE SAVEPOINT expected_error'); }
+ };
  try{
   await client.query('BEGIN');
   const scopeResult=await client.query(
@@ -32,10 +37,7 @@ test('PostgreSQL AI budget ledger transitions, idempotency and reconciliation', 
   const settled=(await client.query('SELECT state,actual_amount FROM ai_budget_reservations WHERE id=$1',[reservation])).rows[0];
   assert.equal(settled.state,'settled');
   assert.equal(Number(settled.actual_amount),2.5);
-  await assert.rejects(
-   client.query('SELECT botforge_settle_ai_budget($1,$2,NULL)',[reservation,3]),
-   /already settled/
-  );
+  await expectPgError('SELECT botforge_settle_ai_budget($1,$2,NULL)',[reservation,3],/conflicting amount or provider request id/);
 
   const releaseKey='req-release-'+Date.now();
   const releaseId=(await client.query(
@@ -62,9 +64,7 @@ test('PostgreSQL AI budget ledger transitions, idempotency and reconciliation', 
    [scopeId,0.25,adjustKey,'Verified provider invoice correction']
   )).rows[0].id;
   assert.equal(adjustAgain,adjust);
-  await assert.rejects(
-   client.query('SELECT botforge_reconcile_ai_budget($1,$2,$3,$4)',[scopeId,0.5,adjustKey,'Conflicting correction'])
-  );
+  await expectPgError('SELECT botforge_reconcile_ai_budget($1,$2,$3,$4)',[scopeId,0.5,adjustKey,'Conflicting correction'],/reconciliation key reused with different parameters/);
 
   await client.query('ROLLBACK');
  }catch(error){
