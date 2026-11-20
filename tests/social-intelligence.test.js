@@ -69,3 +69,31 @@ test('social token encryption fails closed when key is missing or malformed',()=
   assert.throws(()=>social.encryptToken('secret'),/must be a base64-encoded 32-byte key/);
  }finally{process.env.BOTFORGE_SOCIAL_TOKEN_ENCRYPTION_KEY=original;}
 });
+
+
+test('social account connections store encrypted secrets and enforce owner isolation',async()=>{
+ const input={userId:'owner-1',platform:'youtube',platformAccountId:'channel-123',displayName:'Creator channel',scopes:['profile','analytics'],accessToken:'access-secret-value',refreshToken:'refresh-secret-value',tokenExpiresAt:'2027-01-01T00:00:00.000Z'};
+ const connected=await social.connectAccount(input);
+ assert.equal(connected.status,'connected');
+ assert.equal(connected.displayName,'Creator channel');
+ assert.deepEqual(connected.scopes,['profile','analytics']);
+ const store=require('../server/store'),raw=await store.findByIdAsync('socialConnections',connected.id);
+ assert.equal(JSON.stringify(raw).includes(input.accessToken),false);
+ assert.equal(JSON.stringify(raw).includes(input.refreshToken),false);
+ assert.ok(raw.accessTokenEnvelope);
+ assert.ok(raw.refreshTokenEnvelope);
+ assert.equal(await social.getConnectionCredentials('other-user',connected.id),null);
+ const secrets=await social.getConnectionCredentials('owner-1',connected.id);
+ assert.equal(secrets.accessToken,input.accessToken);
+ assert.equal(secrets.refreshToken,input.refreshToken);
+ const updated=await social.connectAccount({...input,displayName:'Updated channel',accessToken:'rotated-access-token',refreshToken:null});
+ assert.equal(updated.id,connected.id);
+ assert.equal(updated.displayName,'Updated channel');
+ const rotated=await social.getConnectionCredentials('owner-1',connected.id);
+ assert.equal(rotated.accessToken,'rotated-access-token');
+ assert.equal(rotated.refreshToken,null);
+ assert.equal((await social.listConnections('owner-1')).length,1);
+ assert.equal(await social.disconnectConnection('other-user',connected.id),false);
+ assert.equal(await social.disconnectConnection('owner-1',connected.id),true);
+ assert.equal(await social.getConnectionCredentials('owner-1',connected.id),null);
+});
