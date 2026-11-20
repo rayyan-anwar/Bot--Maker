@@ -26,7 +26,7 @@ test('administrator-only bot and document listing routes require the configured 
  assert.equal((await mine.json()).bots[0].id,bot.id);
  const shared=await fetch(base+'/api/bots/public',{headers:{cookie}});
  assert.equal(shared.status,200);
- assert.equal((await shared.json()).bots[0].id,bot.id);
+ assert.deepEqual((await shared.json()).bots,[]); // Owners do not see their own bots in the public discovery feed.
  const history=await fetch(base+'/api/chat/'+bot.id+'/messages',{headers:{cookie}});
  assert.equal(history.status,200);
  assert.deepEqual((await history.json()).messages,[]);
