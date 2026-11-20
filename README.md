@@ -70,6 +70,7 @@ See [`.env.example`](.env.example) for the complete list. Common settings:
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GEMINI_API_KEY` | Optional provider credentials; configure only providers you will enable |
 | `DATABASE_URL` | Optional PostgreSQL connection; absent means JSON development storage |
 | `FREE_DAILY_MESSAGES`, `BOTFORGE_PLANS_JSON` | Usage quota configuration |
+| `BOTFORGE_AI_BUDGET_ENABLED`, `BOTFORGE_AI_BUDGET_SCOPE_ID`, `BOTFORGE_AI_PRICING_JSON` | Optional PostgreSQL AI spend preflight and settlement; disabled unless explicitly enabled |
 
 | `STRIPE_* `, `RAZORPAY_* ` | Optional subscription billing configuration |
 | `BOTFORGE_GITHUB_TOKEN`, `BOTFORGE_GITHUB_WRITE_TOKEN` | Optional AI Engineer GitHub integration; separate least-privilege tokens |
@@ -87,6 +88,10 @@ npm run migrate:postgres
 The importer records a migration marker. Keep the original backup until row counts, application behavior and a restore drill have been verified. The migration does not transfer original uploaded files.
 
 For local PostgreSQL staging, see `docker-compose.staging.yml` and the staging runbook. Do not treat the staging compose stack as a production deployment recipe.
+
+### Optional AI spend enforcement
+
+The PostgreSQL AI budget ledger can be enabled for chat requests with `BOTFORGE_AI_BUDGET_ENABLED=true`, a valid `BOTFORGE_AI_BUDGET_SCOPE_ID`, and a verified `BOTFORGE_AI_PRICING_JSON` map keyed by `provider:model`. Each pricing entry must include `inputPerMillion`, `outputPerMillion`, `currency`, and `version`. The scope currency must match the pricing currency. Missing or invalid pricing blocks the request. The preflight reserves a conservative input-token allowance plus the configured output-token cap, then settles from provider-reported token usage. If a provider has completed but settlement fails, the reservation is retained for reconciliation rather than released. Keep this feature disabled until the model rates and PostgreSQL scope have been independently verified; do not copy example rates into production.
 
 ## Tests and verification
 
