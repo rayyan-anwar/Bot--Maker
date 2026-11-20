@@ -1,5 +1,6 @@
 const crypto=require('node:crypto');
 const store=require('./store');
+const {isAllowedEngineerPath}=require('./engineer-path');
 const CONTROL_ID='11111111-1111-4111-8111-111111111111';
 const MAX_AUDIT_ROWS=1000;
 
@@ -30,7 +31,7 @@ async function appendAudit({actorId,method,route,statusCode,repository,filePath}
   route:safeRoute(route),
   statusCode:Number.isInteger(statusCode)?statusCode:0,
   repository:typeof repository==='string'&&/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)?repository:null,
-  filePath:typeof filePath==='string'&&/^(server|tests)\/[A-Za-z0-9_./-]+\.(js|json)$/.test(filePath)&&!filePath.includes('..')?filePath:null,
+  filePath:isAllowedEngineerPath(filePath)?filePath:null,
   createdAt:new Date().toISOString()
  };
  await store.insertAsync('aiEngineerRuns',event);
