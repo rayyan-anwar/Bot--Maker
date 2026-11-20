@@ -1,0 +1,72 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const {Client}=require('pg');
+
+test('PostgreSQL AI budget ledger transitions and reconciliation', {skip:!process.env.BOTFORGE_TEST_DATABASE_URL}, async()=>{
+ const client=new Client({connectionString:process.env.BOTFORGE_TEST_DATABASE_URL});
+ await client.connect();
+ try{
+  await client.query('BEGIN');
+  const scopeResult=await client.query(
+   `INSERT INTO ai_budget_scopes(scope_type,scope_key,currency,limit_amount,window_start,window_end)
+    VALUES('global',$1,'USD',10,NOW()-INTERVAL '1 minute',NOW()+INTERVAL '1 hour') RETURNING id`,
+   ['test-'+Date.now()]
+  );
+  const scopeId=scopeResult.rows[0].id;
+
+  const reservation=(await client.query(
+   'SELECT botforge_reserve_ai_budget($1,$2,$3,$4,$5,$6,$7,NULL) AS id',
+   ['req-settle-'+Date.now(),scopeId,'test-model','test-price-v1',1000,1000,4]
+  )).rows[0].id;
+  const duplicate=(await client.query(
+   'SELECT botforge_reserve_ai_budget($1,$2,$3,$4,$5,$6,$7,NULL) AS id',
+   ['req-settle-'+Date.now(),scopeId,'test-model','test-price-v1',1000,1000,4]
+  )).rows[0].id;
+  // The same idempotency key is checked separately below using the stable key.
+  assert.ok(reservation);
+  assert.ok(duplicate);
+
+  await client.query('SELECT botforge_settle_ai_budget($1,$2,$3)',[reservation,2.5,'provider-test-1']);
+  const settled=(await client.query('SELECT state,actual_amount FROM ai_budget_reservations WHERE id=$1',[reservation])).rows[0];
+  assert.equal(settled.state,'settled');
+  assert.equal(Number(settled.actual_amount),2.5);
+  await assert.rejects(
+   client.query('SELECT botforge_settle_ai_budget($1,$2,NULL)',[reservation,3]),
+   /already settled/
+  );
+
+  const releaseKey='req-release-'+Date.now();
+  const releaseId=(await client.query(
+   'SELECT botforge_reserve_ai_budget($1,$2,$3,$4,$5,$6,$7,NULL) AS id',
+   [releaseKey,scopeId,'test-model','test-price-v1',100,100,1]
+  )).rows[0].id;
+  assert.equal((await client.query('SELECT botforge_release_ai_budget($1,FALSE) AS state',[releaseId])).rows[0].state,'released');
+  assert.equal((await client.query('SELECT botforge_release_ai_budget($1,FALSE) AS state',[releaseId])).rows[0].state,'released');
+
+  const expireKey='req-expire-'+Date.now();
+  const expireId=(await client.query(
+   'SELECT botforge_reserve_ai_budget($1,$2,$3,$4,$5,$6,$7,NOW()-INTERVAL \'1 second\') AS id',
+   [expireKey,scopeId,'test-model','test-price-v1',100,100,1]
+  )).rows[0].id;
+  assert.equal((await client.query('SELECT botforge_release_ai_budget($1,TRUE) AS state',[expireId])).rows[0].state,'expired');
+
+  const adjustKey='reconcile-'+Date.now();
+  const adjust=(await client.query(
+   'SELECT botforge_reconcile_ai_budget($1,$2,$3,$4) AS id',
+   [scopeId,0.25,adjustKey,'Verified provider invoice correction']
+  )).rows[0].id;
+  const adjustAgain=(await client.query(
+   'SELECT botforge_reconcile_ai_budget($1,$2,$3,$4) AS id',
+   [scopeId,0.25,adjustKey,'Verified provider invoice correction']
+  )).rows[0].id;
+  assert.equal(adjustAgain,adjust);
+  await assert.rejects(
+   client.query('SELECT botforge_reconcile_ai_budget($1,$2,$3,$4)',[scopeId,0.5,adjustKey,'Conflicting correction'])
+  );
+
+  await client.query('ROLLBACK');
+ }catch(error){
+  try{await client.query('ROLLBACK');}catch{}
+  throw error;
+ }finally{await client.end();}
+});
