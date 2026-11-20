@@ -1,13 +1,7 @@
 // Very small "search my documents" helper.
 //
-// This does NOT use embeddings or a vector database — it splits uploaded
-// documents into chunks and, for each chat message, scores every chunk by
-// how many of the message's words it shares (classic keyword search).
-// That's simple, free, and good enough for an MVP with modest-sized
-// documents. If you outgrow it, the usual upgrade is to add an embeddings
-// API (e.g. Voyage AI, which Anthropic recommends) and do similarity
-// search instead of word-overlap — everything that calls into this file
-// would stay the same.
+// Retrieval utilities for document-grounded bot conversations. Keyword
+// search uses BM25-style ranking; optional embeddings add a semantic signal.
 
 const STOPWORDS = new Set([
   'the','a','an','is','are','was','were','be','been','being','to','of','and','or','in','on',
@@ -23,6 +17,7 @@ function tokenize(text) {
 
 /** Split a long text into overlapping chunks of roughly `size` words. */
 function chunkText(text, size = 220, overlap = 40) {
+  if (typeof text !== 'string') throw new TypeError('Document text must be a string.');
   if (!Number.isInteger(size) || size < 1) throw new RangeError('Chunk size must be a positive integer.');
   if (!Number.isInteger(overlap) || overlap < 0 || overlap >= size) throw new RangeError('Chunk overlap must be a non-negative integer smaller than chunk size.');
   const words = text.split(/\s+/).filter(Boolean);
@@ -110,19 +105,25 @@ function cosineSimilarity(a,b){
  return aa&&bb?dot/(Math.sqrt(aa)*Math.sqrt(bb)):0;
 }
 async function topChunksHybrid(documents,query,k=4){
+ if(!Array.isArray(documents)||!Number.isInteger(k)||k<1)return [];
  const keyword=topChunks(documents,query,Math.max(k,documents.reduce((n,d)=>n+(Array.isArray(d?.chunks)?d.chunks.length:0),0)));
  const embeddings=require('./embeddings');
  if(!embeddings.enabled())return keyword.slice(0,k);
  try{
   const [queryVector]=await embeddings.embedTexts([query]);
-  const lexicalScores=new Map(keyword.filter(item=>item.chunkId).map(item=>[item.chunkId,item.score]));
+  const lexicalScores=new Map(keyword.map(item=>[
+   String(item.documentId||item.filename)+'\\u0000'+String(item.chunkId||item.text),item.score
+  ]));
   const maxLexicalScore=Math.max(0,...lexicalScores.values());
-  const candidates=[];
+  const candidates=[],seen=new Set();
   for(const doc of documents)for(const chunk of Array.isArray(doc?.chunks)?doc.chunks:[]){
-   if(!chunk||typeof chunk.text!=='string')continue;
+   if(!chunk||typeof chunk.text!=='string'||!chunk.text.trim())continue;
+   const identity=String(doc.id||doc.filename||'')+'\\u0000'+String(chunk.id||chunk.text);
+   if(seen.has(identity))continue;
+   seen.add(identity);
    const semantic=cosineSimilarity(queryVector,chunk.embedding);
-   const lexical=lexicalScores.get(chunk.id)||0;
-   if(semantic>0||lexical>0)candidates.push({text:chunk.text,filename:doc.filename,documentId:doc.id,chunkId:chunk.id,score:semantic*0.75+(lexical&&maxLexicalScore?lexical/maxLexicalScore*0.25:0),semanticScore:semantic,keywordScore:lexical});
+   const lexical=lexicalScores.get(String(doc.id||doc.filename||'')+'\\u0000'+String(chunk.id||chunk.text))||0;
+   if(semantic>0||lexical>0)candidates.push({text:chunk.text,filename:doc.filename||'Untitled document',documentId:doc.id||null,chunkId:chunk.id||null,score:semantic*0.75+(lexical&&maxLexicalScore?lexical/maxLexicalScore*0.25:0),semanticScore:semantic,keywordScore:lexical});
   }
   candidates.sort((a,b)=>b.score-a.score||String(a.filename).localeCompare(String(b.filename))||String(a.chunkId).localeCompare(String(b.chunkId)));
   return candidates.slice(0,k);
