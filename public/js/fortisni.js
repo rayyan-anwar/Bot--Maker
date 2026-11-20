@@ -84,12 +84,12 @@
       celebrating: 'excited', comforting: 'sad', calming: 'concerned',
       reassuring: 'concerned', attentive: 'curious', warm: 'grateful'
     };
-    function setState(state, customMessage) {
+    function setState(state, customMessage, syncSession = true) {
       const requested = String(state || 'idle');
       const mapped = STATE_ALIASES[requested] || requested;
       const safeState = Object.prototype.hasOwnProperty.call(STATES, mapped) ? mapped : 'idle';
       const previous = host.dataset.state || 'idle';
-      session.set(safeState);
+      if (syncSession) session.set(safeState);
       host.dataset.previousState = previous;
       host.dataset.state = safeState;
       host.dataset.emotion = requested;
@@ -100,7 +100,7 @@
 
     function setText(value, source) {
       const state = session.next(value, source);
-      setState(state);
+      setState(state, undefined, false);
       return state;
     }
 
