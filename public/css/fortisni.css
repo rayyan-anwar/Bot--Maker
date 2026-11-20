@@ -39,3 +39,25 @@
 .fortisni-companion[data-emotion="reassuring"] .fortisni-avatar{filter:drop-shadow(0 4px 12px rgba(52,211,153,.24))}
 .fortisni-companion[data-emotion="attentive"] .fortisni-avatar{transform:rotate(3deg)}
 .fortisni-companion[data-emotion="warm"] .fortisni-eyes{transform:scaleY(.45);transform-origin:center}
+
+
+/* Refined facial expression motion */
+.fortisni-eyes,.fortisni-brows,.fortisni-mouth,.fortisni-aura{transition:transform .28s cubic-bezier(.2,.8,.2,1),stroke .28s ease,opacity .28s ease}
+.fortisni-companion[data-state="happy"] .fortisni-mouth,
+.fortisni-companion[data-state="excited"] .fortisni-mouth{transform:scale(1.16) translateY(-1px);transform-origin:center}
+.fortisni-companion[data-state="sad"] .fortisni-eyes{transform:translateY(2px) scaleY(.8);transform-origin:center}
+.fortisni-companion[data-state="sad"] .fortisni-brows{transform:translateY(2px) rotate(-5deg);transform-origin:center}
+.fortisni-companion[data-state="concerned"] .fortisni-brows{transform:translateY(1px) rotate(4deg);transform-origin:center}
+.fortisni-companion[data-state="curious"] .fortisni-eyes{transform:scaleY(1.2);transform-origin:center}
+.fortisni-companion[data-state="confused"] .fortisni-brows{transform:rotate(-8deg);transform-origin:center}
+.fortisni-companion[data-state="angry"] .fortisni-mouth{transform:scaleX(1.2) translateY(1px);transform-origin:center}
+.fortisni-companion[data-state="grateful"] .fortisni-mouth{transform:scale(1.1);transform-origin:center}
+@keyframes fortisni-blink{0%,45%,49%,100%{transform:scaleY(1)}47%{transform:scaleY(.08)}}
+.fortisni-companion[data-state="idle"] .fortisni-eyes{animation:fortisni-blink 5.5s ease-in-out infinite;transform-origin:center}
+.fortisni-companion[data-state="speaking"] .fortisni-avatar{filter:drop-shadow(0 4px 13px rgba(72,207,255,.34))}
+.fortisni-companion[data-state="error"] .fortisni-avatar{animation:fortisni-think .8s ease-in-out 2}
+@media(prefers-reduced-motion:reduce){
+ .fortisni-eyes,.fortisni-brows,.fortisni-mouth,.fortisni-aura{transition:none}
+ .fortisni-companion[data-state="idle"] .fortisni-eyes{animation:none}
+ .fortisni-companion[data-state="error"] .fortisni-avatar{animation:none}
+}
