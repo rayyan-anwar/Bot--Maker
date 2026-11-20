@@ -212,7 +212,10 @@
     input.value = '';
     renderMessage('user', text, false);
     window.setFortisniText(text, 'user');
-    const thinkingTimer = window.setTimeout(() => window.setFortisniState('thinking'), 1100);
+    window.setFortisniState('thinking');
+    const thinkingTimer = window.setTimeout(() => window.setFortisniState('thinking'), 700);
+    const sendButton = form.querySelector('button[type="submit"]');
+    if (sendButton) sendButton.disabled = true;
     const pending = renderMessage('assistant', 'Thinking…', true);
 
     try {
@@ -220,7 +223,7 @@
       if(!response.ok){let failure={};try{failure=await response.json();}catch(_){}throw new Error(failure.error||'Chat request failed ('+response.status+').');}
       if(!response.body)throw new Error('Streaming is not supported by this browser.');
       const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',message=null,sources=[],receivedToken=false;
-      const handleEvent=async block=>{let event='message',data='';for(const line of block.split(/\r?\n/)){if(line.startsWith('event:'))event=line.slice(6).trim();else if(line.startsWith('data:'))data+=line.slice(5).trim();}if(!data)return;const value=JSON.parse(data);if(event==='token'){if(!receivedToken){pending.textContent='';receivedToken=true;}pending.textContent+=value.text;log.scrollTop=log.scrollHeight;}else if(event==='complete'){message=value.message;sources=value.sources||[];}else if(event==='error')throw new Error(value.error||'Streaming chat failed.');};
+      const handleEvent=async block=>{let event='message',data='';for(const line of block.split(/\r?\n/)){if(line.startsWith('event:'))event=line.slice(6).trim();else if(line.startsWith('data:'))data+=line.slice(5).trim();}if(!data)return;const value=JSON.parse(data);if(event==='token'){if(!receivedToken){window.clearTimeout(thinkingTimer);window.setFortisniState('speaking');pending.textContent='';receivedToken=true;}pending.textContent+=value.text;log.scrollTop=log.scrollHeight;}else if(event==='complete'){message=value.message;sources=value.sources||[];}else if(event==='error')throw new Error(value.error||'Streaming chat failed.');};
       while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let boundary;while((boundary=/\r?\n\r?\n/.exec(buffer))){const block=buffer.slice(0,boundary.index);buffer=buffer.slice(boundary.index+boundary[0].length);await handleEvent(block);}}
       buffer+=decoder.decode();if(buffer.trim())await handleEvent(buffer);
       if(!message)throw new Error('The streaming connection ended before the response was saved.');
@@ -228,6 +231,7 @@
       pending.textContent=message.content;
       window.setFortisniText(message.content, 'assistant');
       window.setTimeout(() => window.setFortisniState('idle'), 2600);
+      if (sendButton) sendButton.disabled = false;
       pending.classList.remove('pending');
       if (sources.length) {
         const panel = document.createElement('div');
@@ -250,6 +254,7 @@
       }
     } catch (err) {
       window.clearTimeout(thinkingTimer);
+      if (sendButton) sendButton.disabled = false;
       pending.textContent = 'Error: ' + err.message;
       window.setFortisniState('error');
       pending.classList.remove('pending');
