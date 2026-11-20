@@ -86,7 +86,7 @@ test('BM25 retrieval prioritizes focused chunks and avoids duplicate chunk text'
 
 test('BM25 deduplicates equivalent whitespace across chunks',()=>{
  const docs=[{id:'d',filename:'notes.txt',chunks:[
-  {id:'a',text:'refund policy\\ncustomer returns'},
+  {id:'a',text:'refund policy\ncustomer returns'},
   {id:'b',text:'refund   policy customer returns'}
  ]}];
  const rows=topChunks(docs,'refund policy customer returns',5);
