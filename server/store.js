@@ -203,6 +203,36 @@ async function updateEngineerApproval(id,actorId,patch){
  if(!current||current.actorId!==actorId)return null;
  return updateByIdAsync('aiEngineerApprovals',id,{...patch,updatedAt:new Date().toISOString()});
 }
+async function insertDocumentWithinCapacity(record,{maxDocuments=50,maxCharacters=5000000}={}){
+ if(!record||!isUuid(record.id)||typeof record.botId!=='string'||!record.botId||typeof record.contentHash!=='string'||!Array.isArray(record.chunks))throw new TypeError('Invalid knowledge document record.');
+ if(!Number.isSafeInteger(maxDocuments)||maxDocuments<1||!Number.isSafeInteger(maxCharacters)||maxCharacters<1)throw new TypeError('Invalid knowledge base capacity limits.');
+ const textLength=Number.isSafeInteger(record.characterCount)?record.characterCount:record.chunks.reduce((sum,chunk)=>sum+(typeof chunk?.text==='string'?chunk.text.length:0),0);
+ if(!Number.isSafeInteger(textLength)||textLength<0)throw new TypeError('Invalid knowledge document character count.');
+ await initialize();
+ if(!isPostgres()){
+  const docs=all('documents').filter(doc=>doc.botId===record.botId);
+  const duplicate=docs.find(doc=>doc.contentHash===record.contentHash);
+  if(duplicate)return {inserted:false,reason:'duplicate',document:duplicate};
+  if(docs.length>=maxDocuments)return {inserted:false,reason:'document_limit'};
+  const total=docs.reduce((sum,doc)=>sum+(Number.isSafeInteger(doc.characterCount)?doc.characterCount:(Array.isArray(doc.chunks)?doc.chunks.reduce((n,chunk)=>n+(typeof chunk?.text==='string'?chunk.text.length:0),0):0)),0);
+  if(total+textLength>maxCharacters)return {inserted:false,reason:'character_limit'};
+  insert('documents',record);return {inserted:true,document:record};
+ }
+ const client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+  await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',['botforge-documents:'+record.botId]);
+  const result=await client.query("SELECT data FROM botforge_records WHERE collection='documents' AND data->>'botId'=$1 FOR UPDATE",[record.botId]);
+  const docs=result.rows.map(row=>row.data),duplicate=docs.find(doc=>doc.contentHash===record.contentHash);
+  if(duplicate){await client.query('COMMIT');return {inserted:false,reason:'duplicate',document:duplicate};}
+  if(docs.length>=maxDocuments){await client.query('COMMIT');return {inserted:false,reason:'document_limit'};}
+  const total=docs.reduce((sum,doc)=>sum+(Number.isSafeInteger(doc.characterCount)?doc.characterCount:(Array.isArray(doc.chunks)?doc.chunks.reduce((n,chunk)=>n+(typeof chunk?.text==='string'?chunk.text.length:0),0):0)),0);
+  if(total+textLength>maxCharacters){await client.query('COMMIT');return {inserted:false,reason:'character_limit'};}
+  await client.query("INSERT INTO botforge_records(collection,id,data) VALUES('documents',$1,$2::jsonb)",[record.id,JSON.stringify(record)]);
+  await client.query('COMMIT');return {inserted:true,document:record};
+ }catch(error){try{await client.query('ROLLBACK');}catch(_){}throw error;}finally{client.release();}
+}
+
 async function consumeSocialOAuthState(stateHash,userId,platform,now=new Date()){
  if(typeof stateHash!=='string'||typeof userId!=='string'||typeof platform!=='string')return null;
  if(!isPostgres()){
@@ -219,4 +249,4 @@ async function consumeSocialOAuthState(stateHash,userId,platform,now=new Date())
 async function query(sql,values=[]){if(!isPostgres())throw new Error('Shared PostgreSQL storage is not configured.');await initialize();return pool.query(sql,values);}
 async function health(){if(!isPostgres())return {ok:true,database:'json-development'};try{await initialize();await pool.query('SELECT 1');return {ok:true,database:'postgres'};}catch(_){return {ok:false,database:'postgres'};}}
 async function close(){if(pool){await pool.end();pool=null;}initialized=false;}
-module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,consumeSocialOAuthState,query,health,load,persist};
+module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,consumeSocialOAuthState,insertDocumentWithinCapacity,query,health,load,persist};
