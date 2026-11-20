@@ -75,3 +75,21 @@ test('chat integration clears the delayed thinking transition after success and 
   assert.match(html, /window\.setFortisniText\(text, 'user'\)/);
   assert.match(html, /window\.setFortisniText\(message\.content, 'assistant'\)/);
 });
+
+test('Fortisni keeps emotional context briefly across neutral turns, then returns to idle', () => {
+  const session = Fortisni.createSession();
+  assert.equal(session.next('I feel lonely', 'user'), 'sad');
+  assert.equal(session.next('Okay', 'user'), 'sad');
+  assert.equal(session.snapshot().neutralTurns, 1);
+  assert.equal(session.next('Hello', 'user'), 'idle');
+  assert.equal(session.snapshot().neutralTurns, 2);
+});
+
+test('Fortisni session resets emotional continuity for explicit work and assistant speech', () => {
+  const session = Fortisni.createSession();
+  assert.equal(session.next('I am worried', 'user'), 'concerned');
+  assert.equal(session.next('Build me a website', 'user'), 'thinking');
+  assert.equal(session.next('Here is the result.', 'assistant'), 'speaking');
+  assert.equal(session.reset(), 'idle');
+  assert.deepEqual(session.snapshot(), { state: 'idle', neutralTurns: 0 });
+});
