@@ -1,5 +1,5 @@
 const test=require('node:test');const assert=require('node:assert/strict');const crypto=require('node:crypto');
-const {validEventId}=require('../server/billing');
+const {validEventId,validWebhookPayload}=require('../server/billing');
 test('payment webhook event IDs reject blank, padded and oversized values',()=>{
  assert.equal(validEventId('evt_123'),true);
  assert.equal(validEventId('evt_'),true);
@@ -56,4 +56,12 @@ test('Razorpay grants paid plan only for active subscriptions',()=>{
  assert.equal(resolveRazorpayPlan('active','plus'),'plus');
  for(const status of ['created','authenticated','pending','halted','paused','cancelled','completed','unknown'])assert.equal(resolveRazorpayPlan(status,'pro'),'free',status);
  assert.equal(resolveRazorpayPlan('active','unknown'),'free');
+});
+
+
+test('payment webhook event IDs reject control characters and payloads must be JSON objects',()=>{
+ for(const value of ['evt_123\\n','evt_123\\r','evt_123\\u0000','evt_123\\u007f'])assert.equal(validEventId(value),false,JSON.stringify(value));
+ assert.equal(validEventId('evt_safe-123'),true);
+ for(const value of [null,undefined,[], 'event', 42, true])assert.equal(validWebhookPayload(value),false);
+ for(const value of [{id:'evt_1'}, {event:'subscription.activated'}])assert.equal(validWebhookPayload(value),true);
 });
