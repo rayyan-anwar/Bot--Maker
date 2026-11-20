@@ -2,7 +2,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const {Client}=require('pg');
 
-test('PostgreSQL AI budget ledger transitions and reconciliation', {skip:!process.env.BOTFORGE_TEST_DATABASE_URL}, async()=>{
+test('PostgreSQL AI budget ledger transitions, idempotency and reconciliation', {skip:!process.env.BOTFORGE_TEST_DATABASE_URL}, async()=>{
  const client=new Client({connectionString:process.env.BOTFORGE_TEST_DATABASE_URL});
  await client.connect();
  try{
