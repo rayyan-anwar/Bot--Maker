@@ -6,6 +6,16 @@ const social=require('./social-intelligence');
 const router=express.Router();
 const stateLimiter=rateLimit({windowMs:15*60*1000,limit:10,standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:req=>req.user.id,message:{error:'Too many social authorization attempts. Try again later.'}});
 router.get('/platforms',requireAuth,(req,res)=>res.json({platforms:social.getPlatforms()}));
+router.get('/connections',requireAuth,async(req,res,next)=>{
+ try{res.json({connections:await social.listConnections(req.user.id)});}catch(error){next(error);}
+});
+router.delete('/connections/:id',requireAuth,async(req,res,next)=>{
+ try{
+  const removed=await social.disconnectConnection(req.user.id,req.params.id);
+  if(!removed)return res.status(404).json({error:'Social connection not found.'});
+  res.json({ok:true});
+ }catch(error){next(error);}
+});
 router.post('/:platform/oauth/state',requireAuth,stateLimiter,async(req,res,next)=>{
  try{
   if(!Object.prototype.hasOwnProperty.call(social.PLATFORMS,req.params.platform))return res.status(404).json({error:'Unsupported social platform.'});
