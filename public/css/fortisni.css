@@ -26,3 +26,16 @@
 @keyframes fortisni-talk{from{transform:scaleY(.8)}to{transform:scaleY(1.65)}}
 @keyframes fortisni-excited{from{transform:translateY(0) rotate(-4deg) scale(1)}to{transform:translateY(-5px) rotate(4deg) scale(1.04)}}
 @media(prefers-reduced-motion:reduce){.fortisni-avatar,.fortisni-companion[data-state="thinking"] .fortisni-avatar,.fortisni-companion[data-state="speaking"] .fortisni-mouth,.fortisni-companion[data-state="excited"] .fortisni-avatar{animation:none}}
+
+/* Emotion-engine aliases and state transitions */
+.fortisni-companion[data-transition="transition"] .fortisni-avatar{transition:transform .32s cubic-bezier(.2,.8,.2,1),filter .32s ease}
+.fortisni-companion[data-emotion="celebrating"] .fortisni-aura{stroke:#fbbf24}
+.fortisni-companion[data-emotion="comforting"] .fortisni-aura{stroke:#60a5fa}
+.fortisni-companion[data-emotion="calming"] .fortisni-aura{stroke:#a78bfa}
+.fortisni-companion[data-emotion="reassuring"] .fortisni-aura{stroke:#34d399}
+.fortisni-companion[data-emotion="attentive"] .fortisni-aura{stroke:#a78bfa}
+.fortisni-companion[data-emotion="warm"] .fortisni-aura{stroke:#34d399}
+.fortisni-companion[data-emotion="calming"] .fortisni-avatar{animation:fortisni-think 1.2s ease-in-out 1}
+.fortisni-companion[data-emotion="reassuring"] .fortisni-avatar{filter:drop-shadow(0 4px 12px rgba(52,211,153,.24))}
+.fortisni-companion[data-emotion="attentive"] .fortisni-avatar{transform:rotate(3deg)}
+.fortisni-companion[data-emotion="warm"] .fortisni-eyes{transform:scaleY(.45);transform-origin:center}
