@@ -7,7 +7,7 @@ const suiteDir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-doc-suite-'));
 process.env.NODE_ENV='test';
 process.env.JWT_SECRET='upload-limit-test-secret-with-at-least-thirty-two-characters';
 process.env.BOTFORGE_DATA_FILE=path.join(suiteDir,'db.json');
-const {extractText}=require('../server/documents');
+const {extractText,publicDoc}=require('../server/documents');
 
 async function withFile(name,bytes,fn){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-doc-'));
@@ -15,6 +15,26 @@ async function withFile(name,bytes,fn){
  try{fs.writeFileSync(file,bytes);await fn(file,name);}
  finally{fs.rmSync(dir,{recursive:true,force:true});}
 }
+
+test('public document metadata tolerates malformed chunks and never exposes content or vectors',()=>{
+ const result=publicDoc({id:'doc-1',botId:'bot-1',filename:'safe.txt',createdAt:'2026-11-20T00:00:00.000Z',chunks:[
+  null,{text:'private content',embedding:[0.1,0.2]},{text:'keyword only'}
+ ]});
+ assert.equal(result.chunkCount,2);
+ assert.equal(result.indexedChunkCount,1);
+ assert.equal(result.keywordSearchAvailable,true);
+ assert.equal(result.semanticSearchAvailable,false);
+ assert.equal(JSON.stringify(result).includes('private content'),false);
+ assert.equal(JSON.stringify(result).includes('0.1'),false);
+});
+
+test('public document metadata handles missing and empty chunk collections',()=>{
+ const empty=publicDoc({id:'doc-2',chunks:null});
+ assert.equal(empty.chunkCount,0);
+ assert.equal(empty.indexedChunkCount,0);
+ assert.equal(empty.keywordSearchAvailable,false);
+ assert.equal(empty.semanticSearchAvailable,false);
+});
 
 test('text document extraction accepts valid UTF-8',async()=>{
  await withFile('notes.txt',Buffer.from('BotForge documentation\nनमस्ते','utf8'),async file=>{
