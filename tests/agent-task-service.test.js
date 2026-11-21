@@ -99,3 +99,29 @@ test('parallel JSON fallback enqueues cannot exceed the per-user active task cap
   assert.equal(records.filter(row=>row.userId==='u-cap'&&row.kind==='agent-task'&&!['completed','failed','cancelled'].includes(row.status)).length,service.MAX_TASKS_PER_USER);
  }finally{teardown();}
 });
+
+test('JSON fallback serializes completion against cancellation without terminal-state overwrite',async()=>{
+ setup();try{
+  const queued=await service.enqueueTask({userId:'u-race',taskType:'agent.plan',payload:{}});
+  const claimed=await service.claimTask('worker-race',new Date(Date.parse(queued.task.createdAt)+5));
+  const [completed,cancelled]=await Promise.all([
+   service.completeTask(claimed.id,'worker-race',{ok:true},new Date(Date.parse(claimed.leaseExpiresAt)-1)),
+   service.cancelTask(claimed.id,'u-race',new Date(Date.parse(claimed.leaseExpiresAt)-2))
+  ]);
+  const final=await store.findByIdAsync('aiEngineerRuns',claimed.id);
+  assert.ok(['completed','cancelled'].includes(final.status));
+  if(final.status==='completed'){assert.equal(completed.status,'completed');assert.equal(cancelled,null);}
+  else {assert.equal(cancelled.status,'cancelled');assert.equal(completed,null);}
+ }finally{teardown();}
+});
+test('JSON fallback lease recovery rechecks state before resetting an expired worker task',async()=>{
+ setup();try{
+  const queued=await service.enqueueTask({userId:'u-recover-race',taskType:'agent.plan',payload:{}});
+  const claimed=await service.claimTask('worker-recover',new Date(Date.parse(queued.task.createdAt)+5));
+  const expiry=new Date(Date.parse(claimed.leaseExpiresAt));
+  const recovered=await service.recoverExpiredTasks(expiry);
+  assert.equal(recovered.length,1);
+  assert.equal(recovered[0].status,'queued');
+  assert.equal(recovered[0].leaseOwner,null);
+ }finally{teardown();}
+});
