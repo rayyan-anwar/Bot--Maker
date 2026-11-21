@@ -234,6 +234,19 @@ router.get('/ai-budget/alerts/history',async(req,res,next)=>{
   res.json({items:result.rows,limit:Number(limitRaw)});
  }catch(e){next(e);}
 });
+router.get('/ai-budget/alerts/outbox',async(req,res,next)=>{
+ try{
+  if(!store.isPostgres())return res.status(503).json({error:'AI budget controls require PostgreSQL storage.'});
+  const limitRaw=req.query.limit===undefined?'50':String(req.query.limit);
+  if(!/^\d{1,3}$/.test(limitRaw)||Number(limitRaw)<1||Number(limitRaw)>100)return res.status(400).json({error:'limit must be an integer from 1 to 100.'});
+  const state=req.query.state===undefined?null:String(req.query.state);
+  if(state!==null&&!['pending','attempted','delivered','failed'].includes(state))return res.status(400).json({error:'state must be pending, attempted, delivered or failed.'});
+  const result=await store.query(`SELECT id,event_id,scope_id,event_type,payload,delivery_state,attempts,last_error,created_at,available_at,delivered_at
+    FROM ai_budget_alert_outbox WHERE ($1::text IS NULL OR delivery_state=$1)
+    ORDER BY available_at,created_at LIMIT $2`,[state,Number(limitRaw)]);
+  res.json({items:result.rows,limit:Number(limitRaw),deliveryEnabled:false,notice:'Outbox records are queued for a future delivery adapter; no messages are sent by this endpoint.'});
+ }catch(e){next(e);}
+});
 router.get('/ai-budget/reservations',async(req,res,next)=>{
  try{
   if(!store.isPostgres())return res.status(503).json({error:'AI budget controls require PostgreSQL storage.'});
