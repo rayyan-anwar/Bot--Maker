@@ -65,7 +65,7 @@ async function processOneTask() {
     const result=await handler(task,{workerId:WORKER_ID,leaseMs:LEASE_MS});
     await taskService.completeTask(task.id,WORKER_ID,result,new Date());
   }catch(error){
-    await taskService.failTask(task.id,WORKER_ID,safeError(error),new Date(),Math.min(60000,1000*MathMath.pow(2,task.attempt-1))).catch(()=>{});
+    await taskService.failTask(task.id,WORKER_ID,safeError(error),new Date(),Math.min(60000,1000*Math.pow(2,task.attempt-1))).catch(()=>{});
   }finally{clearInterval(heartbeat);}
   return true;
 }
