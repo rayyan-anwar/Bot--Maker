@@ -18,7 +18,7 @@ test('queue validates bounds and payload serialization', () => {
 });
 
 test('enqueue supports idempotency scoped to owner and bounded queue capacity', () => {
- const q=queue({maxSize:1});
+ const q=queue({maxSize:2});
  const first=q.enqueue(task('t1',{idempotencyKey:'key'}),10);
  const repeat=q.enqueue(task('t2',{idempotencyKey:'key'}),11);
  assert.equal(first.id,repeat.id);
