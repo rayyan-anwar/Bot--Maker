@@ -13,6 +13,9 @@ Both tools are disabled until a run is approved and each tool ID is explicitly a
 - `bot.read`
 These catalog entries are unavailable for execution.
 
+## Dashboard controls
+The dashboard lets users select local tools when approving a plan. Draft preview selection automatically requests explicit write permission. Approved runs show a tool picker, bounded JSON argument input, run button, and safely rendered JSON result. Web and other external tools are not selectable.
+
 ## Execution API
 `POST /api/agents/:runId/approve` accepts optional `toolIds` (up to five known IDs), `writePermission`, and `externalPermission`. Omitting these values keeps approval plan-only. Requested write or external tools require their matching explicit permission. Approval is owner-only and only transitions a planned run.
 
