@@ -28,7 +28,7 @@ async function listUserTasks(userId, limit = 50) {
   return rows.filter(row => row.kind === TASK_KIND).sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, Math.max(1, Math.min(100, limit))).map(publicTask);
 }
 async function enqueueTask({ userId, taskType, payload, idempotencyKey }) {
-  if (typeof userId !== 'string' || !userId) throw new TypeTypeError('userId required');
+  if (typeof userId !== 'string' || !userId) throw new TypeError('userId required');
   if (typeof taskType !== 'string' || !/^[a-z][a-z0-9.-]{1,79}$/.test(taskType)) throw new TypeError('Invalid task type.');
   const safePayload = boundedJson(payload, MAX_PAYLOAD_BYTES, 'Task payload');
   if (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string' || !idempotencyKey.trim() || idempotencyKey.length > 160)) throw new TypeError('Invalid idempotency key.');
@@ -54,7 +54,7 @@ async function getTaskForUser(taskId, userId) {
 async function claimTask(workerId, now = new Date(), leaseMs = DEFAULT_LEASE_MS) {
   if (typeof workerId !== 'string' || !workerId.trim() || workerId.length > 128) throw new TypeError('Invalid worker ID.');
   const current = now instanceof Date ? now : new Date(now);
-  if (!Number.isFinite(current.getTime()) || !Number.isInteger(leaseMs) || leaseMs < 1000 || leaseMs > 900000) throw new TypeTypeError('Invalid claim parameters.');
+  if (!Number.isFinite(current.getTime()) || !Number.isInteger(leaseMs) || leaseMs < 1000 || leaseMs > 900000) throw new TypeError('Invalid claim parameters.');
   const timestamp = current.toISOString(), expires = new Date(current.getTime() + leaseMs).toISOString();
   if (store.isPostgres()) {
     const result = await store.query(`UPDATE botforge_records SET data=data || jsonb_build_object('status','running','attempt',COALESCE((data->>'attempt')::int,0)+1,'leaseOwner',$1,'leaseExpiresAt',$2,'updatedAt',$3),updated_at=now() WHERE collection='aiEngineerRuns' AND id=(SELECT id FROM botforge_records WHERE collection='aiEngineerRuns' AND data->>'kind'='agent-task' AND data->>'status'='queued' AND COALESCE(data->>'availableAt',$4)<=$4 ORDER BY data->>'availableAt',created_at,id FOR UPDATE SKIP LOCKED LIMIT 1) AND data->>'status'='queued' RETURNING data`, [workerId, expires, timestamp, timestamp]);
