@@ -55,6 +55,21 @@ async function allAsync(c){assertCollection(c);if(!isPostgres())return all(c);aw
 async function findManyAsync(c,filters={}){assertCollection(c);const allowed=new Set(['ownerId','botId','userId','isPublic','email']);const entries=Object.entries(filters);if(entries.some(([key,value])=>!allowed.has(key)||value===undefined||value===null))throw new Error('Unsupported data filter.');if(!isPostgres())return all(c).filter(row=>entries.every(([key,value])=>row[key]===value));await initialize();if(!entries.length)return allAsync(c);const clauses=entries.map((_,i)=>`data->>$${i*2+3}=$${i*2+2}`);const values=[c,...entries.flatMap(([key,value])=>[String(value),key])];const result=await pool.query(`SELECT data FROM botforge_records WHERE collection=$1 AND ${clauses.join(' AND ')} ORDER BY updated_at,id`,values);return result.rows.map(row=>row.data);}
 async function findByIdAsync(c,id){assertCollection(c);if(!isUuid(id))return null;if(!isPostgres())return findById(c,id);await initialize();const r=await pool.query('SELECT data FROM botforge_records WHERE collection=$1 AND id=$2',[c,id]);return r.rowCount?r.rows[0].data:null;}
 async function insertAsync(c,record){assertCollection(c);if(!isPostgres()){if(c==='users'&&all('users').some(u=>String(u.email).toLowerCase()===String(record.email).toLowerCase())){const e=new Error('Duplicate user email.');e.code='23505';throw e;}return insert(c,record);}await initialize();await pool.query('INSERT INTO botforge_records(collection,id,data) VALUES($1,$2,$3::jsonb)',[c,record.id,JSON.stringify(record)]);return record;}
+async function insertAgentTaskIdempotent(record){
+ if(!record||record.kind!=='agent-task'||typeof record.userId!=='string'||typeof record.idempotencyKey!=='string'||!record.idempotencyKey)throw new TypeError('Agent task idempotency fields are required.');
+ if(!isPostgres()){
+  const prior=all('aiEngineerRuns').find(row=>row.kind==='agent-task'&&row.userId===record.userId&&row.idempotencyKey===record.idempotencyKey);
+  if(prior)return {created:false,record:prior};
+  insert('aiEngineerRuns',record);return {created:true,record};
+ }
+ await initialize();
+ const inserted=await pool.query("INSERT INTO botforge_records(collection,id,data) VALUES('aiEngineerRuns',$1,$2::jsonb) ON CONFLICT DO NOTHING RETURNING data",[record.id,JSON.stringify(record)]);
+ if(inserted.rowCount)return {created:true,record:inserted.rows[0].data};
+ const prior=await pool.query("SELECT data FROM botforge_records WHERE collection='aiEngineerRuns' AND data->>'kind'='agent-task' AND data->>'userId'=$1 AND data->>'idempotencyKey'=$2 LIMIT 1",[record.userId,record.idempotencyKey]);
+ if(prior.rowCount)return {created:false,record:prior.rows[0].data};
+ throw new Error('Idempotent task insertion conflicted without a matching task.');
+}
+
 async function updateByIdAsync(c,id,patch){assertCollection(c);if(!isUuid(id))return null;if(!isPostgres())return updateById(c,id,patch);await initialize();const r=await pool.query("UPDATE botforge_records SET data=data || $3::jsonb,updated_at=now() WHERE collection=$1 AND id=$2 RETURNING data",[c,id,JSON.stringify(patch)]);return r.rowCount?r.rows[0].data:null;}
 async function deleteByIdAsync(c,id){assertCollection(c);if(!isUuid(id))return false;if(!isPostgres())return deleteById(c,id);await initialize();const r=await pool.query('DELETE FROM botforge_records WHERE collection=$1 AND id=$2',[c,id]);return r.rowCount>0;}
 async function findUserByPasswordResetTokenHash(tokenHash){
