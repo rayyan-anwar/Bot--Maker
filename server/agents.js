@@ -261,7 +261,7 @@ router.post('/:runId/cancel', requireAuth, async (req, res, next) => {
     if (!existing || existing.kind !== 'agent-plan' || existing.userId !== req.user.id) return res.status(404).json({ error: 'Agent plan not found.' });
     const cancelledAt = new Date().toISOString();
     const steps = cancelPlanSteps(existing.plan?.steps, cancelledAt);
-    const result = await store.transitionAgentRunStatus(req.params.runId, req.user.id, ['planned', 'approved'], 'cancelled', {
+    const result = await store.transitionAgentRunStatus(req.params.runId, req.user.id, ['planned', 'approved', 'executing'], 'cancelled', {
       cancelledAt, cancellation: { cancelledBy: req.user.id, cancelledAt },
       plan: { ...existing.plan, steps }, progress: getPlanProgress(steps),
     });
