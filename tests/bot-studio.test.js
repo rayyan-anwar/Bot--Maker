@@ -38,3 +38,17 @@ test('Bot Studio dashboard exposes owner publish and unpublish controls',()=>{
  assert.match(html,/api\('\/bots\/'\+encodeURIComponent\(id\)\+\'\/\'/);
  assert.match(html,/const theirs = pub;/);
 });
+
+test('Bot Studio dashboard exposes version history and restore actions for owned bots',()=>{
+ assert.match(html,/bot-version-toggle/);
+ assert.match(html,/bot-version-panel/);
+ assert.match(html,/bot-version-restore/);
+ assert.match(html,/\/bots\/\+encodeURIComponent\(botId\)\+'\/versions'/);
+ assert.match(html,/\/versions\/\+encodeURIComponent\(restoreButton\.dataset\.version\)\/restore/);
+ assert.match(html,/data-current-version|Current version:/);
+});
+test('Bot Studio version history uses DOM text APIs for saved summaries',()=>{
+ assert.match(html,/label\.textContent='Version '\+version\.version/);
+ assert.match(html,/detail\.textContent=' · '\+version\.summary/);
+ assert.match(html,/panel\.replaceChildren\(\)/);
+});
