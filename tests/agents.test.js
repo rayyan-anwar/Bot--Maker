@@ -116,3 +116,12 @@ test('Agent Lab exposes owner-scoped knowledge search route',()=>{
  const {router}=require('../server/agents');
  assert.ok(router.stack.some(layer=>layer.route?.path==='/:runId/tools/:toolId'&&layer.route.methods.post));
 });
+
+test('Agent Lab task API and approved-plan execution routes are registered',()=>{
+ const {router}=require('../server/agents');
+ assert.ok(router.stack.some(layer=>layer.route?.path==='/tasks'&&layer.route.methods.post));
+ assert.ok(router.stack.some(layer=>layer.route?.path==='/tasks'&&layer.route.methods.get));
+ assert.ok(router.stack.some(layer=>layer.route?.path==='/tasks/:taskId'&&layer.route.methods.get));
+ assert.ok(router.stack.some(layer=>layer.route?.path==='/tasks/:taskId/cancel'&&layer.route.methods.post));
+ assert.ok(router.stack.some(layer=>layer.route?.path==='/:runId/execute'&&layer.route.methods.post));
+});
