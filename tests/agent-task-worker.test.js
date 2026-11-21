@@ -75,3 +75,10 @@ test('execution cancellation route delegates cancellation to its linked task',()
  assert.ok(source.includes('agentTaskService.cancelTask(existing.executionTaskId, req.user.id)'));
  assert.match(source, /\['planned', 'approved', 'executing'\], 'cancelled'/);
 });
+
+test('worker preserves plan cancellation state when provider fails after cancellation',async()=>{setup();try{
+ providers.generate=async()=>{generated++;const run=records.get(runId);records.set(runId,{...run,status:'cancelled',plan:{...run.plan,steps:run.plan.steps.map(step=>({...step,status:'cancelled'}))}});throw new Error('provider returned after cancellation');};
+ await assert.rejects(worker.executeApprovedPlan(records.get(taskId),{workerId:'test-worker'}),/provider returned after cancellation/);
+ const run=records.get(runId);assert.equal(run.status,'cancelled');assert.equal(run.plan.steps[0].status,'cancelled');
+ }finally{teardown();}
+});
