@@ -35,6 +35,7 @@
     <div class="flex-between"><small class="muted">Up to 4,000 characters · AI usage limits apply</small><button class="btn btn-primary" id="agent-plan-submit" type="submit">Create plan</button></div>
     <p id="agent-plan-error" class="error-msg" role="alert"></p>
   </form>
+  <div style="margin-top:20px"><div class="flex-between"><h3>Fortisni activity</h3><button type="button" class="btn btn-ghost" id="fortisni-refresh">Refresh</button></div><div id="fortisni-agent-events" aria-live="polite"><p class="muted">Loading companion activity…</p></div></div>
   <div style="margin-top:20px"><h3>Your plans</h3><div id="agent-plan-list"><p class="muted">Loading plans…</p></div></div><div style="margin-top:20px"><div class="flex-between"><h3>Your queued tasks</h3><button type="button" class="btn btn-ghost" id="agent-task-refresh">Refresh</button></div><div id="agent-task-list"><p class="muted">Loading tasks…</p></div></div>
 </section>
   <section class="card" style="margin-top:20px">
@@ -325,6 +326,7 @@
       status.textContent=executionEnabled?'Execution tools are enabled. Review permissions before use.':(message||'Catalog preview only. Tools cannot run yet.');
     }catch(error){status.textContent='Tool catalog is temporarily unavailable.';list.replaceChildren();}
   }
+  async function loadFortisniEvents(){const root=document.getElementById('fortisni-agent-events');try{const {events=[]}=await api('/agents/fortisni/events?limit=20');root.replaceChildren();if(!events.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='Fortisni will react as your agent tasks progress.';root.appendChild(empty);return;}events.forEach(item=>{const row=document.createElement('div');row.className='card';row.style.marginBottom='8px';const head=document.createElement('div');head.className='flex-between';const state=document.createElement('strong');state.textContent=(item.reaction?.emotion||'neutral')+' · '+(item.reaction?.state||'idle');const time=document.createElement('small');time.className='muted';time.textContent=item.createdAt?new Date(item.createdAt).toLocaleString():'';head.append(state,time);const message=document.createElement('p');message.textContent=item.message||'Agent activity';message.style.margin='6px 0 0';row.append(head,message);root.appendChild(row);});}catch(_){root.textContent='Fortisni activity is temporarily unavailable.';}}
   async function loadAgentPlans(){
     try{const {runs=[]}=await api('/agents/mine');renderAgentPlans(runs);}
     catch(error){agentList.textContent='Agent Lab plans are temporarily unavailable.';}
@@ -372,9 +374,11 @@
       }
     }catch(error){window.alert(error.message);button.disabled=false;}
   });
+  document.getElementById('fortisni-refresh').addEventListener('click',loadFortisniEvents);
+  loadFortisniEvents();
   loadAgentPlans();
   loadAgentTasks();
-  setInterval(()=>{loadAgentTasks();loadAgentPlans();},10000);
+  setInterval(()=>{loadAgentTasks();loadAgentPlans();loadFortisniEvents();},10000);
   loadAgentToolCatalog();
 
   loadBots();
