@@ -9,7 +9,8 @@ const LABELS = Object.freeze({
 });
 function safeText(value, fallback = 'unknown', maxLength = 120) {
   if (typeof value !== 'string' || !value.trim()) return fallback;
-  return value.replace(/[\\r\\n\\t]+/g, ' ').replace(/[<>]/g, '').trim().slice(0, maxLength) || fallback;
+  const cleaned = value.replace(/<[^>]*>/g, '').replace(/[\\r\\n\\t]+/g, ' ').replace(/[\\u0000-\\u001f\\u007f]/g, ' ').trim().slice(0, maxLength);
+  return cleaned || fallback;
 }
 function money(value, currency) {
   const amount = Number(value);
