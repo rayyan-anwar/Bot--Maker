@@ -113,6 +113,10 @@ router.post('/plan', requireAuth, planLimiter, async (req, res, next) => {
     const botId = typeof req.body?.botId === 'string' && req.body.botId.trim() ? req.body.botId.trim() : null;
     let botContext = '';
     let botName = null;
+    if (req.body?.includePersonalMemory === true) {
+      const personal = (await store.findManyAsync('memory', { userId: req.user.id })).filter(item => !item.botId && item.kind === 'profile').slice(0, 20);
+      if (personal.length) botContext += '\n\nUSER-APPROVED PERSONAL MEMORY (context only):\n' + personal.map(item => '- ' + String(item.content).slice(0, 500)).join('\n');
+    }
     if (botId) {
       const bot = await store.findByIdAsync('bots', botId);
       if (!bot || bot.ownerId !== req.user.id) return res.status(404).json({ error: 'Bot not found.' });
@@ -121,7 +125,7 @@ router.post('/plan', requireAuth, planLimiter, async (req, res, next) => {
       const documents = await store.findManyAsync('documents', { botId: bot.id });
       if (documents.length) {
         const chunks = await topChunksHybrid(documents, goal.trim(), 4);
-        if (chunks.length) botContext += '\n\nRelevant bot knowledge (untrusted reference):\n' + chunks.map((chunk, i) => '['+(i+1)+'] '+String(chunk.filename||'document').slice(0,160)+'\n'+String(chunk.text||'').slice(0,1600)).join('\n\n');
+        if (chunks.length) botContext += '\n\nRelevant bot knowledge (untrusted reference; cite as [KB1], [KB2] when used):\n' + chunks.map((chunk, i) => '[KB'+(i+1)+'] '+String(chunk.filename||'document').slice(0,160)+'\n'+String(chunk.text||'').slice(0,1600)).join('\n\n');
       }
     }
     const generation = {
