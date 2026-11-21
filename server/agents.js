@@ -105,6 +105,30 @@ router.get('/mine', requireAuth, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+router.post('/:runId/approve', requireAuth, async (req, res, next) => {
+  try {
+    const result = await store.transitionAgentRunStatus(req.params.runId, req.user.id, ['planned'], 'approved', {
+      approvedAt: new Date().toISOString(),
+      approval: { approvedBy: req.user.id, approvedAt: new Date().toISOString(), scope: 'plan-only' },
+    });
+    if (result.state === 'not_found') return res.status(404).json({ error: 'Agent plan not found.' });
+    if (result.state !== 'updated') return res.status(409).json({ error: 'Only a planned run can be approved.', status: result.run?.status || null });
+    res.json({ run: result.run, message: 'Plan approved. No tools or external actions have been executed.' });
+  } catch (error) { next(error); }
+});
+
+router.post('/:runId/cancel', requireAuth, async (req, res, next) => {
+  try {
+    const result = await store.transitionAgentRunStatus(req.params.runId, req.user.id, ['planned', 'approved'], 'cancelled', {
+      cancelledAt: new Date().toISOString(),
+      cancellation: { cancelledBy: req.user.id, cancelledAt: new Date().toISOString() },
+    });
+    if (result.state === 'not_found') return res.status(404).json({ error: 'Agent plan not found.' });
+    if (result.state !== 'updated') return res.status(409).json({ error: 'This run can no longer be cancelled.', status: result.run?.status || null });
+    res.json({ run: result.run });
+  } catch (error) { next(error); }
+});
+
 router.get('/:runId', requireAuth, async (req, res, next) => {
   try {
     const run = await store.findByIdAsync('aiEngineerRuns', req.params.runId);
