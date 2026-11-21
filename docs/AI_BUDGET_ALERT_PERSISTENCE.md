@@ -4,6 +4,7 @@ Migration 012 stores one latest alert snapshot per budget scope and a transition
 
 - `ai_budget_alert_state` stores the latest status and snapshot.
 - `ai_budget_alert_events` stores initial non-normal states, escalations, downgrades, recovery and evaluation-unavailable transitions.
+- `ai_budget_alert_outbox` queues one immutable payload per transition event in the same database function call; duplicate event IDs are ignored.
 - `botforge_record_ai_budget_alert` serializes concurrent writes for a scope through PostgreSQL row locking. Repeated identical statuses update the latest snapshot without creating duplicate events.
 - Admin `GET /api/admin/ai-budget/summary` now evaluates scopes, persists alert state and returns per-scope alert summaries plus counts. It requires PostgreSQL and administrator authentication.
 - Admin `GET /api/admin/ai-budget/alerts/history?limit=50&scopeId=<uuid>` returns bounded transition history (limit 1–100), optionally scoped to a UUID.
