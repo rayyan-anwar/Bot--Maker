@@ -42,7 +42,7 @@ test('safe text tool is allowed only with approved run and per-run approval',()=
 test('text analyzer returns bounded safe metadata and preview',()=>{
  const result=executeSafeTool('text.analyze',{text:'Hello world.\nSecond line!'});
  assert.equal(result.type,'text-analysis');
- assert.equal(result.words,3);
+ assert.equal(result.words,4);
  assert.equal(result.lines,2);
  assert.equal(result.sentences,2);
  assert.equal(result.preview,'Hello world.\nSecond line!');
