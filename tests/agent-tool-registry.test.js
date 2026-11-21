@@ -1,12 +1,15 @@
 'use strict';
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {getToolCatalog,validateToolRequest,MAX_ARGUMENT_BYTES}=require('../server/agent-tool-registry');
+const {getToolCatalog,validateToolRequest,executeSafeTool,MAX_ARGUMENT_BYTES,MAX_TEXT_CHARS}=require('../server/agent-tool-registry');
 
 test('catalog returns a bounded descriptive allowlist with execution disabled',()=>{
  const catalog=getToolCatalog();
  assert.equal(catalog.length,5);
- assert.ok(catalog.every(tool=>tool.requiresApproval===true&&tool.executionAvailable===false&&tool.enabled===false));
+ assert.ok(catalog.every(tool=>tool.requiresApproval===true));
+ assert.equal(catalog.find(tool=>tool.id==='text.analyze').executionAvailable,true);
+ assert.equal(catalog.find(tool=>tool.id==='draft.create').executionAvailable,true);
+ assert.equal(catalog.find(tool=>tool.id==='knowledge.search').executionAvailable,false);
  assert.ok(catalog.every(tool=>typeof tool.id==='string'&&tool.id.length<=64));
 });
 test('unknown tool identifiers are rejected',()=>{
@@ -33,6 +36,23 @@ test('arguments must be object and are bounded to 4 KB',()=>{
 test('catalog-only tools cannot be executed even with context approval',()=>{
  const result=validateToolRequest({toolId:'text.analyze',arguments:{text:'test'}},{runStatus:'approved',approvedToolIds:['text.analyze']});
  assert.equal(result.valid,false);
- assert.ok(result.errors.some(error=>error.includes('not enabled')));
- assert.equal(result.executable,false);
+ assert.equal(result.valid,true);
+ assert.equal(result.executable,true);
+});
+
+test('text analyzer returns bounded safe metadata and preview',()=>{
+ const result=executeSafeTool('text.analyze',{text:'Hello world.\nSecond line!'});
+ assert.equal(result.type,'text-analysis');
+ assert.equal(result.words,3);
+ assert.equal(result.lines,2);
+ assert.equal(result.sentences,2);
+ assert.equal(result.preview,'Hello world.\nSecond line!');
+ assert.throws(()=>executeSafeTool('text.analyze',{text:'x'.repeat(MAX_TEXT_CHARS+1)}),/12,000/);
+});
+test('draft tool validates content and returns review-only artifact',()=>{
+ const draft=executeSafeTool('draft.create',{title:'Proposal',content:'Draft content'});
+ assert.equal(draft.type,'draft');
+ assert.equal(draft.status,'created-for-review');
+ assert.equal(draft.content,'Draft content');
+ assert.throws(()=>executeSafeTool('draft.create',{title:'',content:'x'}),/Draft title/);
 });
