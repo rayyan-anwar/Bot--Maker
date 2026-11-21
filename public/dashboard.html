@@ -221,8 +221,21 @@
       const status=document.createElement('span');status.className='tag';status.textContent=String(run.status||'unknown').replace(/-/g,' ');
       head.append(title,status);card.appendChild(head);
       const summary=document.createElement('p');summary.className='muted';summary.textContent=run.plan?.summary||'';card.appendChild(summary);
+      const progress=run.progress||{total:(run.plan?.steps||[]).length,completed:(run.plan?.steps||[]).filter(step=>step.status==='completed').length,percent:0};
+      const progressText=document.createElement('p');progressText.className='muted';progressText.textContent='Progress: '+progress.completed+'/'+progress.total+' steps · '+progress.percent+'%';card.appendChild(progressText);
       const steps=document.createElement('ol');
-      (run.plan?.steps||[]).forEach(step=>{const li=document.createElement('li');const strong=document.createElement('strong');strong.textContent=step.title+' · ';li.append(strong,document.createTextNode(step.description));steps.appendChild(li);});
+      (run.plan?.steps||[]).forEach((step,index)=>{
+        const li=document.createElement('li');const strong=document.createElement('strong');strong.textContent=step.title+' · ';
+        const status=document.createElement('span');status.className='tag';status.textContent=step.status||'pending';
+        li.append(strong,document.createTextNode(step.description+' '),status);
+        if(run.status==='approved'){
+          const controls=document.createElement('span');controls.style.display='inline-flex';controls.style.gap='6px';controls.style.marginLeft='8px';
+          const actions=step.status==='pending'?[{label:'Start',value:'running'}]:step.status==='running'?[{label:'Complete',value:'completed'},{label:'Fail',value:'failed'}]:step.status==='failed'&&step.retryCount<2?[{label:'Retry',value:'pending'}]:[];
+          actions.forEach(action=>{const btn=document.createElement('button');btn.type='button';btn.className='btn btn-ghost';btn.textContent=action.label;btn.dataset.agentStepAction=action.value;btn.dataset.runId=run.id;btn.dataset.stepIndex=String(index);controls.appendChild(btn);});
+          li.appendChild(controls);
+        }
+        steps.appendChild(li);
+      });
       card.appendChild(steps);
       const actions=document.createElement('div');actions.className='flex-between';
       const note=document.createElement('small');note.className='muted';note.textContent=run.status==='approved'?'Approved. Only explicitly approved local tools can run.':run.status==='cancelled'?'Cancelled':'Awaiting your review.';
@@ -287,6 +300,15 @@
     finally{agentSubmit.disabled=false;agentSubmit.textContent='Create plan';}
   });
   agentList.addEventListener('click',async event=>{
+    const stepButton=event.target.closest('[data-agent-step-action]');
+    if(stepButton){
+      stepButton.disabled=true;
+      try{
+        await api('/agents/'+encodeURIComponent(stepButton.dataset.runId)+'/steps/'+encodeURIComponent(stepButton.dataset.stepIndex)+'/status',{method:'POST',body:{status:stepButton.dataset.agentStepAction}});
+        await loadAgentPlans();
+      }catch(error){window.alert(error.message);stepButton.disabled=false;}
+      return;
+    }
     const button=event.target.closest('[data-agent-action]');if(!button)return;
     button.disabled=true;
     try{
