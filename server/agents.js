@@ -165,7 +165,9 @@ router.post('/:runId/tools/:toolId', requireAuth, async (req, res, next) => {
 });
 
 router.get('/tools', requireAuth, (req, res) => {
-  res.json({ tools: getToolCatalog(), executionEnabled: false, message: 'Catalog only. Tool execution is not enabled yet.' });
+  const tools = getToolCatalog();
+  const executionEnabled = tools.some(tool => tool.executionAvailable);
+  res.json({ tools, executionEnabled, message: executionEnabled ? 'Safe local tools are available after per-run approval; external tools remain disabled.' : 'Catalog only. Tool execution is not enabled yet.' });
 });
 
 router.get('/:runId', requireAuth, async (req, res, next) => {
