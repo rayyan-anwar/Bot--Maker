@@ -42,9 +42,10 @@ test('terminal task failure synchronizes executing plan to failed',async()=>{
  const taskService=require('../server/agent-task-service');
  const savedClaim=taskService.claimTask,savedFail=taskService.failTask;
  const savedFind=store.findByIdAsync,savedUpdate=store.updateByIdAsync;
- const task={id:'task-fail-1',userId:owner,taskType:'unknown.handler',status:'running',attempt:3,payload:{planId:runId}};
+ const task={id:'task-fail-1',userId:owner,taskType:'test.failure.sync',status:'running',attempt:3,payload:{planId:runId}};
  const plan={id:runId,userId:owner,kind:'agent-plan',status:'executing',executionTaskId:task.id,plan:{steps:[{type:'draft',status:'running'},{type:'analyze',status:'pending'}]},executionOutputs:[]};
  taskService.claimTask=async()=>task;taskService.failTask=async()=>({...task,status:'failed'});
+ worker.registerTaskHandler('test.failure.sync',async()=>{throw new Error('expected handler failure');});
  store.findByIdAsync=async(_collection,id)=>id===runId?plan:null;
  store.updateByIdAsync=async(_collection,id,patch)=>{Object.assign(plan,patch);return plan;};
  try{await worker.processOneTask();assert.equal(plan.status,'failed');assert.equal(plan.plan.steps[0].status,'failed');assert.equal(plan.plan.steps[1].status,'pending');assert.equal(plan.progress.failed,1);}
