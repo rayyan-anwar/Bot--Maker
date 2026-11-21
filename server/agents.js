@@ -220,6 +220,20 @@ router.post('/:runId/approve', requireAuth, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+router.post('/:runId/execute', requireAuth, toolExecutionLimiter, async (req, res, next) => {
+  try {
+    const run = await store.findByIdAsync('aiEngineerRuns', req.params.runId);
+    if (!run || run.kind !== 'agent-plan' || run.userId !== req.user.id) return res.status(404).json({ error: 'Agent plan not found.' });
+    if (run.status !== 'approved') return res.status(409).json({ error: 'Only approved plans can be queued for execution.' });
+    const result = await agentTaskService.enqueueTask({ userId: req.user.id, taskType: 'agent.plan.execute', payload: { planId: run.id }, idempotencyKey: 'agent-plan-execute:' + run.id });
+    res.status(result.created ? 202 : 200).json({ task: result.task, queued: result.created });
+  } catch (error) {
+    if (error instanceof TypeError || error instanceof RangeError) return res.status(400).json({ error: error.message });
+    if (error.message === 'Your active task limit has been reached.') return res.status(429).json({ error: error.message });
+    next(error);
+  }
+});
+
 router.post('/:runId/steps/:stepIndex/status', requireAuth, async (req, res, next) => {
   try {
     const run = await store.findByIdAsync('aiEngineerRuns', req.params.runId);
