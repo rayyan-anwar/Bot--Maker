@@ -12,9 +12,9 @@ function safeText(value, fallback = 'unknown', maxLength = 120) {
   if (typeof value !== 'string' || !value.trim()) return fallback;
   const cleaned = value
     .replace(/<[^>]*>/g, '')
-    .replace(/\\\\n|\\\\r|\\\\t/g, ' ')
-    .replace(/[\\r\\n\\t]+/g, ' ')
-    .replace(/[\\u0000-\\u001f\\u007f]/g, ' ')
+    .replace(/\\n|\\r|\\t/g, ' ')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/[\x00-\x1f\x7f]/g, ' ')
     .trim()
     .slice(0, maxLength);
   return cleaned || fallback;
