@@ -79,3 +79,13 @@ test('claim rechecks task eligibility before updating the JSON fallback record',
   store.findByIdAsync=originalFind;
  }finally{teardown();}
 });
+
+test('parallel JSON fallback claims give one queued task to only one worker',async()=>{
+ setup();try{
+  const q=await service.enqueueTask({userId:'u1',taskType:'agent.plan',payload:{goal:'claim race'}});
+  const at=new Date(Date.parse(q.task.createdAt)+10);
+  const claims=await Promise.all([service.claimTask('worker-a',at),service.claimTask('worker-b',at)]);
+  assert.equal(claims.filter(Boolean).length,1);
+  assert.equal(records[0].status,'running');
+ }finally{teardown();}
+});
