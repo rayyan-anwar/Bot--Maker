@@ -82,7 +82,15 @@ async function processOneTask() {
     const result=await handler(task,{workerId:WORKER_ID,leaseMs:LEASE_MS});
     await taskService.completeTask(task.id,WORKER_ID,result,new Date());
   }catch(error){
-    await taskService.failTask(task.id,WORKER_ID,safeError(error),new Date(),Math.min(60000,1000*Math.pow(2,task.attempt-1))).catch(()=>{});
+    const failed=await taskService.failTask(task.id,WORKER_ID,safeError(error),new Date(),Math.min(60000,1000*Math.pow(2,task.attempt-1))).catch(()=>null);
+    if(failed&&failed.status==='failed'&&task.taskType==='agent.plan.execute'&&task.payload?.planId){
+      const plan=await store.findByIdAsync('aiEngineerRuns',task.payload.planId).catch(()=>null);
+      if(plan&&plan.userId===task.userId&&plan.executionTaskId===task.id&&plan.status==='executing'){
+        const now=new Date().toISOString();
+        const steps=Array.isArray(plan.plan?.steps)?plan.plan.steps.map(step=>step.status==='running'?{...step,status:'failed',completedAt:now,error:safeError(error)}:step):[];
+        await store.updateByIdAsync('aiEngineerRuns',plan.id,{status:'failed',plan:{...plan.plan,steps},progress:{total:steps.length,completed:plan.executionOutputs?.length||0,failed:steps.filter(step=>step.status==='failed').length,running:0,pending:steps.filter(step=>step.status==='pending').length,percent:steps.length?Math.round((plan.executionOutputs?.length||0)/steps.length*100):0},lastError:safeError(error),failedAt:now,updatedAt:now}).catch(()=>{});
+      }
+    }
   }finally{clearInterval(heartbeat);}
   return true;
 }
