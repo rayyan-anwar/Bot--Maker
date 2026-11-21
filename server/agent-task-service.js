@@ -138,8 +138,8 @@ async function recoverExpiredTasks(now = new Date()) {
   const current = now instanceof Date ? now : new Date(now);
   if (!Number.isFinite(current.getTime())) throw new TypeError('Invalid recovery time.');
   if (store.isPostgres()) {
-    const result = await store.query(`UPDATE botforge_records SET data=data || jsonb_build_object('status',CASE WHEN COALESCE((data->>'attempt')::int,0)<COALESCE((data->>'maxAttempts')::int,$1) THEN 'queued' ELSE 'failed' END,'availableAt',$2,'lastError','Worker lease expired.','leaseOwner',NULL,'leaseExpiresAt',NULL,'updatedAt',$2,'completedAt',CASE WHEN COALESCE((data->>'attempt')::int,0)>=COALESCE((data->>'maxAttempts')::int,$1) THEN $2 ELSE NULL END),updated_at=now() WHERE collection='aiEngineerRuns' AND data->>'kind'='agent-task' AND data->>'status'='running' AND (data->>'leaseExpiresAt')::timestamptz<=$2 RETURNING data`, [MAX_ATTEMPTS,current.toISOString()]);
-    return result.rows.map(publicTask);
+    const result = await store.query(`UPDATE botforge_records AS task_row SET data=jsonb_set(task_row.data || jsonb_build_object('status',CASE WHEN COALESCE((task_row.data->>'attempt')::int,0)<COALESCE((task_row.data->>'maxAttempts')::int,$1) THEN 'queued' ELSE 'failed' END,'availableAt',$2,'lastError','Worker lease expired.','leaseOwner',NULL,'leaseExpiresAt',NULL,'updatedAt',$2,'completedAt',CASE WHEN COALESCE((task_row.data->>'attempt')::int,0)>=COALESCE((task_row.data->>'maxAttempts')::int,$1) THEN $2 ELSE NULL END),'{id}',to_jsonb(task_row.id::text),true),updated_at=now() WHERE task_row.collection='aiEngineerRuns' AND task_row.data->>'kind'='agent-task' AND task_row.data->>'status'='running' AND (task_row.data->>'leaseExpiresAt')::timestamptz<=$2 RETURNING task_row.data`, [MAX_ATTEMPTS,current.toISOString()]);
+    return result.rows.map(row => publicTask(typeof row.data === 'string' ? JSON.parse(row.data) : row.data));
   }
   return serializeJsonClaim(async () => {
     const rows=(await store.allAsync('aiEngineerRuns')).filter(row=>row.kind===TASK_KIND&&row.status==='running'&&Date.parse(row.leaseExpiresAt)<=current.getTime());
