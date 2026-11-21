@@ -51,7 +51,12 @@ async function run(userId,id,triggerData={}) {
   const scheduleSlot=triggerData.scheduled===true&&workflow.trigger?.type==='schedule'?(triggerData.scheduleSlot||workflow.nextRunAt):null;
   const idempotencyKey=scheduleSlot?'automation:'+id+':schedule:'+scheduleSlot:'automation:'+id+':'+Date.now()+':'+uuidv4();
   const created=await taskService.enqueueTask({userId,taskType:'automation.workflow.execute',payload:{workflowId:id,triggerData},idempotencyKey});
-  await store.updateByIdAsync('aiEngineerRuns',id,{lastRunAt:new Date().toISOString(),lastTaskId:created.task.id,updatedAt:new Date().toISOString(),...(workflow.trigger?.type==='schedule'?{nextRunAt:new Date(Date.now()+workflow.trigger.intervalMinutes*60000).toISOString()}:{})});
+  const latest=await store.findByIdAsync('aiEngineerRuns',id);
+  if(latest&&latest.kind==='automation-workflow'&&latest.userId===userId){
+    const patch={lastRunAt:new Date().toISOString(),lastTaskId:created.task.id,updatedAt:new Date().toISOString()};
+    if(scheduleSlot&&latest.nextRunAt===scheduleSlot)patch.nextRunAt=new Date(Date.parse(scheduleSlot)+workflow.trigger.intervalMinutes*60000).toISOString();
+    await store.updateByIdAsync('aiEngineerRuns',id,patch);
+  }
   return created.task;
 }
 async function getOwned(userId,id){const row=await store.findByIdAsync('aiEngineerRuns',id);return row&&row.kind==='automation-workflow'&&row.userId===userId?row:null;}
