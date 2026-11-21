@@ -26,7 +26,7 @@ test('dashboard exposes owner review lifecycle controls without claiming executi
   assert.match(html, /dataset\.agentAction='approve'/);
   assert.match(html, /dataset\.agentAction='cancel'/);
   assert.match(html, /Approved\. Only explicitly approved local tools can run\./);
-  assert.match(html, /data-agent-action='run-tool'/);
+  assert.match(html, /execute\.dataset\.agentAction='run-tool'/);
 });
 
 test('Agent Lab dashboard displays a tool catalog without enabling execution',()=>{
