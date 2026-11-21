@@ -54,7 +54,8 @@ async function executeApprovedPlan(task, context) {
     }catch(error){
       if(budget)await usage.releaseAiBudget(budget).catch(()=>{});
       const latest=await store.findByIdAsync('aiEngineerRuns',planId);
-      if(latest&&latest.executionTaskId===task.id){const reset=latest.plan.steps.map((s,j)=>j===i?{...s,status:'pending',completedAt:null,error:safeError(error)}:s);await store.updateByIdAsync('aiEngineerRuns',planId,{plan:{...latest.plan,steps:reset},progress:{total:steps.length,completed:outputs.length,failed:0,running:0,pending:steps.length-outputs.length,percent:Math.round(outputs.length/steps.length*100)},updatedAt:new Date().toISOString()});}
+      const taskState=await store.findByIdAsync('aiEngineerRuns',task.id);
+      if(latest&&latest.executionTaskId===task.id){if(taskState?.status==='cancelled'){const cancelledAt=new Date().toISOString();const cancelledSteps=latest.plan.steps.map(s=>['pending','running'].includes(s.status)?{...s,status:'cancelled',completedAt:cancelledAt,error:null}:s);await store.updateByIdAsync('aiEngineerRuns',planId,{status:'cancelled',plan:{...latest.plan,steps:cancelledSteps},progress:{total:steps.length,completed:outputs.length,failed:0,running:0,pending:0,percent:Math.round(outputs.length/steps.length*100)},cancelledAt,updatedAt:cancelledAt});}else{const reset=latest.plan.steps.map((s,j)=>j===i?{...s,status:'pending',completedAt:null,error:safeError(error)}:s);await store.updateByIdAsync('aiEngineerRuns',planId,{plan:{...latest.plan,steps:reset},progress:{total:steps.length,completed:outputs.length,failed:0,running:0,pending:steps.length-outputs.length,percent:Math.round(outputs.length/steps.length*100)},updatedAt:new Date().toISOString()});}}
       throw error;
     }
     const text=result.text.slice(0,12000),completedAt=new Date().toISOString();
