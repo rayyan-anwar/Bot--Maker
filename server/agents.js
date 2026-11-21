@@ -309,6 +309,19 @@ router.get('/tools', requireAuth, (req, res) => {
   res.json({ tools, executionEnabled, message: executionEnabled ? 'Safe local tools are available after per-run approval; external tools remain disabled.' : 'Catalog only. Tool execution is not enabled yet.' });
 });
 
+router.get('/:runId/logs', requireAuth, async (req, res, next) => {
+  try {
+    const run = await store.findByIdAsync('aiEngineerRuns', req.params.runId);
+    if (!run || run.kind !== 'agent-plan' || run.userId !== req.user.id) return res.status(404).json({ error: 'Agent plan not found.' });
+    const logs = Array.isArray(run.executionLogs) ? run.executionLogs : [];
+    const requested = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(requested) ? Math.max(1, Math.min(100, requested)) : 50;
+    const requestedOffset = Number.parseInt(req.query.offset, 10);
+    const offset = Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0;
+    res.json({ logs: logs.slice(offset, offset + limit), total: logs.length, offset, limit, hasMore: offset + limit < logs.length });
+  } catch (error) { next(error); }
+});
+
 router.get('/:runId', requireAuth, async (req, res, next) => {
   try {
     const run = await store.findByIdAsync('aiEngineerRuns', req.params.runId);
