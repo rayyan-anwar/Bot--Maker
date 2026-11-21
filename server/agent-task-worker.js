@@ -66,8 +66,15 @@ async function executeApprovedPlan(task, context) {
     const completed=outputs.length;
     await store.updateByIdAsync('aiEngineerRuns',planId,{plan:{...latest.plan,steps:updatedSteps},executionOutputs:outputs,progress:{total:steps.length,completed,failed:0,running:0,pending:steps.length-completed,percent:Math.round(completed/steps.length*100)},updatedAt:completedAt});
   }
+  const finalTask=await store.findByIdAsync('aiEngineerRuns',task.id);
   const finalRun=await store.findByIdAsync('aiEngineerRuns',planId);
-  if(finalRun&&finalRun.executionTaskId===task.id)await store.updateByIdAsync('aiEngineerRuns',planId,{status:'completed',progress:{total:steps.length,completed:steps.length,failed:0,running:0,pending:0,percent:100},executionOutputs:outputs.sort((a,b)=>a.step-b.step),completedAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
+  if(finalTask?.status==='cancelled'&&finalRun&&finalRun.executionTaskId===task.id&&finalRun.status==='executing'){
+    const cancelledAt=new Date().toISOString();
+    const cancelledSteps=finalRun.plan.steps.map(step=>['pending','running'].includes(step.status)?{...step,status:'cancelled',completedAt:cancelledAt,error:null}:step);
+    await store.updateByIdAsync('aiEngineerRuns',planId,{status:'cancelled',plan:{...finalRun.plan,steps:cancelledSteps},progress:{total:steps.length,completed:outputs.length,failed:0,running:0,pending:0,percent:Math.round(outputs.length/steps.length*100)},cancelledAt,updatedAt:cancelledAt});
+    throw new Error('Task cancelled.');
+  }
+  if(finalRun&&finalRun.executionTaskId===task.id&&finalRun.status==='executing')await store.updateByIdAsync('aiEngineerRuns',planId,{status:'completed',progress:{total:steps.length,completed:steps.length,failed:0,running:0,pending:0,percent:100},executionOutputs:outputs.sort((a,b)=>a.step-b.step),completedAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
   return {planId,stepsCompleted:outputs.length,outputs:outputs.sort((a,b)=>a.step-b.step).map(item=>({step:item.step,text:item.text.slice(0,1800)}))};
 }
 registerTaskHandler('agent.plan.execute',executeApprovedPlan);
