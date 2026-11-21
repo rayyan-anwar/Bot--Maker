@@ -102,5 +102,5 @@ async function tick(){
   finally{active=false;if(!stopped)timer=setTimeout(tick,POLL_MS);}
 }
 function startWorker(){if(timer||active)return;stopped=false;timer=setTimeout(tick,0);}
-async function stopWorker(){stopped=true;if(timer){clearTimeout(timer);timer=null;}while(active)await new Promise(resolve=>setTimeout(resolve,50));}
+async function stopWorker(timeoutMs=10000){stopped=true;if(timer){clearTimeout(timer);timer=null;}const timeout=Math.max(100,Math.min(30000,Number(timeoutMs)||10000));const deadline=Date.now()+timeout;while(active&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,50));return !active;}
 module.exports={registerTaskHandler,startWorker,stopWorker,processOneTask,executeApprovedPlan,handlers};
