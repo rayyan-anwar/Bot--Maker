@@ -22,6 +22,15 @@ const planLimiter = rateLimit({
   message: { error: 'Agent Lab planning limit reached. Try again in a minute.' },
   ...(store.isPostgres() ? { store: new PostgresRateLimitStore('agent-plan', store.query) } : {}),
 });
+const toolExecutionLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: process.env.NODE_ENV === 'test' ? 1000 : 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Agent Lab tool execution limit reached. Try again in a minute.' },
+  ...(store.isPostgres() ? { store: new PostgresRateLimitStore('agent-tool-execution', store.query) } : {}),
+});
+
 
 function parsePlan(text) {
   if (typeof text !== 'string' || text.length > 30000) throw new Error('Agent planner returned an invalid response.');
