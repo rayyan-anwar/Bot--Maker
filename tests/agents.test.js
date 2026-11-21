@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parsePlan, initializePlanSteps, transitionPlanStep, getPlanProgress, STEP_RETRY_LIMIT, MAX_GOAL_CHARS, MAX_STEPS } = require('../server/agents');
+const { parsePlan, initializePlanSteps, transitionPlanStep, cancelPlanSteps, getPlanProgress, STEP_RETRY_LIMIT, MAX_GOAL_CHARS, MAX_STEPS } = require('../server/agents');
 const { getToolCatalog, validateToolRequest } = require('../server/agent-tool-registry');
 
 test('parses a valid bounded Agent Lab plan', () => {
@@ -95,4 +95,13 @@ test('Agent Lab rejects invalid step IDs, statuses and transitions',()=>{
  assert.throws(()=>transitionPlanStep(steps,-1,'running'),/Invalid step index/);
  assert.throws(()=>transitionPlanStep(steps,0,'unknown'),/Unsupported step status/);
  assert.throws(()=>transitionPlanStep(steps,0,'completed'),/Invalid step state transition/);
+});
+
+test('Agent Lab run cancellation marks pending and running steps cancelled',()=>{
+ const initial=initializePlanSteps([{title:'One'},{title:'Two'}]);
+ const running=transitionPlanStep(initial,0,'running');
+ const cancelled=cancelPlanSteps(running,'2026-11-21T12:00:00.000Z');
+ assert.deepEqual(cancelled.map(s=>s.status),['cancelled','cancelled']);
+ assert.ok(cancelled.every(s=>s.completedAt==='2026-11-21T12:00:00.000Z'));
+ assert.deepEqual(getPlanProgress(cancelled),{total:2,completed:0,failed:0,running:0,pending:0,percent:0});
 });
