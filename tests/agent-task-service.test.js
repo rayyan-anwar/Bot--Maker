@@ -72,7 +72,7 @@ test('idempotent enqueue remains single-record under concurrent requests',async(
 
 test('claim rechecks task eligibility before updating the JSON fallback record',async()=>{
  setup();try{
-  const q=await service.enqueueTask({userId:'u1',taskType:'agent.plan',payload:{goal:'race'}};
+  const q=await service.enqueueTask({userId:'u1',taskType:'agent.plan',payload:{goal:'race'}});
   const task=records[0];const originalFind=store.findByIdAsync;
   store.findByIdAsync=async(_collection,id)=>id===task.id?{...task,status:'cancelled'}:null;
   const claimed=await service.claimTask('worker-race',new Date(Date.parse(q.task.createdAt)+10));assert.equal(claimed,null);assert.equal(task.status,'queued');
