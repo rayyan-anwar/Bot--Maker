@@ -50,7 +50,9 @@ test('Agent Lab catalog is authenticated route metadata and execution remains di
  assert.ok(route);
  const catalog=getToolCatalog();
  assert.equal(catalog.length,5);
- assert.ok(catalog.every(tool=>tool.executionAvailable===false));
+ assert.equal(catalog.find(tool=>tool.id==='text.analyze').executionAvailable,true);
+ assert.equal(catalog.find(tool=>tool.id==='draft.create').executionAvailable,true);
+ assert.equal(catalog.find(tool=>tool.id==='knowledge.search').executionAvailable,false);
  const policy=validateToolRequest({toolId:'knowledge.search',arguments:{query:'x'}},{runStatus:'approved',approvedToolIds:['knowledge.search']});
  assert.equal(policy.valid,false);
  assert.equal(policy.executable,false);
