@@ -24,6 +24,11 @@
   </div>
   <div class="ad-slot" aria-label="Advertisement"><span>ADVERTISEMENT</span><div>Sponsored placement · available after ad-network approval</div></div><div class="card usage-card" id="usage-card" style="margin-top:20px"><div class="flex-between"><div><h2 style="margin:0">Usage today</h2><p id="usage-copy" style="margin:4px 0 0">Loading usage…</p></div><strong id="usage-count">—</strong></div><div class="usage-track"><span id="usage-progress"></span></div></div><div id="my-bots" class="bot-grid"></div><section class="card" id="agent-lab" style="margin-top:20px">
   <div class="flex-between"><div><h2 style="margin:0">Agent Lab</h2><p class="muted" style="margin:4px 0 0">Turn a goal into a structured plan. Plans require your review; approval does not execute tools or external actions.</p></div><span class="tag">Planning</span></div>
+  <div id="agent-tool-catalog" class="card" style="margin-top:14px">
+    <h3 style="margin-top:0">Tool catalog</h3>
+    <p class="muted" id="agent-tool-catalog-status">Loading approved tool catalog…</p>
+    <div id="agent-tool-catalog-list"></div>
+  </div>
   <form id="agent-plan-form" style="margin-top:16px">
     <div class="field"><label for="agent-goal">What do you want to accomplish?</label><textarea id="agent-goal" maxlength="4000" required rows="4" placeholder="Example: Research the market, compare competitors, and prepare a launch strategy."></textarea></div>
     <div class="flex-between"><small class="muted">Up to 4,000 characters · AI usage limits apply</small><button class="btn btn-primary" id="agent-plan-submit" type="submit">Create plan</button></div>
@@ -233,6 +238,23 @@
       card.appendChild(actions);agentList.appendChild(card);
     });
   }
+  async function loadAgentToolCatalog(){
+    const status=document.getElementById('agent-tool-catalog-status');
+    const list=document.getElementById('agent-tool-catalog-list');
+    try{
+      const {tools=[],executionEnabled=false,message=''}=await api('/agents/tools');
+      list.replaceChildren();
+      tools.forEach(tool=>{
+        const row=document.createElement('div');row.className='flex-between';row.style.padding='8px 0';
+        const info=document.createElement('div');const name=document.createElement('strong');name.textContent=tool.title;
+        const detail=document.createElement('small');detail.className='muted';detail.textContent=tool.description+' · '+tool.access+(tool.external?' · external':'');
+        info.append(name,detail);
+        const state=document.createElement('span');state.className='tag';state.textContent=tool.executionAvailable?'Available':'Planned';
+        row.append(info,state);list.appendChild(row);
+      });
+      status.textContent=executionEnabled?'Execution tools are enabled. Review permissions before use.':(message||'Catalog preview only. Tools cannot run yet.');
+    }catch(error){status.textContent='Tool catalog is temporarily unavailable.';list.replaceChildren();}
+  }
   async function loadAgentPlans(){
     try{const {runs=[]}=await api('/agents/mine');renderAgentPlans(runs);}
     catch(error){agentList.textContent='Agent Lab plans are temporarily unavailable.';}
@@ -251,6 +273,7 @@
     catch(error){window.alert(error.message);button.disabled=false;}
   });
   loadAgentPlans();
+  loadAgentToolCatalog();
 
   loadBots();
   document.getElementById('my-bots').addEventListener('click',async event=>{

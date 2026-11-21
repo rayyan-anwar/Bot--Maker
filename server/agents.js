@@ -8,6 +8,7 @@ const usage = require('./usage');
 const { requireAuth } = require('./auth');
 const rateLimit = require('express-rate-limit');
 const { PostgresRateLimitStore } = require('./rate-limit-store');
+const { getToolCatalog } = require('./agent-tool-registry');
 
 const router = express.Router();
 const MAX_GOAL_CHARS = 4000;
@@ -127,6 +128,10 @@ router.post('/:runId/cancel', requireAuth, async (req, res, next) => {
     if (result.state !== 'updated') return res.status(409).json({ error: 'This run can no longer be cancelled.', status: result.run?.status || null });
     res.json({ run: result.run });
   } catch (error) { next(error); }
+});
+
+router.get('/tools', requireAuth, (req, res) => {
+  res.json({ tools: getToolCatalog(), executionEnabled: false, message: 'Catalog only. Tool execution is not enabled yet.' });
 });
 
 router.get('/:runId', requireAuth, async (req, res, next) => {

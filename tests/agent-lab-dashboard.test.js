@@ -28,3 +28,18 @@ test('dashboard exposes owner review lifecycle controls without claiming executi
   assert.match(html, /Approved for review only\. No tools have run\./);
   assert.match(html, /api\('\/agents\/'\+encodeURIComponent\(button\.dataset\.runId\)\+'\/'\+button\.dataset\.agentAction/);
 });
+
+test('Agent Lab dashboard displays a tool catalog without enabling execution',()=>{
+  assert.match(html,/id="agent-tool-catalog"/);
+  assert.match(html,/id="agent-tool-catalog-list"/);
+  assert.match(html,/api\('\/agents\/tools'\)/);
+  assert.match(html,/Catalog preview only\. Tools cannot run yet\./);
+  assert.match(html,/executionAvailable\?'Available':'Planned'/);
+});
+
+test('dashboard fetches the Agent Lab catalog and keeps catalog actions non-executable',()=>{
+  assert.ok(html.includes("api('/agents/tools')"));
+  assert.ok(html.includes('loadAgentToolCatalog();'));
+  assert.ok(html.includes("state.textContent=tool.executionAvailable?'Available':'Planned'"));
+  assert.ok(html.includes("message||'Catalog preview only. Tools cannot run yet.'"));
+});
