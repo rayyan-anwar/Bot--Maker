@@ -6,6 +6,8 @@ const usage = require('./usage');
 const taskService = require('./agent-task-service');
 const { topChunksHybrid } = require('./retrieval');
 const fortisniEvents = require('./fortisni-events');
+const { executeSafeTool } = require('./agent-tool-registry');
+const automationService = require('./automation-service');
 
 const POLL_MS = Math.max(250, Math.min(30000, Number(process.env.AGENT_WORKER_POLL_MS) || 1500));
 const LEASE_MS = Math.max(10000, Math.min(900000, Number(process.env.AGENT_WORKER_LEASE_MS) || 60000));
@@ -104,6 +106,28 @@ async function executeApprovedPlan(task, context) {
   return {planId,stepsCompleted:outputs.length,outputs:outputs.sort((a,b)=>a.step-b.step).map(item=>({step:item.step,text:item.text.slice(0,1800)}))};
 }
 registerTaskHandler('agent.plan.execute',executeApprovedPlan);
+async function executeAutomationWorkflow(task) {
+  const workflow=await automationService.getOwned(task.userId,task.payload?.workflowId);
+  if(!workflow||!workflow.enabled)throw new Error('Workflow is unavailable or disabled.');
+  const results=[];
+  for(let index=0;index<workflow.steps.length;index++){
+    const current=await store.findByIdAsync('aiEngineerRuns',task.id);
+    if(!current||current.status==='cancelled')throw new Error('Workflow execution cancelled.');
+    const step=workflow.steps[index];
+    const output=executeSafeTool(step.type,step.arguments||{});
+    results.push({step:index+1,type:step.type,result:output,completedAt:new Date().toISOString()});
+    await fortisniEvents.publish({userId:task.userId,planId:workflow.id,taskId:task.id,type:'step.completed',message:'Automation '+workflow.name+': step '+(index+1)+' completed.',metadata:{step:index+1,totalSteps:workflow.steps.length}});
+  }
+  return {workflowId:workflow.id,workflowName:workflow.name,results,completedAt:new Date().toISOString()};
+}
+async function enqueueDueSchedules(){
+  const rows=await store.allAsync('aiEngineerRuns');
+  const now=Date.now();
+  for(const workflow of rows.filter(row=>row.kind==='automation-workflow'&&row.enabled&&row.trigger?.type==='schedule'&&Number.isFinite(Date.parse(row.nextRunAt))&&Date.parse(row.nextRunAt)<=now)){
+    await automationService.run(workflow.userId,workflow.id,{scheduled:true}).catch(()=>{});
+  }
+}
+registerTaskHandler('automation.workflow.execute',executeAutomationWorkflow);
 
 async function processOneTask() {
   const task=await taskService.claimTask(WORKER_ID,new Date(),LEASE_MS);
@@ -130,10 +154,10 @@ async function processOneTask() {
 async function tick(){
   if(stopped||active)return;
   active=true;
-  try{await taskService.recoverExpiredTasks();await processOneTask();}
+  try{await enqueueDueSchedules();await taskService.recoverExpiredTasks();await processOneTask();}
   catch(error){console.error('Agent task worker tick failed:',safeError(error));}
   finally{active=false;if(!stopped)timer=setTimeout(tick,POLL_MS);}
 }
 function startWorker(){if(timer||active)return;stopped=false;timer=setTimeout(tick,0);}
 async function stopWorker(timeoutMs=10000){stopped=true;if(timer){clearTimeout(timer);timer=null;}const timeout=Math.max(100,Math.min(30000,Number(timeoutMs)||10000));const deadline=Date.now()+timeout;while(active&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,50));return !active;}
-module.exports={registerTaskHandler,startWorker,stopWorker,processOneTask,executeApprovedPlan,handlers};
+module.exports={registerTaskHandler,startWorker,stopWorker,processOneTask,executeApprovedPlan,executeAutomationWorkflow,enqueueDueSchedules,handlers};
