@@ -28,3 +28,12 @@ function setup(){
 function teardown(){for(const name of ['findByIdAsync','updateByIdAsync'])store[name]=originals[name];for(const name of ['isProviderConfigured','getDefaultModel','generate'])providers[name]=originals['providers_'+name];for(const name of ['reserveAiBudget','settleAiBudget','releaseAiBudget'])usage[name]=originals['usage_'+name];records.clear();}
 test('approved plan worker completes step and persists output',async()=>{setup();try{const result=await worker.executeApprovedPlan(records.get(taskId),{workerId:'test-worker'});assert.equal(result.stepsCompleted,1);assert.equal(generated,1);const run=records.get(runId);assert.equal(run.status,'completed');assert.equal(run.plan.steps[0].status,'completed');assert.equal(run.executionOutputs[0].text,'Completed draft output');}finally{teardown();}});
 test('approved plan worker rejects task owner mismatch',async()=>{setup();try{const task={...records.get(taskId),userId:'intruder'};await assert.rejects(worker.executeApprovedPlan(task,{workerId:'test-worker'}),/not found for task owner/);assert.equal(generated,0);}finally{teardown();}});
+test('worker retries resume completed steps without repeating successful work',async()=>{setup();try{
+ const run=records.get(runId);run.plan.steps.push({type:'analyze',title:'Analyze',description:'Analyze the draft',status:'pending'});
+ let failOnce=true;providers.generate=async()=>{generated++;if(generated===2&&failOnce){failOnce=false;throw new Error('temporary provider error');}return{text:'Output '+generated,usage:{}};};
+ await assert.rejects(worker.executeApprovedPlan(records.get(taskId),{workerId:'test-worker'}),/temporary provider error/);
+ assert.equal(records.get(runId).executionOutputs.length,1);
+ const resumed=await worker.executeApprovedPlan(records.get(taskId),{workerId:'test-worker'});
+ assert.equal(resumed.stepsCompleted,2);assert.equal(generated,3);assert.equal(records.get(runId).status,'completed');
+ assert.deepEqual(records.get(runId).executionOutputs.map(item=>item.step),[1,2]);
+ }finally{teardown();}});
