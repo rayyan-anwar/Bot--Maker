@@ -20,14 +20,14 @@
   };
 
   const MATCHERS = [
-    ['sad', /\b(sad|depressed|depressing|lonely|upset|heartbroken|unhappy|crying|miserable)\b/, ['दुखी', 'उदास', 'अकेला', 'अकेली', 'परेशान हूं', 'रो रहा', 'रो रही']],
-    ['concerned', /\b(scared|afraid|worried|anxious|nervous|unsafe|emergency|help me)\b/, ['डर लग', 'चिंता', 'घबरा', 'डर गया', 'डर गई', 'मदद करो']],
-    ['angry', /\b(angry|furious|annoyed|frustrated|frustrating|frustration|irritated|irritating|hate|stupid|useless)\b/, ['गुस्सा', 'नाराज़', 'चिढ़', 'बेकार', 'बकवास']],
-    ['grateful', /\b(thank you|thanks|thx|grateful|appreciate it)\b/, ['धन्यवाद', 'शुक्रिया', 'आभारी']],
-    ['excited', /\b(excited|can't wait|cant wait|let’s go|lets go|congratulations|congrats)\b/, ['उत्साहित', 'बधाई', 'कमाल', 'जश्न']],
-    ['happy', /\b(happy|glad|awesome|amazing|great|wonderful|fantastic|good news)\b/, ['खुश', 'शानदार', 'बहुत अच्छा', 'अच्छी खबर']],
-    ['confused', /\b(confused|don't understand|do not understand|unclear|lost|what do you mean)\b/, ['समझ नहीं', 'समझ नहीं आया', 'उलझन', 'कन्फ्यूज']],
-    ['curious', /\b(why|how|what|when|where|which|explain|tell me|can you)\b/, ['क्यों', 'कैसे', 'क्या', 'कब', 'कहां', 'कौन', 'समझाओ', 'बताओ']]
+    ['sad', /\b(sad|depressed|depressing|lonely|upset|heartbroken|unhappy|crying|miserable)\b/, ['दुखी', 'उदास', 'अकेला', 'अकेली', 'परेशान हूं', 'रो रहा', 'रो रही', 'dukhi', 'udaas', 'akela', 'akeli', 'pareshan hoon', 'pareshan hun', 'rona aa raha', 'rona aa rahi']],
+    ['concerned', /\b(scared|afraid|worried|anxious|nervous|unsafe|emergency|help me)\b/, ['डर लग', 'चिंता', 'घबरा', 'डर गया', 'डर गई', 'मदद करो', 'dar lag', 'ghabra', 'tension ho rahi', 'chinta ho rahi', 'darr lag']],
+    ['angry', /\b(angry|furious|annoyed|frustrated|frustrating|frustration|irritated|irritating|hate|stupid|useless)\b/, ['गुस्सा', 'नाराज़', 'चिढ़', 'बेकार', 'बकवास', 'gussa', 'naraz', 'chidh', 'bekaar', 'bakwas']],
+    ['grateful', /\b(thank you|thanks|thx|grateful|appreciate it)\b/, ['धन्यवाद', 'शुक्रिया', 'आभारी', 'shukriya', 'dhanyawad', 'aabhari', 'thanks yaar']],
+    ['excited', /\b(excited|can't wait|cant wait|let’s go|lets go|congratulations|congrats)\b/, ['उत्साहित', 'बधाई', 'कमाल', 'जश्न', 'maza aa raha', 'zabardast', 'kamal hai', 'bahut excited']],
+    ['happy', /\b(happy|glad|awesome|amazing|great|wonderful|fantastic|good news)\b/, ['खुश', 'शानदार', 'बहुत अच्छा', 'अच्छी खबर', 'accha laga', 'achha laga', 'bahut badhiya', 'mast hai']],
+    ['confused', /\b(confused|don't understand|do not understand|unclear|lost|what do you mean)\b/, ['समझ नहीं', 'समझ नहीं आया', 'उलझन', 'कन्फ्यूज', 'samajh nahi', 'samajh nhi', 'confuse ho gaya', 'confuse ho gayi']],
+    ['curious', /\b(why|how|what|when|where|which|explain|tell me|can you)\b/, ['क्यों', 'कैसे', 'क्या', 'कब', 'कहां', 'कौन', 'समझाओ', 'बताओ', 'kyun', 'kyu', 'kaise', 'kya', 'kab', 'kahan', 'kaun', 'samjhao', 'batao']]
   ];
 
   function classifyText(value, source) {
@@ -40,7 +40,7 @@
 
     if (source === 'assistant') return 'speaking';
     if (/\b(build|create|make|write|design|debug|fix|plan|calculate|analyze|analyse|generate|help)\b/.test(text) ||
-        ['बनाओ', 'लिखो', 'ठीक करो', 'समाधान', 'मदद', 'प्लान'].some(phrase => text.includes(phrase))) return 'thinking';
+        ['बनाओ', 'लिखो', 'ठीक करो', 'समाधान', 'मदद', 'प्लान', 'banao', 'likho', 'theek karo', 'thik karo', 'plan banao', 'help kar', 'code likh'].some(phrase => text.includes(phrase))) return 'thinking';
     return 'idle';
   }
 
