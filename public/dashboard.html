@@ -362,7 +362,7 @@
   });
   loadAgentPlans();
   loadAgentTasks();
-  setInterval(loadAgentTasks,10000);
+  setInterval(()=>{loadAgentTasks();loadAgentPlans();},10000);
   loadAgentToolCatalog();
 
   loadBots();
