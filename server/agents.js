@@ -154,6 +154,7 @@ router.post('/plan', requireAuth, planLimiter, async (req, res, next) => {
 router.post('/tasks', requireAuth, toolExecutionLimiter, async (req, res, next) => {
   try {
     const taskType = req.body?.taskType;
+    if(taskType!=='agent.plan.execute')return res.status(400).json({error:'Unsupported Agent Lab task type.'});
     const payload = req.body?.payload;
     const idempotencyKey = req.get('Idempotency-Key') || req.body?.idempotencyKey;
     const result = await agentTaskService.enqueueTask({ userId: req.user.id, taskType, payload, idempotencyKey });
