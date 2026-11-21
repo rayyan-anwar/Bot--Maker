@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parsePlan, MAX_GOAL_CHARS, MAX_STEPS } = require('../server/agents');
+const { parsePlan, initializePlanSteps, transitionPlanStep, getPlanProgress, STEP_RETRY_LIMIT, MAX_GOAL_CHARS, MAX_STEPS } = require('../server/agents');
 const { getToolCatalog, validateToolRequest } = require('../server/agent-tool-registry');
 
 test('parses a valid bounded Agent Lab plan', () => {
@@ -50,6 +50,7 @@ test('Agent Lab catalog route and safe execution routes are registered',()=>{
  assert.ok(route);
  assert.ok(router.stack.some(layer=>layer.route?.path==='/:runId/tools/:toolId'&&layer.route.methods.post));
  assert.ok(router.stack.some(layer=>layer.route?.path==='/:runId/approve'&&layer.route.methods.post));
+ assert.ok(router.stack.some(layer=>layer.route?.path==='/:runId/steps/:stepIndex/status'&&layer.route.methods.post));
  const catalog=getToolCatalog();
  assert.equal(catalog.length,5);
  assert.equal(catalog.find(tool=>tool.id==='text.analyze').executionAvailable,true);
@@ -58,4 +59,40 @@ test('Agent Lab catalog route and safe execution routes are registered',()=>{
  const policy=validateToolRequest({toolId:'knowledge.search',arguments:{query:'x'}},{runStatus:'approved',approvedToolIds:['knowledge.search']});
  assert.equal(policy.valid,false);
  assert.equal(policy.executable,false);
+});
+
+test('Agent Lab steps initialize in pending state with progress',()=>{
+ const steps=initializePlanSteps([{order:1,title:'Research',type:'research',description:'Find sources'},{order:2,title:'Draft',type:'draft',description:'Write draft'}]);
+ assert.deepEqual(steps.map(s=>s.status),['pending','pending']);
+ assert.deepEqual(getPlanProgress(steps),{total:2,completed:0,failed:0,running:0,pending:2,percent:0});
+});
+test('Agent Lab step state transitions track completion and timestamps',()=>{
+ const base=initializePlanSteps([{title:'Analyze'}]);
+ const running=transitionPlanStep(base,0,'running','2026-11-21T10:00:00.000Z');
+ assert.equal(running[0].status,'running');
+ assert.equal(running[0].startedAt,'2026-11-21T10:00:00.000Z');
+ const completed=transitionPlanStep(running,0,'completed','2026-11-21T10:02:00.000Z');
+ assert.equal(completed[0].status,'completed');
+ assert.equal(completed[0].completedAt,'2026-11-21T10:02:00.000Z');
+ assert.deepEqual(getPlanProgress(completed),{total:1,completed:1,failed:0,running:0,pending:0,percent:100});
+ assert.throws(()=>transitionPlanStep(completed,0,'running'),/Invalid step state transition/);
+});
+test('Agent Lab failed steps can retry only within bounded retry policy',()=>{
+ let steps=initializePlanSteps([{title:'Retry me'}]);
+ steps=transitionPlanStep(steps,0,'running');
+ steps=transitionPlanStep(steps,0,'failed');
+ assert.equal(steps[0].status,'failed');
+ for(let i=0;i<STEP_RETRY_LIMIT;i++){
+   steps=transitionPlanStep(steps,0,'pending');
+   assert.equal(steps[0].retryCount,i+1);
+   steps=transitionPlanStep(steps,0,'running');
+   steps=transitionPlanStep(steps,0,'failed');
+ }
+ assert.throws(()=>transitionPlanStep(steps,0,'pending'),/Invalid step state transition/);
+});
+test('Agent Lab rejects invalid step IDs, statuses and transitions',()=>{
+ const steps=initializePlanSteps([{title:'A'}]);
+ assert.throws(()=>transitionPlanStep(steps,-1,'running'),/Invalid step index/);
+ assert.throws(()=>transitionPlanStep(steps,0,'unknown'),/Unsupported step status/);
+ assert.throws(()=>transitionPlanStep(steps,0,'completed'),/Invalid step state transition/);
 });
