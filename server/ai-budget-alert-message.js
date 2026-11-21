@@ -11,7 +11,7 @@ const LABELS = Object.freeze({
 function safeText(value, fallback = 'unknown', maxLength = 120) {
   if (typeof value !== 'string' || !value.trim()) return fallback;
   const cleaned = value
-    .replace(/<[^>]*>/g, '')
+    .replace(/[<>]/g, '')
     .replace(/\\n|\\r|\\t/g, ' ')
     .replace(/[\r\n\t]+/g, ' ')
     .replace(/[\x00-\x1f\x7f]/g, ' ')
