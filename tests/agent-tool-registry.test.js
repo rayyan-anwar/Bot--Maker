@@ -3,7 +3,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const {getToolCatalog,validateToolRequest,executeSafeTool,MAX_ARGUMENT_BYTES,MAX_TEXT_CHARS}=require('../server/agent-tool-registry');
 
-test('catalog returns a bounded descriptive allowlist with execution disabled',()=>{
+test('catalog reports only implemented safe tools as available',()=>{
  const catalog=getToolCatalog();
  assert.equal(catalog.length,5);
  assert.ok(catalog.every(tool=>tool.requiresApproval===true));
@@ -33,9 +33,8 @@ test('arguments must be object and are bounded to 4 KB',()=>{
  assert.equal(validateToolRequest({toolId:'text.analyze',arguments:'text'},{runStatus:'approved',approvedToolIds:['text.analyze']}).valid,false);
  assert.ok(validateToolRequest({toolId:'text.analyze',arguments:{text:'x'.repeat(MAX_ARGUMENT_BYTES)}},{runStatus:'approved',approvedToolIds:['text.analyze']}).errors.some(error=>error.includes('4 KB')));
 });
-test('catalog-only tools cannot be executed even with context approval',()=>{
+test('safe text tool is allowed only with approved run and per-run approval',()=>{
  const result=validateToolRequest({toolId:'text.analyze',arguments:{text:'test'}},{runStatus:'approved',approvedToolIds:['text.analyze']});
- assert.equal(result.valid,false);
  assert.equal(result.valid,true);
  assert.equal(result.executable,true);
 });
