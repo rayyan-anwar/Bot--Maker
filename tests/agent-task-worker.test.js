@@ -51,10 +51,14 @@ test('terminal task failure synchronizes executing plan to failed',async()=>{
  finally{taskService.claimTask=savedClaim;taskService.failTask=savedFail;store.findByIdAsync=savedFind;store.updateByIdAsync=savedUpdate;}
 });
 
-test('stopWorker returns within configured timeout when handler remains active',async()=>{
+
+test('stopWorker times out instead of waiting indefinitely for an active handler',async()=>{
  const service=require('../server/agent-task-service');
- const originalClaim=service.claimTask, originalRecover=service.recoverExpiredTasks;
- service.claimTask=async()=>null;service.recoverExpiredTasks=async()=>{};
- try{worker.startWorker();const start=Date.now();const stopped=await worker.stopWorker(200);assert.equal(stopped,true);assert.ok(Date.now()-start<1000);}
- finally{service.claimTask=originalClaim;service.recoverExpiredTasks=originalRecover;}
+ const originals={claim:service.claimTask,complete:service.completeTask,recover:service.recoverExpiredTasks};
+ let release,startedResolve;const started=new Promise(resolve=>{startedResolve=resolve;});const gate=new Promise(resolve=>{release=resolve;});
+ const type='test.shutdown.wait';const task={id:'shutdown-task',userId:owner,taskType:type,status:'running',attempt:1};
+ service.claimTask=async()=>task;service.completeTask=async()=>task;service.recoverExpiredTasks=async()=>{};
+ worker.registerTaskHandler(type,async()=>{startedResolve();await gate;return {ok:true};});
+ try{worker.startWorker();await started;const began=Date.now();const result=await worker.stopWorker(200);assert.equal(result,false);assert.ok(Date.now()-began<1000);release();}
+ finally{release();service.claimTask=originals.claim;service.completeTask=originals.complete;service.recoverExpiredTasks=originals.recover;}
 });
