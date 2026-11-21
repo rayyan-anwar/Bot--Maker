@@ -23,8 +23,8 @@ test('dashboard loads private plans and renders content using safe DOM text APIs
 });
 
 test('dashboard exposes owner review lifecycle controls without claiming execution', () => {
-  assert.match(html, /data-agent-action='approve'/);
-  assert.match(html, /data-agent-action='cancel'/);
+  assert.match(html, /dataset\.agentAction='approve'/);
+  assert.match(html, /dataset\.agentAction='cancel'/);
   assert.match(html, /Approved for review only\. No tools have run\./);
   assert.match(html, /api\('\/agents\/'\+encodeURIComponent\(button\.dataset\.runId\)\+'\/'\+button\.dataset\.agentAction/);
 });
