@@ -128,7 +128,7 @@ router.post('/:runId/approve', requireAuth, async (req, res, next) => {
     });
     if (result.state === 'not_found') return res.status(404).json({ error: 'Agent plan not found.' });
     if (result.state !== 'updated') return res.status(409).json({ error: 'Only a planned run can be approved.', status: result.run?.status || null });
-    res.json({ run: result.run, message: 'Plan approved. No tools or external actions have been executed.' });
+    res.json({ run: result.run, message: requestedToolIds.length ? 'Plan approved with explicit tool permissions. Tools run only when requested.' : 'Plan approved. No tools or external actions have been executed.' });
   } catch (error) { next(error); }
 });
 
