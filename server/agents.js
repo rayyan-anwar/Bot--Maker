@@ -29,7 +29,7 @@ function transitionPlanStep(steps, stepIndex, targetStatus, now = new Date().toI
     ...current,
     status: targetStatus,
     retryCount: targetStatus === 'pending' && current.status === 'failed' ? current.retryCount + 1 : current.retryCount,
-    startedAt: targetStatus === 'running' ? now : current.startedAt,
+    startedAt: targetStatus === 'running' ? now : targetStatus === 'pending' ? null : current.startedAt,
     completedAt: ['completed', 'failed', 'cancelled'].includes(targetStatus) ? now : null,
     error: targetStatus === 'failed' ? (typeof current.error === 'string' ? current.error.slice(0, 500) : null) : targetStatus === 'pending' ? null : current.error,
   };
