@@ -8,12 +8,13 @@ const service = require('../server/agent-task-service');
 const original = {};
 const records = [];
 function setup() {
-  for (const name of ['isPostgres','findManyAsync','findByIdAsync','insertAsync','updateByIdAsync','allAsync']) original[name]=store[name];
+  for (const name of ['isPostgres','findManyAsync','findByIdAsync','insertAsync','insertAgentTaskIdempotent','updateByIdAsync','allAsync']) original[name]=store[name];
   store.isPostgres=()=>false;
   store.findManyAsync=async (_collection,filter={})=>records.filter(row=>Object.entries(filter).every(([k,v])=>row[k]===v));
   store.allAsync=async()=>records;
   store.findByIdAsync=async (_collection,id)=>records.find(row=>row.id===id)||null;
   store.insertAsync=async (_collection,row)=>{records.push(row);return row;};
+  store.insertAgentTaskIdempotent=async row=>{const prior=records.find(x=>x.kind==='agent-task'&&x.userId===row.userId&&x.idempotencyKey===row.idempotencyKey);if(prior)return{created:false,record:prior};records.push(row);return{created:true,record:row};};
   store.updateByIdAsync=async (_collection,id,patch)=>{const idx=records.findIndex(row=>row.id===id);if(idx<0)return null;records[idx]={...records[idx],...patch};return records[idx];};
 }
 function teardown(){for(const name of Object.keys(original))store[name]=original[name];records.length=0;}
@@ -63,4 +64,8 @@ test('durable task cancellation is user-scoped and terminal-state protected',asy
   assert.equal(cancelled.status,'cancelled');
   assert.equal(await service.cancelTask(q.task.id,'u1'),null);
  }finally{teardown();}
+});
+
+test('idempotent enqueue remains single-record under concurrent requests',async()=>{
+ setup();try{const requests=await Promise.all(Array.from({length:12},()=>service.enqueueTask({userId:'u1',taskType:'agent.plan',payload:{goal:'same'},idempotencyKey:'parallel-key'})));assert.equal(records.length,1);assert.equal(requests.filter(x=>x.created).length,1);assert.ok(requests.every(x=>x.task.id===requests[0].task.id));}finally{teardown();}
 });
