@@ -63,3 +63,9 @@ test('stopWorker times out instead of waiting indefinitely for an active handler
  try{worker.startWorker();await started;const began=Date.now();const result=await worker.stopWorker(200);assert.equal(result,false);assert.ok(Date.now()-began<1000);release();}
  finally{release();service.claimTask=originals.claim;service.completeTask=originals.complete;service.recoverExpiredTasks=originals.recover;}
 });
+
+test('worker does not mark plan completed if cancellation arrives during final provider call',async()=>{setup();try{
+ providers.generate=async()=>{generated++;records.set(taskId,{...records.get(taskId),status:'cancelled'});return{text:'Late output',usage:{}};};
+ await assert.rejects(worker.executeApprovedPlan(records.get(taskId),{workerId:'test-worker'}),/Task cancelled/);
+ const run=records.get(runId);assert.equal(run.status,'cancelled');assert.equal(run.plan.steps[0].status,'completed');assert.equal(run.progress.percent,100);
+ }finally{teardown();}});
