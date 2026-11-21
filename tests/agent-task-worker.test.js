@@ -48,7 +48,7 @@ test('terminal task failure synchronizes executing plan to failed',async()=>{
  worker.handlers.set('agent.plan.execute',async()=>{throw new Error('expected handler failure');});
  store.findByIdAsync=async(_collection,id)=>id===runId?plan:null;
  store.updateByIdAsync=async(_collection,id,patch)=>{Object.assign(plan,patch);return plan;};
- try{await worker.processOneTask();assert.equal(plan.status,'failed');assert.equal(plan.plan.steps[0].status,'failed');assert.equal(plan.plan.steps[1].status,'pending');assert.equal(plan.progress.failed,1);}
+ try{await worker.processOneTask();assert.equal(plan.status,'failed');assert.equal(plan.plan.steps[0].status,'failed');assert.equal(plan.plan.steps[1].status,'pending');assert.equal(plan.progress.failed,1);assert.ok(plan.executionLogs.some(log=>log.event==='plan.failed'&&log.level==='error'));}
  finally{taskService.claimTask=savedClaim;taskService.failTask=savedFail;worker.handlers.set('agent.plan.execute',savedHandler);store.findByIdAsync=savedFind;store.updateByIdAsync=savedUpdate;}
 });
 
