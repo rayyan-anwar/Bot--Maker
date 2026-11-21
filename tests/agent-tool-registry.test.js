@@ -9,7 +9,7 @@ test('catalog reports only implemented safe tools as available',()=>{
  assert.ok(catalog.every(tool=>tool.requiresApproval===true));
  assert.equal(catalog.find(tool=>tool.id==='text.analyze').executionAvailable,true);
  assert.equal(catalog.find(tool=>tool.id==='draft.create').executionAvailable,true);
- assert.equal(catalog.find(tool=>tool.id==='knowledge.search').executionAvailable,false);
+ assert.equal(catalog.find(tool=>tool.id==='knowledge.search').executionAvailable,true);
  assert.ok(catalog.every(tool=>typeof tool.id==='string'&&tool.id.length<=64));
 });
 test('unknown tool identifiers are rejected',()=>{
@@ -54,4 +54,12 @@ test('draft tool validates content and returns review-only artifact',()=>{
  assert.equal(draft.status,'preview-only');
  assert.equal(draft.content,'Draft content');
  assert.throws(()=>executeSafeTool('draft.create',{title:'',content:'x'}),/Draft title/);
+});
+
+test('knowledge search tool requires explicit approval but no write or external permission',()=>{
+ const policy=validateToolRequest({toolId:'knowledge.search',arguments:{botId:'bot-id',query:'refund policy',limit:4}},{runStatus:'approved',approvedToolIds:['knowledge.search']});
+ assert.equal(policy.valid,true);
+ assert.equal(policy.executable,true);
+ assert.equal(policy.tool.access,'read');
+ assert.equal(policy.tool.external,false);
 });
