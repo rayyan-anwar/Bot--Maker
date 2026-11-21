@@ -52,3 +52,11 @@ test('dashboard exposes per-run tool permission selection and execution UI',()=>
  assert.match(html,/writePermission:selected\.includes\('draft\.create'\)/);
  assert.match(html,/valid JSON/);
 });
+
+test('dashboard renders step progress and approved-step transition controls',()=>{
+ assert.match(html,/run\.progress/);
+ assert.match(html,/data-agent-step-action/);
+ assert.match(html,/data-step-index/);
+ assert.match(html,/steps\/\+encodeURIComponent\(stepButton\.dataset\.stepIndex\)\/status/);
+ assert.match(html,/label:'Complete',value:'completed'/);
+});
