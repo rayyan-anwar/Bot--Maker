@@ -7,17 +7,28 @@ const LABELS = Object.freeze({
   normal: 'Budget recovered',
   unknown: 'Budget status unavailable',
 });
+
 function safeText(value, fallback = 'unknown', maxLength = 120) {
   if (typeof value !== 'string' || !value.trim()) return fallback;
-  const cleaned = value.replace(/<[^>]*>/g, '').replace(/[\\x0d\\x0a\\x09]+/g, ' ').replace(/[\\u0000-\\u001f\\u007f]/g, ' ').trim().slice(0, maxLength);
+  const cleaned = value
+    .replace(/<[^>]*>/g, '')
+    .replace(/\\\\n|\\\\r|\\\\t/g, ' ')
+    .replace(/[\\r\\n\\t]+/g, ' ')
+    .replace(/[\\u0000-\\u001f\\u007f]/g, ' ')
+    .trim()
+    .slice(0, maxLength);
   return cleaned || fallback;
 }
+
 function money(value, currency) {
   const amount = Number(value);
   if (!Number.isFinite(amount) || amount < 0) return null;
-  const code = safeText(currency, '', 8).toUpperCase();
+  const code = typeof currency === 'string' && /^[A-Za-z]{3}$/.test(currency.trim())
+    ? currency.trim().toUpperCase()
+    : '';
   return code ? amount.toFixed(2) + ' ' + code : amount.toFixed(2);
 }
+
 function formatBudgetAlert({status,scopeLabel,percentUsed,limitAmount,reservedAmount=0,spentAmount=0,currency}={}) {
   const state = Object.hasOwn(LABELS, status) ? status : 'unknown';
   const percent = Number(percentUsed);
