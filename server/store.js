@@ -70,6 +70,30 @@ async function insertAgentTaskIdempotent(record){
  throw new Error('Idempotent task insertion conflicted without a matching task.');
 }
 
+async function insertAgentTaskWithinCapacity(record,maxActive=100){
+ if(!record||record.kind!=='agent-task'||typeof record.userId!=='string'||!record.userId||!Number.isInteger(maxActive)||maxActive<1)throw new TypeError('Invalid agent task capacity request.');
+ if(!isPostgres()){
+  const rows=all('aiEngineerRuns');
+  if(record.idempotencyKey){const prior=rows.find(row=>row.kind==='agent-task'&&row.userId===record.userId&&row.idempotencyKey===record.idempotencyKey);if(prior)return {created:false,record:prior};}
+  const active=rows.filter(row=>row.kind==='agent-task'&&row.userId===record.userId&&!['completed','failed','cancelled'].includes(row.status)).length;
+  if(active>=maxActive)return {created:false,reason:'capacity'};
+  insert('aiEngineerRuns',record);return {created:true,record};
+ }
+ await initialize();
+ const client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+  await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',['botforge-agent-task-capacity:'+record.userId]);
+  if(record.idempotencyKey){
+   const prior=await client.query("SELECT data FROM botforge_records WHERE collection='aiEngineerRuns' AND data->>'kind'='agent-task' AND data->>'userId'=$1 AND data->>'idempotencyKey'=$2 LIMIT 1",[record.userId,record.idempotencyKey]);
+   if(prior.rowCount){await client.query('COMMIT');return {created:false,record:prior.rows[0].data};}
+  }
+  const count=await client.query("SELECT count(*)::int AS active FROM botforge_records WHERE collection='aiEngineerRuns' AND data->>'kind'='agent-task' AND data->>'userId'=$1 AND data->>'status' NOT IN ('completed','failed','cancelled')",[record.userId]);
+  if(count.rows[0].active>=maxActive){await client.query('ROLLBACK');return {created:false,reason:'capacity'};}
+  await client.query("INSERT INTO botforge_records(collection,id,data) VALUES('aiEngineerRuns',$1,$2::jsonb)",[record.id,JSON.stringify(record)]);
+  await client.query('COMMIT');return {created:true,record};
+ }catch(error){try{await client.query('ROLLBACK');}catch(_){}throw error;}finally{client.release();}
+}
 async function updateByIdAsync(c,id,patch){assertCollection(c);if(!isUuid(id))return null;if(!isPostgres())return updateById(c,id,patch);await initialize();const r=await pool.query("UPDATE botforge_records SET data=data || $3::jsonb,updated_at=now() WHERE collection=$1 AND id=$2 RETURNING data",[c,id,JSON.stringify(patch)]);return r.rowCount?r.rows[0].data:null;}
 async function deleteByIdAsync(c,id){assertCollection(c);if(!isUuid(id))return false;if(!isPostgres())return deleteById(c,id);await initialize();const r=await pool.query('DELETE FROM botforge_records WHERE collection=$1 AND id=$2',[c,id]);return r.rowCount>0;}
 async function findUserByPasswordResetTokenHash(tokenHash){
@@ -284,4 +308,4 @@ async function consumeSocialOAuthState(stateHash,userId,platform,now=new Date())
 async function query(sql,values=[]){if(!isPostgres())throw new Error('Shared PostgreSQL storage is not configured.');await initialize();return pool.query(sql,values);}
 async function health(){if(!isPostgres())return {ok:true,database:'json-development'};try{await initialize();await pool.query('SELECT 1');return {ok:true,database:'postgres'};}catch(_){return {ok:false,database:'postgres'};}}
 async function close(){if(pool){await pool.end();pool=null;}initialized=false;}
-module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,insertAgentTaskIdempotent,updateByIdAsync,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,transitionAgentRunStatus,consumeSocialOAuthState,insertDocumentWithinCapacity,query,health,load,persist};
+module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,insertAgentTaskIdempotent,insertAgentTaskWithinCapacity,updateByIdAsync,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,transitionAgentRunStatus,consumeSocialOAuthState,insertDocumentWithinCapacity,query,health,load,persist};
