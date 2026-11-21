@@ -171,6 +171,8 @@ async function processOneTask() {
         const now=new Date().toISOString();
         const steps=Array.isArray(plan.plan?.steps)?plan.plan.steps.map(step=>step.status==='running'?{...step,status:'failed',completedAt:now,error:safeError(error)}:step):[];
         await store.updateByIdAsync('aiEngineerRuns',plan.id,{status:'failed',plan:{...plan.plan,steps},progress:{total:steps.length,completed:plan.executionOutputs?.length||0,failed:steps.filter(step=>step.status==='failed').length,running:0,pending:steps.filter(step=>step.status==='pending').length,percent:steps.length?Math.round((plan.executionOutputs?.length||0)/steps.length*100):0},lastError:safeError(error),failedAt:now,updatedAt:now}).catch(()=>{});
+        await appendPlanLog(plan.id,task.id,task.userId,'plan.failed','error',safeError(error)).catch(()=>{});
+        await fortisniEvents.publish({userId:task.userId,planId:plan.id,taskId:task.id,type:'plan.failed',message:'Your Agent Lab plan failed after retries.',metadata:{error:safeError(error)}}).catch(()=>{});
       }
     }
   }finally{clearInterval(heartbeat);}
