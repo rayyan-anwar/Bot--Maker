@@ -89,3 +89,12 @@ test('parallel JSON fallback claims give one queued task to only one worker',asy
   assert.equal(records[0].status,'running');
  }finally{teardown();}
 });
+
+test('parallel JSON fallback enqueues cannot exceed the per-user active task cap',async()=>{
+ setup();try{
+  const requests=await Promise.allSettled(Array.from({length:service.MAX_TASKS_PER_USER+8},(_,index)=>service.enqueueTask({userId:'u-cap',taskType:'agent.plan',payload:{index}})));
+  assert.equal(requests.filter(result=>result.status==='fulfilled').length,service.MAX_TASKS_PER_USER);
+  assert.equal(requests.filter(result=>result.status==='rejected').length,8);
+  assert.equal(records.filter(row=>row.userId==='u-cap'&&row.kind==='agent-task'&&!['completed','failed','cancelled'].includes(row.status)).length,service.MAX_TASKS_PER_USER);
+ }finally{teardown();}
+});
