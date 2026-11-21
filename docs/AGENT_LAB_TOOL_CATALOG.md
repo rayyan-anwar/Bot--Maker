@@ -1,14 +1,22 @@
-# Agent Lab tool catalog and execution gate
+# Agent Lab tool catalog and controlled execution
 
-The authenticated `GET /api/agents/tools` endpoint returns a bounded catalog of planned tools for the signed-in dashboard. The catalog is descriptive and does not imply execution capability.
+Authenticated `GET /api/agents/tools` returns the tool catalog. Every run is user-owned and checked before tool requests.
 
-Initial catalog:
-- `knowledge.search`: read-only knowledge search (not implemented)
-- `web.search`: external public search (not implemented)
-- `bot.read`: read owned bot configuration (not implemented)
-- `text.analyze`: analyze user-provided text (not implemented)
-- `draft.create`: create a draft artifact (not implemented)
+## Implemented local tools
+- `text.analyze`: bounded text statistics (characters, words, lines, sentence count, short preview). Maximum input 12,000 characters.
+- `draft.create`: validates a title and content, returning a draft preview for user review. This does not save or publish the draft.
+Both tools are disabled until a run is approved and each tool ID is explicitly approved on that run. Draft creation additionally requires explicit write permission.
 
-Every catalog entry requires explicit approval. The policy validator checks the allowlist, run status, per-run tool approval, write/external permissions, and a 4 KB argument limit. Unknown tools and tools not enabled by the registry are rejected.
+## Not implemented
+- `knowledge.search`
+- `web.search`
+- `bot.read`
+These catalog entries are unavailable for execution.
 
-This PR does not execute tools. All catalog entries remain disabled and the validator always reports `executable: false`. Before execution is enabled, tool implementations need server-side permission checks, user approval, bounded runtime, sandboxing where applicable, audit logging, cancellation, budget checks, and tests for isolation and concurrency.
+## Execution API
+`POST /api/agents/:runId/approve` accepts optional `toolIds` (up to five known IDs), `writePermission`, and `externalPermission`. Omitting these values keeps approval plan-only. Requested write or external tools require their matching explicit permission. Approval is owner-only and only transitions a planned run.
+
+`POST /api/agents/:runId/tools/:toolId` executes a registered tool only when the run is owned by the caller, approved, the tool is explicitly listed in `approvedToolIds`, permissions are present, and bounded arguments pass validation.
+
+## Safety boundary
+No shell, file system, network, arbitrary code, web browsing, or external action tool is implemented in this batch. Tools run synchronously in-process and are limited to bounded text processing. Draft results are preview-only, not persisted or published. Future tools need isolation, cancellation/timeouts, audit logs, abuse limits, budget checks, and concurrency tests before enabling external actions.
