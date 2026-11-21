@@ -64,5 +64,5 @@ test('dashboard renders step status, completion progress and approved controls',
  assert.match(html,/run\.progress/);
  assert.match(html,/dataset\.agentStepAction/);
  assert.match(html,/dataset\.stepIndex=String\(index\)/);
- assert.match(html,/steps\/\+encodeURIComponent\(stepButton\.dataset\.stepIndex\)\/status/);
+ assert.ok(html.includes("'/steps/'+encodeURIComponent(stepButton.dataset.stepIndex)+'/status'"));
 });
