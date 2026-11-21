@@ -37,3 +37,16 @@ test('worker retries resume completed steps without repeating successful work',a
  assert.equal(resumed.stepsCompleted,2);assert.equal(generated,3);assert.equal(records.get(runId).status,'completed');
  assert.deepEqual(records.get(runId).executionOutputs.map(item=>item.step),[1,2]);
  }finally{teardown();}});
+
+test('terminal task failure synchronizes executing plan to failed',async()=>{
+ const taskService=require('../server/agent-task-service');
+ const savedClaim=taskService.claimTask,savedFail=taskService.failTask;
+ const savedFind=store.findByIdAsync,savedUpdate=store.updateByIdAsync;
+ const task={id:'task-fail-1',userId:owner,taskType:'unknown.handler',status:'running',attempt:3,payload:{planId:runId}};
+ const plan={id:runId,userId:owner,kind:'agent-plan',status:'executing',executionTaskId:task.id,plan:{steps:[{type:'draft',status:'running'},{type:'analyze',status:'pending'}]},executionOutputs:[]};
+ taskService.claimTask=async()=>task;taskService.failTask=async()=>({...task,status:'failed'});
+ store.findByIdAsync=async(_collection,id)=>id===runId?plan:null;
+ store.updateByIdAsync=async(_collection,id,patch)=>{Object.assign(plan,patch);return plan;};
+ try{await worker.processOneTask();assert.equal(plan.status,'failed');assert.equal(plan.plan.steps[0].status,'failed');assert.equal(plan.plan.steps[1].status,'pending');assert.equal(plan.progress.failed,1);}
+ finally{taskService.claimTask=savedClaim;taskService.failTask=savedFail;store.findByIdAsync=savedFind;store.updateByIdAsync=savedUpdate;}
+});
