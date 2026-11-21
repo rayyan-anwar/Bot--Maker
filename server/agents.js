@@ -11,6 +11,16 @@ const { PostgresRateLimitStore } = require('./rate-limit-store');
 const { getToolCatalog, validateToolRequest, executeSafeTool, TOOL_CATALOG } = require('./agent-tool-registry');
 
 const router = express.Router();
+function summarizeToolResult(toolId, result) {
+  if (toolId === 'text.analyze') return { characters: result.characters, words: result.words, lines: result.lines, sentences: result.sentences };
+  if (toolId === 'draft.create') return { title: result.title, status: result.status, characters: typeof result.content === 'string' ? result.content.length : 0 };
+  return { type: result && result.type ? result.type : 'result' };
+}
+function appendToolExecution(run, toolId, result, now = new Date().toISOString()) {
+  const entry = { id: uuidv4(), toolId, status: 'completed', executedAt: now, summary: summarizeToolResult(toolId, result) };
+  const previous = Array.isArray(run.toolExecutionHistory) ? run.toolExecutionHistory : [];
+  return { ...run, toolExecutionHistory: [...previous, entry].slice(-50), updatedAt: now };
+}
 const MAX_GOAL_CHARS = 4000;
 const MAX_STEPS = 12;
 const ALLOWED_STEP_TYPES = new Set(['research', 'analyze', 'draft', 'review', 'decide']);
