@@ -51,7 +51,7 @@ test('fail retries with delay then reaches terminal failure',()=>{
  q.enqueue(task('a'),0);
  q.claim('w',1);
  assert.equal(q.fail('a','w','temporary',2,500).status,'queued');
- assert.equal(q.claim('w',100).id,undefined);
+ assert.equal(q.claim('w',100),null);
  assert.equal(q.claim('w',502).attempt,2);
  assert.equal(q.fail('a','w','fatal',503,0).status,'failed');
 });
