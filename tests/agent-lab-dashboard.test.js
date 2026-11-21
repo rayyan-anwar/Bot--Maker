@@ -59,3 +59,8 @@ test('dashboard renders persisted Agent Lab execution history safely',()=>{
  assert.match(html,/entry\.summary/);
  assert.match(html,/line\.textContent=entry\.toolId/);
 });
+
+test('dashboard provides a knowledge-search argument template requiring an owned bot ID',()=>{
+ assert.match(html,/YOUR_BOT_ID/);
+ assert.match(html,/Search your knowledge base/);
+});
