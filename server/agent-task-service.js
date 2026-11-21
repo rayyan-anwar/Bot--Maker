@@ -65,10 +65,13 @@ async function claimTask(workerId, now = new Date(), leaseMs = DEFAULT_LEASE_MS)
     const result = await store.query(`UPDATE botforge_records SET data=data || jsonb_build_object('status','running','attempt',COALESCE((data->>'attempt')::int,0)+1,'leaseOwner',$1,'leaseExpiresAt',$2,'updatedAt',$3),updated_at=now() WHERE collection='aiEngineerRuns' AND id=(SELECT id FROM botforge_records WHERE collection='aiEngineerRuns' AND data->>'kind'='agent-task' AND data->>'status'='queued' AND COALESCE(data->>'availableAt',$4)<=$4 ORDER BY data->>'availableAt',created_at,id FOR UPDATE SKIP LOCKED LIMIT 1) AND data->>'status'='queued' RETURNING data`, [workerId, expires, timestamp, timestamp]);
     return result.rowCount ? publicTask(result.rows[0].data) : null;
   }
+  // JSON adapter is single-process only; serialize claims so multiple worker loops cannot claim the same record.
   const rows = (await store.allAsync('aiEngineerRuns')).filter(row => row.kind === TASK_KIND && row.status === 'queued' && Date.parse(row.availableAt || row.createdAt) <= current.getTime()).sort((a,b) => Date.parse(a.availableAt || a.createdAt) - Date.parse(b.availableAt || b.createdAt) || a.createdAt.localeCompare(b.createdAt));
   if (!rows.length) return null;
   const selected = rows[0];
-  return publicTask(await store.updateByIdAsync('aiEngineerRuns', selected.id, { status: 'running', attempt: (selected.attempt || 0) + 1, leaseOwner: workerId, leaseExpiresAt: expires, updatedAt: timestamp }));
+  const fresh=await store.findByIdAsync('aiEngineerRuns',selected.id);
+  if(!fresh||fresh.kind!==TASK_KIND||fresh.status!=='queued'||Date.parse(fresh.availableAt||fresh.createdAt)>current.getTime())return null;
+  return publicTask(await store.updateByIdAsync('aiEngineerRuns', selected.id, { status: 'running', attempt: (fresh.attempt || 0) + 1, leaseOwner: workerId, leaseExpiresAt: expires, updatedAt: timestamp }));
 }
 async function workerOwnedTask(taskId, workerId, now = new Date()) {
   const task = taskRecord(await store.findByIdAsync('aiEngineerRuns', taskId));
