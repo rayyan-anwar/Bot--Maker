@@ -23,8 +23,8 @@ test('durable task service validates and deduplicates owner-scoped enqueue',asyn
   const b=await service.enqueueTask({userId:'u1',taskType:'agent.plan',payload:{goal:'changed'},idempotencyKey:'key'});
   assert.equal(a.created,true);assert.equal(b.created,false);assert.equal(a.task.id,b.task.id);
   assert.equal(await service.getTaskForUser(a.task.id,'u2'),null);
-  assert.throws(()=>service.enqueueTask({userId:'u1',taskType:'bad type',payload:{}}),/task type/);
-  assert.throws(()=>service.enqueueTask({userId:'u1',taskType:'agent.plan',payload:{data:'x'.repeat(34000)}}),/size limit/);
+  await assert.rejects(service.enqueueTask({userId:'u1',taskType:'bad type',payload:{}}),/task type/);
+  await assert.rejects(service.enqueueTask({userId:'u1',taskType:'agent.plan',payload:{data:'x'.repeat(34000)}}),/size limit/);
  }finally{teardown();}
 });
 test('durable tasks claim, heartbeat, complete and enforce owner visibility',async()=>{
