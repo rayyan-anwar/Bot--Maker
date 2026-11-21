@@ -51,7 +51,7 @@ test('text analyzer returns bounded safe metadata and preview',()=>{
 test('draft tool validates content and returns review-only artifact',()=>{
  const draft=executeSafeTool('draft.create',{title:'Proposal',content:'Draft content'});
  assert.equal(draft.type,'draft');
- assert.equal(draft.status,'created-for-review');
+ assert.equal(draft.status,'preview-only');
  assert.equal(draft.content,'Draft content');
  assert.throws(()=>executeSafeTool('draft.create',{title:'',content:'x'}),/Draft title/);
 });
