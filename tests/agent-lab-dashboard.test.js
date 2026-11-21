@@ -66,3 +66,8 @@ test('dashboard renders step status, completion progress and approved controls',
  assert.match(html,/dataset\.stepIndex=String\(index\)/);
  assert.ok(html.includes("'/steps/'+encodeURIComponent(stepButton.dataset.stepIndex)+'/status'"));
 });
+
+test('dashboard offers owner-scoped knowledge search template',()=>{
+ assert.match(html,/YOUR_BOT_ID/);
+ assert.match(html,/Search your knowledge base/);
+});
