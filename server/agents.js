@@ -8,7 +8,7 @@ const usage = require('./usage');
 const { requireAuth } = require('./auth');
 const rateLimit = require('express-rate-limit');
 const { PostgresRateLimitStore } = require('./rate-limit-store');
-const { getToolCatalog, validateToolRequest, executeSafeTool } = require('./agent-tool-registry');
+const { getToolCatalog, validateToolRequest, executeSafeTool, TOOL_CATALOG } = require('./agent-tool-registry');
 
 const router = express.Router();
 const MAX_GOAL_CHARS = 4000;
@@ -108,9 +108,23 @@ router.get('/mine', requireAuth, async (req, res, next) => {
 
 router.post('/:runId/approve', requireAuth, async (req, res, next) => {
   try {
+    const requestedToolIds = req.body?.toolIds === undefined ? [] : req.body.toolIds;
+    if (!Array.isArray(requestedToolIds) || requestedToolIds.length > 5 || requestedToolIds.some(id => typeof id !== 'string') || new Set(requestedToolIds).size !== requestedToolIds.length) {
+      return res.status(400).json({ error: 'toolIds must be a unique list of up to 5 tool IDs.' });
+    }
+    const knownToolIds = new Set(TOOL_CATALOG.map(tool => tool.id));
+    if (requestedToolIds.some(id => !knownToolIds.has(id))) return res.status(400).json({ error: 'Approval contains an unknown tool.' });
+    const writePermission = req.body?.writePermission === true;
+    const externalPermission = req.body?.externalPermission === true;
+    if (requestedToolIds.some(id => TOOL_CATALOG.find(tool => tool.id === id)?.access === 'write') && !writePermission) return res.status(400).json({ error: 'Write tools require writePermission=true.' });
+    if (requestedToolIds.some(id => TOOL_CATALOG.find(tool => tool.id === id)?.external) && !externalPermission) return res.status(400).json({ error: 'External tools require externalPermission=true.' });
+    const approvedAt = new Date().toISOString();
     const result = await store.transitionAgentRunStatus(req.params.runId, req.user.id, ['planned'], 'approved', {
-      approvedAt: new Date().toISOString(),
-      approval: { approvedBy: req.user.id, approvedAt: new Date().toISOString(), scope: 'plan-only' },
+      approvedAt,
+      approvedToolIds: requestedToolIds,
+      writePermission,
+      externalPermission,
+      approval: { approvedBy: req.user.id, approvedAt, scope: requestedToolIds.length ? 'explicit-tool-approval' : 'plan-only', approvedToolIds: requestedToolIds, writePermission, externalPermission },
     });
     if (result.state === 'not_found') return res.status(404).json({ error: 'Agent plan not found.' });
     if (result.state !== 'updated') return res.status(409).json({ error: 'Only a planned run can be approved.', status: result.run?.status || null });
