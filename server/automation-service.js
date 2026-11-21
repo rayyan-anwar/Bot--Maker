@@ -48,7 +48,9 @@ async function run(userId,id,triggerData={}) {
   const workflow=await store.findByIdAsync('aiEngineerRuns',id);
   if(!workflow||workflow.kind!=='automation-workflow'||workflow.userId!==userId) return null;
   if(!workflow.enabled)throw new Error('Workflow is disabled.');
-  const created=await taskService.enqueueTask({userId,taskType:'automation.workflow.execute',payload:{workflowId:id,triggerData},idempotencyKey:'automation:'+id+':'+Date.now()+':'+uuidv4()});
+  const scheduleSlot=triggerData.scheduled===true&&workflow.trigger?.type==='schedule'?workflow.nextRunAt:null;
+  const idempotencyKey=scheduleSlot?'automation:'+id+':schedule:'+scheduleSlot:'automation:'+id+':'+Date.now()+':'+uuidv4();
+  const created=await taskService.enqueueTask({userId,taskType:'automation.workflow.execute',payload:{workflowId:id,triggerData},idempotencyKey});
   await store.updateByIdAsync('aiEngineerRuns',id,{lastRunAt:new Date().toISOString(),lastTaskId:created.task.id,updatedAt:new Date().toISOString(),...(workflow.trigger?.type==='schedule'?{nextRunAt:new Date(Date.now()+workflow.trigger.intervalMinutes*60000).toISOString()}:{})});
   return created.task;
 }
