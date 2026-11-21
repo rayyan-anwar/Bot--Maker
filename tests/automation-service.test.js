@@ -26,3 +26,22 @@ test('workflow ownership lookup never returns another user workflow',async()=>{
   assert.equal(await service.getOwned('attacker','workflow-1'),null);
  }finally{store.findByIdAsync=original;}
 });
+
+test('scheduled workflow runs reuse the scheduler-observed slot as an idempotency key',async()=>{
+ const originalFind=store.findByIdAsync,originalUpdate=store.updateByIdAsync,originalEnqueue=require('../server/agent-task-service').enqueueTask;
+ const workflow={id:'schedule-1',kind:'automation-workflow',userId:'owner',enabled:true,trigger:{type:'schedule',intervalMinutes:60},nextRunAt:'2026-11-22T10:00:00.000Z'};
+ const keys=[];
+ store.findByIdAsync=async(_collection,id)=>id===workflow.id?{...workflow}:null;
+ store.updateByIdAsync=async(_collection,id,patch)=>{Object.assign(workflow,patch);return workflow;};
+ require('../server/agent-task-service').enqueueTask=async args=>{keys.push(args.idempotencyKey);return{created:keys.length===1,task:{id:'task-'+keys.length}};};
+ try{
+  await service.run('owner',workflow.id,{scheduled:true,scheduleSlot:'2026-11-22T10:00:00.000Z'});
+  await service.run('owner',workflow.id,{scheduled:true,scheduleSlot:'2026-11-22T10:00:00.000Z'});
+  assert.equal(keys.length,2);
+  assert.equal(keys[0],keys[1]);
+  assert.equal(keys[0],'automation:schedule-1:schedule:2026-11-22T10:00:00.000Z');
+ }finally{
+  store.findByIdAsync=originalFind;store.updateByIdAsync=originalUpdate;
+  require('../server/agent-task-service').enqueueTask=originalEnqueue;
+ }
+});
