@@ -33,6 +33,7 @@ async function initialize(){
     await pool.query('ALTER TABLE botforge_webhook_events ADD COLUMN IF NOT EXISTS processing_until timestamptz');
     await pool.query('ALTER TABLE botforge_webhook_events ADD COLUMN IF NOT EXISTS processed_at timestamptz');
     await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS botforge_records_user_email_uidx ON botforge_records((lower(data->>'email'))) WHERE collection='users'");
+    await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS botforge_agent_task_idempotency_uidx ON botforge_records((data->>'userId'),(data->>'idempotencyKey')) WHERE collection='aiEngineerRuns' AND data->>'kind'='agent-task' AND data->>'idempotencyKey' IS NOT NULL");
     await pool.query('CREATE TABLE IF NOT EXISTS botforge_quota_reservations (id uuid PRIMARY KEY, user_id uuid NOT NULL, usage_day date NOT NULL, expires_at timestamptz NOT NULL)');
     await pool.query('CREATE INDEX IF NOT EXISTS botforge_quota_user_day_idx ON botforge_quota_reservations(user_id,usage_day,expires_at)');
     await pool.query('CREATE TABLE IF NOT EXISTS botforge_rate_limits (rate_key text PRIMARY KEY, window_started_at timestamptz NOT NULL, hits integer NOT NULL CHECK(hits>=0), expires_at timestamptz NOT NULL)');
