@@ -86,9 +86,11 @@ async function conditionalWorkerUpdate(taskId, workerId, current, patch) {
     const result = await store.query(`UPDATE botforge_records SET data=data || $4::jsonb,updated_at=now() WHERE collection='aiEngineerRuns' AND id=$1 AND data->>'kind'='agent-task' AND data->>'status'='running' AND data->>'leaseOwner'=$2 AND (data->>'leaseExpiresAt')::timestamptz>$3 RETURNING data`, [taskId, workerId, timestamp, JSON.stringify(patch)]);
     return result.rowCount ? publicTask(result.rows[0].data) : null;
   }
-  const task = await workerOwnedTask(taskId, workerId, current);
-  if (!task) return null;
-  return publicTask(await store.updateByIdAsync('aiEngineerRuns', taskId, patch));
+  return serializeJsonClaim(async () => {
+    const task = await workerOwnedTask(taskId, workerId, current);
+    if (!task) return null;
+    return publicTask(await store.updateByIdAsync('aiEngineerRuns', taskId, patch));
+  });
 }
 async function heartbeatTask(taskId, workerId, now = new Date(), leaseMs = DEFAULT_LEASE_MS) {
   const current = now instanceof Date ? now : new Date(now);
@@ -121,7 +123,11 @@ async function cancelTask(taskId, userId, now = new Date()) {
     const result = await store.query("UPDATE botforge_records SET data=data || jsonb_build_object('status','cancelled','cancelledAt',$3,'updatedAt',$3,'leaseOwner',NULL,'leaseExpiresAt',NULL),updated_at=now() WHERE collection='aiEngineerRuns' AND id=$1 AND data->>'userId'=$2 AND data->>'kind'='agent-task' AND data->>'status' NOT IN ('completed','failed','cancelled') RETURNING data", [taskId,userId,timestamp]);
     return result.rowCount ? publicTask(result.rows[0].data) : null;
   }
-  return publicTask(await store.updateByIdAsync('aiEngineerRuns', taskId, { status: 'cancelled', cancelledAt: timestamp, updatedAt: timestamp, leaseOwner: null, leaseExpiresAt: null }));
+  return serializeJsonClaim(async () => {
+    const fresh = taskRecord(await store.findByIdAsync('aiEngineerRuns', taskId));
+    if (!fresh || fresh.userId !== userId || TERMINAL.has(fresh.status)) return null;
+    return publicTask(await store.updateByIdAsync('aiEngineerRuns', taskId, { status: 'cancelled', cancelledAt: timestamp, updatedAt: timestamp, leaseOwner: null, leaseExpiresAt: null }));
+  });
 }
 async function recoverExpiredTasks(now = new Date()) {
   const current = now instanceof Date ? now : new Date(now);
