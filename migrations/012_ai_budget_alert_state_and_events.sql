@@ -42,7 +42,8 @@ CREATE OR REPLACE FUNCTION botforge_record_ai_budget_alert(
 ) RETURNS JSONB LANGUAGE plpgsql AS $$
 DECLARE
   v_previous TEXT;
-  v_event TEXT;\n  v_event_id UUID;
+  v_event TEXT;
+  v_event_id UUID;
   v_changed BOOLEAN := FALSE;
 BEGIN
   IF p_status NOT IN ('normal','warning','critical','exhausted','unknown') THEN
@@ -77,7 +78,11 @@ BEGIN
   END IF;
   IF v_changed AND v_event IS NOT NULL THEN
     INSERT INTO ai_budget_alert_events(scope_id,previous_status,current_status,event_type,snapshot)
-      VALUES(p_scope_id,v_previous,p_status,v_event,COALESCE(p_snapshot,'{}'::jsonb));
+      VALUES(p_scope_id,v_previous,p_status,v_event,COALESCE(p_snapshot,'{}'::jsonb))
+      RETURNING id INTO v_event_id;
+    INSERT INTO ai_budget_alert_outbox(event_id,scope_id,event_type,payload)
+      VALUES(v_event_id,p_scope_id,v_event,jsonb_build_object('eventId',v_event_id,'scopeId',p_scope_id,'previous',v_previous,'current',p_status,'eventType',v_event,'snapshot',COALESCE(p_snapshot,'{}'::jsonb)))
+      ON CONFLICT(event_id) DO NOTHING;
   END IF;
   RETURN jsonb_build_object('changed',v_changed,'previous',v_previous,'current',p_status,'event',v_event);
 END;
