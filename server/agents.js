@@ -227,6 +227,8 @@ router.post('/:runId/execute', requireAuth, toolExecutionLimiter, async (req, re
     if (!run || run.kind !== 'agent-plan' || run.userId !== req.user.id) return res.status(404).json({ error: 'Agent plan not found.' });
     if (run.status !== 'approved') return res.status(409).json({ error: 'Only approved plans can be queued for execution.' });
     const result = await agentTaskService.enqueueTask({ userId: req.user.id, taskType: 'agent.plan.execute', payload: { planId: run.id }, idempotencyKey: 'agent-plan-execute:' + run.id });
+    // Persist the task link so plan cancellation can cancel its queued/running task too.
+    await store.updateByIdAsync('aiEngineerRuns', run.id, { executionTaskId: result.task.id, executionQueuedAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
     res.status(result.created ? 202 : 200).json({ task: result.task, queued: result.created });
   } catch (error) {
     if (error instanceof TypeError || error instanceof RangeError) return res.status(400).json({ error: error.message });
@@ -265,6 +267,8 @@ router.post('/:runId/cancel', requireAuth, async (req, res, next) => {
     });
     if (result.state === 'not_found') return res.status(404).json({ error: 'Agent plan not found.' });
     if (result.state !== 'updated') return res.status(409).json({ error: 'This run can no longer be cancelled.', status: result.run?.status || null });
+    // Best-effort cancellation of the linked queue task; the plan state is already terminal.
+    if (existing.executionTaskId) await agentTaskService.cancelTask(existing.executionTaskId, req.user.id).catch(() => null);
     res.json({ run: result.run });
   } catch (error) { next(error); }
 });
