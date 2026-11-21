@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parsePlan, appendToolExecution, summarizeToolResult, MAX_GOAL_CHARS, MAX_STEPS } = require('../server/agents');
+const { parsePlan, initializePlanSteps, transitionPlanStep, cancelPlanSteps, getPlanProgress, STEP_RETRY_LIMIT, appendToolExecution, summarizeToolResult, MAX_GOAL_CHARS, MAX_STEPS } = require('../server/agents');
 const { getToolCatalog, validateToolRequest } = require('../server/agent-tool-registry');
 
 test('parses a valid bounded Agent Lab plan', () => {
@@ -50,6 +50,7 @@ test('Agent Lab catalog route and safe execution routes are registered',()=>{
  assert.ok(route);
  assert.ok(router.stack.some(layer=>layer.route?.path==='/:runId/tools/:toolId'&&layer.route.methods.post));
  assert.ok(router.stack.some(layer=>layer.route?.path==='/:runId/approve'&&layer.route.methods.post));
+ assert.ok(router.stack.some(layer=>layer.route?.path==='/:runId/steps/:stepIndex/status'&&layer.route.methods.post));
  const catalog=getToolCatalog();
  assert.equal(catalog.length,5);
  assert.equal(catalog.find(tool=>tool.id==='text.analyze').executionAvailable,true);
@@ -77,4 +78,36 @@ test('Agent Lab history summaries avoid storing draft content',()=>{
  const summary=summarizeToolResult('draft.create',{title:'Example',status:'preview-only',content:'Sensitive body'});
  assert.deepEqual(summary,{title:'Example',status:'preview-only',characters:14});
  assert.equal(JSON.stringify(summary).includes('Sensitive body'),false);
+});
+
+test('plan steps initialize pending with bounded progress',()=>{
+ const steps=initializePlanSteps([{title:'A'},{title:'B'}]);
+ assert.deepEqual(steps.map(s=>s.status),['pending','pending']);
+ assert.deepEqual(getPlanProgress(steps),{total:2,completed:0,failed:0,running:0,pending:2,percent:0});
+});
+test('step lifecycle rejects invalid transitions and timestamps completion',()=>{
+ let steps=initializePlanSteps([{title:'A'}]);
+ steps=transitionPlanStep(steps,0,'running','2026-11-21T10:00:00.000Z');
+ steps=transitionPlanStep(steps,0,'completed','2026-11-21T10:02:00.000Z');
+ assert.equal(steps[0].completedAt,'2026-11-21T10:02:00.000Z');
+ assert.equal(getPlanProgress(steps).percent,100);
+ assert.throws(()=>transitionPlanStep(steps,0,'running'),/Invalid step state transition/);
+});
+test('failed step retries are bounded',()=>{
+ let steps=initializePlanSteps([{title:'Retry'}]);
+ for(let i=0;i<STEP_RETRY_LIMIT;i++){
+  steps=transitionPlanStep(steps,0,'running');
+  steps=transitionPlanStep(steps,0,'failed');
+  steps=transitionPlanStep(steps,0,'pending');
+  assert.equal(steps[0].retryCount,i+1);
+ }
+ steps=transitionPlanStep(steps,0,'running');
+ steps=transitionPlanStep(steps,0,'failed');
+ assert.throws(()=>transitionPlanStep(steps,0,'pending'),/Invalid step state transition/);
+});
+test('cancellation marks unfinished steps cancelled',()=>{
+ const initial=initializePlanSteps([{title:'One'},{title:'Two'}]);
+ const running=transitionPlanStep(initial,0,'running');
+ const cancelled=cancelPlanSteps(running,'2026-11-21T12:00:00.000Z');
+ assert.deepEqual(cancelled.map(s=>s.status),['cancelled','cancelled']);
 });
