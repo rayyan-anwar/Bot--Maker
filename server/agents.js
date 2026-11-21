@@ -9,6 +9,7 @@ const { requireAuth } = require('./auth');
 const rateLimit = require('express-rate-limit');
 const { PostgresRateLimitStore } = require('./rate-limit-store');
 const { getToolCatalog, validateToolRequest, executeSafeTool, TOOL_CATALOG } = require('./agent-tool-registry');
+const { topChunksHybrid } = require('./retrieval');
 
 const router = express.Router();
 const STEP_RETRY_LIMIT = 2;
@@ -43,6 +44,7 @@ function getPlanProgress(steps) {
 function summarizeToolResult(toolId, result) {
   if (toolId === 'text.analyze') return { characters: result.characters, words: result.words, lines: result.lines, sentences: result.sentences };
   if (toolId === 'draft.create') return { title: result.title, status: result.status, characters: typeof result.content === 'string' ? result.content.length : 0 };
+  if (toolId === 'knowledge.search') return { query: result.query, sources: Array.isArray(result.sources) ? result.sources.length : 0 };
   return { type: result && result.type ? result.type : 'result' };
 }
 function appendToolExecution(run, toolId, result, now = new Date().toISOString()) {
@@ -227,7 +229,19 @@ router.post('/:runId/tools/:toolId', requireAuth, toolExecutionLimiter, async (r
       externalPermission: run.externalPermission === true,
     });
     if (!policy.valid) return res.status(403).json({ error: 'Tool request blocked by policy.', reasons: policy.errors });
-    const result = executeSafeTool(req.params.toolId, req.body?.arguments || {});
+    let result;
+    if(req.params.toolId==='knowledge.search'){
+      const args=req.body?.arguments||{};
+      if(typeof args.botId!=='string'||!args.botId.trim()||typeof args.query!=='string'||!args.query.trim()||args.query.length>1000) return res.status(400).json({error:'Knowledge search requires an owned bot ID and a query of 1 to 1,000 characters.'});
+      const bot=await store.findByIdAsync('bots',args.botId);
+      if(!bot||bot.ownerId!==req.user.id) return res.status(404).json({error:'Bot not found.'});
+      const docs=await store.findManyAsync('documents',{botId:bot.id});
+      const limit=Number.isInteger(args.limit)?Math.min(8,Math.max(1,args.limit)):4;
+      const matches=await topChunksHybrid(docs,args.query.trim(),limit);
+      result={type:'knowledge-search',query:args.query.trim(),sources:matches.map(item=>({documentId:item.documentId,chunkId:item.chunkId,filename:item.filename,text:item.text,score:Number(item.score.toFixed(4))}))};
+    }else{
+      result=executeSafeTool(req.params.toolId,req.body?.arguments||{});
+    }
     const updatedRun = appendToolExecution(run, req.params.toolId, result);
     await store.updateByIdAsync('aiEngineerRuns', run.id, { toolExecutionHistory: updatedRun.toolExecutionHistory, updatedAt: updatedRun.updatedAt });
     res.json({ result, tool: policy.tool, execution: 'completed', history: updatedRun.toolExecutionHistory });
