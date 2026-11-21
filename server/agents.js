@@ -11,6 +11,7 @@ const { PostgresRateLimitStore } = require('./rate-limit-store');
 const { getToolCatalog, validateToolRequest, executeSafeTool, TOOL_CATALOG } = require('./agent-tool-registry');
 const { topChunksHybrid } = require('./retrieval');
 const agentTaskService = require('./agent-task-service');
+const fortisniEvents = require('./fortisni-events');
 
 const router = express.Router();
 const STEP_RETRY_LIMIT = 2;
@@ -320,6 +321,14 @@ router.post('/:runId/tools/:toolId', requireAuth, toolExecutionLimiter, async (r
     if (error.message?.startsWith('Text must') || error.message?.startsWith('Draft title') || error.message?.startsWith('Draft content')) return res.status(400).json({ error: error.message });
     next(error);
   }
+});
+
+router.get('/fortisni/events', requireAuth, async (req, res, next) => {
+  try {
+    const limit = req.query.limit === undefined ? 30 : Number(req.query.limit);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) return res.status(400).json({ error: 'limit must be between 1 and 100.' });
+    res.json({ events: await fortisniEvents.listForUser(req.user.id, limit) });
+  } catch (error) { next(error); }
 });
 
 router.get('/tools', requireAuth, (req, res) => {
