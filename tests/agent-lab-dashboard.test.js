@@ -36,3 +36,10 @@ test('Agent Lab dashboard displays a tool catalog without enabling execution',()
   assert.match(html,/Catalog preview only\. Tools cannot run yet\./);
   assert.match(html,/executionAvailable\?'Available':'Planned'/);
 });
+
+test('dashboard fetches the Agent Lab catalog and keeps catalog actions non-executable',()=>{
+  assert.ok(html.includes("api('/agents/tools')"));
+  assert.ok(html.includes('loadAgentToolCatalog();'));
+  assert.ok(html.includes('executionEnabled=false'));
+  assert.ok(html.includes("state.textContent=tool.executionAvailable?'Available':'Planned'"));
+});
