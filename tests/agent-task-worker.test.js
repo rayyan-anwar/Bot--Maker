@@ -82,3 +82,14 @@ test('worker preserves plan cancellation state when provider fails after cancell
  const run=records.get(runId);assert.equal(run.status,'cancelled');assert.equal(run.plan.steps[0].status,'cancelled');
  }finally{teardown();}
 });
+
+test('provider cancellation updates the plan even when the provider call rejects',async()=>{setup();try{
+ providers.generate=async()=>{generated++;records.set(taskId,{...records.get(taskId),status:'cancelled',leaseOwner:null,leaseExpiresAt:null});throw new Error('provider request aborted after cancellation');};
+ await assert.rejects(worker.executeApprovedPlan(records.get(taskId),{workerId:'test-worker'}),/provider request aborted/);
+ const run=records.get(runId);assert.equal(run.status,'cancelled');assert.equal(run.plan.steps[0].status,'cancelled');assert.equal(run.progress.running,0);assert.equal(run.progress.pending,0);
+ }finally{teardown();}});
+test('provider cancellation never resets a cancelled task step to pending',async()=>{setup();try{
+ providers.generate=async()=>{generated++;records.set(taskId,{...records.get(taskId),status:'cancelled',leaseOwner:null,leaseExpiresAt:null});throw new Error('cancelled while provider was running');};
+ await assert.rejects(worker.executeApprovedPlan(records.get(taskId),{workerId:'test-worker'}),/cancelled while provider/);
+ assert.equal(records.get(runId).plan.steps[0].status,'cancelled');
+ }finally{teardown();}});
