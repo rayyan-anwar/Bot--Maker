@@ -75,6 +75,6 @@ test('Agent Lab execution history is bounded, timestamped and stores summaries o
 });
 test('Agent Lab history summaries avoid storing draft content',()=>{
  const summary=summarizeToolResult('draft.create',{title:'Example',status:'preview-only',content:'Sensitive body'});
- assert.deepEqual(summary,{title:'Example',status:'preview-only',characters:13});
+ assert.deepEqual(summary,{title:'Example',status:'preview-only',characters:14});
  assert.equal(JSON.stringify(summary).includes('Sensitive body'),false);
 });
