@@ -8,7 +8,7 @@ const usage = require('./usage');
 const { requireAuth } = require('./auth');
 const rateLimit = require('express-rate-limit');
 const { PostgresRateLimitStore } = require('./rate-limit-store');
-const { getToolCatalog } = require('./agent-tool-registry');
+const { getToolCatalog, validateToolRequest, executeSafeTool } = require('./agent-tool-registry');
 
 const router = express.Router();
 const MAX_GOAL_CHARS = 4000;
@@ -128,6 +128,26 @@ router.post('/:runId/cancel', requireAuth, async (req, res, next) => {
     if (result.state !== 'updated') return res.status(409).json({ error: 'This run can no longer be cancelled.', status: result.run?.status || null });
     res.json({ run: result.run });
   } catch (error) { next(error); }
+});
+
+router.post('/:runId/tools/:toolId', requireAuth, async (req, res, next) => {
+  try {
+    const run = await store.findByIdAsync('aiEngineerRuns', req.params.runId);
+    if (!run || run.kind !== 'agent-plan' || run.userId !== req.user.id) return res.status(404).json({ error: 'Agent plan not found.' });
+    const approvedToolIds = Array.isArray(run.approvedToolIds) ? run.approvedToolIds : [];
+    const policy = validateToolRequest({ toolId: req.params.toolId, arguments: req.body?.arguments }, {
+      runStatus: run.status,
+      approvedToolIds,
+      writePermission: run.writePermission === true,
+      externalPermission: run.externalPermission === true,
+    });
+    if (!policy.valid) return res.status(403).json({ error: 'Tool request blocked by policy.', reasons: policy.errors });
+    const result = executeSafeTool(req.params.toolId, req.body?.arguments || {});
+    res.json({ result, tool: policy.tool, execution: 'completed' });
+  } catch (error) {
+    if (error.message?.startsWith('Text must') || error.message?.startsWith('Draft title') || error.message?.startsWith('Draft content')) return res.status(400).json({ error: error.message });
+    next(error);
+  }
 });
 
 router.get('/tools', requireAuth, (req, res) => {
