@@ -63,11 +63,11 @@ async function claimTask(workerId, now = new Date(), leaseMs = DEFAULT_LEASE_MS)
   if (!Number.isFinite(current.getTime()) || !Number.isInteger(leaseMs) || leaseMs < 1000 || leaseMs > 900000) throw new TypeError('Invalid claim parameters.');
   const timestamp = current.toISOString(), expires = new Date(current.getTime() + leaseMs).toISOString();
   if (store.isPostgres()) {
-    const result = await store.query(`UPDATE botforge_records SET data=data || jsonb_build_object('status','running','attempt',COALESCE((data->>'attempt')::int,0)+1,'leaseOwner',$1::text,'leaseExpiresAt',$2::text,'updatedAt',$3::text),updated_at=now() WHERE collection='aiEngineerRuns' AND id=(SELECT id FROM botforge_records WHERE collection='aiEngineerRuns' AND data->>'kind'='agent-task' AND data->>'status'='queued' AND COALESCE(data->>'availableAt',$4::text)<=$4::text ORDER BY COALESCE(data->>'availableAt',data->>'createdAt'),data->>'createdAt',id FOR UPDATE SKIP LOCKED LIMIT 1) AND data->>'status'='queued' RETURNING data,id::text AS id`, [workerId, expires, timestamp, timestamp]);
+    const result = await store.query(`UPDATE botforge_records AS task_row SET data=jsonb_set(task_row.data || jsonb_build_object('status','running','attempt',COALESCE((task_row.data->>'attempt')::int,0)+1,'leaseOwner',$1::text,'leaseExpiresAt',$2::text,'updatedAt',$3::text),'{id}',to_jsonb(task_row.id::text),true),updated_at=now() WHERE task_row.collection='aiEngineerRuns' AND task_row.id=(SELECT candidate.id FROM botforge_records AS candidate WHERE candidate.collection='aiEngineerRuns' AND candidate.data->>'kind'='agent-task' AND candidate.data->>'status'='queued' AND COALESCE(candidate.data->>'availableAt',$4::text)<=$4::text ORDER BY COALESCE(candidate.data->>'availableAt',candidate.data->>'createdAt'),candidate.data->>'createdAt',candidate.id FOR UPDATE SKIP LOCKED LIMIT 1) AND task_row.data->>'status'='queued' RETURNING task_row.data,task_row.id::text AS claimed_id`, [workerId, expires, timestamp, timestamp]);
     if (!result.rowCount) return null;
     const row = result.rows[0];
     const task = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
-    const id = row.id || task?.id;
+    const id = row.claimed_id || task?.id || row.id;
     if (!id) throw new Error('PostgreSQL returned a claimed task without its identifier.');
     return publicTask({ ...task, id });
   }
