@@ -289,8 +289,27 @@
   agentList.addEventListener('click',async event=>{
     const button=event.target.closest('[data-agent-action]');if(!button)return;
     button.disabled=true;
-    try{await api('/agents/'+encodeURIComponent(button.dataset.runId)+'/'+button.dataset.agentAction,{method:'POST'});await loadAgentPlans();}
-    catch(error){window.alert(error.message);button.disabled=false;}
+    try{
+      const runId=button.dataset.runId;
+      if(button.dataset.agentAction==='approve'){
+        const selected=[...agentList.querySelectorAll('[data-agent-tool-approval]')].filter(input=>input.dataset.runId===runId&&input.checked).map(input=>input.dataset.agentToolApproval);
+        const body={toolIds:selected,writePermission:selected.includes('draft.create'),externalPermission:false};
+        await api('/agents/'+encodeURIComponent(runId)+'/approve',{method:'POST',body});
+        await loadAgentPlans();
+      }else if(button.dataset.agentAction==='run-tool'){
+        const select=agentList.querySelector('[data-agent-run-tool="'+runId+'"]');
+        const argsField=agentList.querySelector('[data-agent-tool-arguments="'+runId+'"]');
+        const output=agentList.querySelector('[data-agent-tool-result="'+runId+'"]');
+        const toolId=select?.value;
+        let args;
+        try{args=JSON.parse(argsField?.value||'{}');}catch(_){throw new Error('Tool arguments must be valid JSON.');}
+        const result=await api('/agents/'+encodeURIComponent(runId)+'/tools/'+encodeURIComponent(toolId),{method:'POST',body:{arguments:args}});
+        output.textContent=JSON.stringify(result,null,2);
+      }else{
+        await api('/agents/'+encodeURIComponent(runId)+'/cancel',{method:'POST'});
+        await loadAgentPlans();
+      }
+    }catch(error){window.alert(error.message);button.disabled=false;}
   });
   loadAgentPlans();
   loadAgentToolCatalog();
