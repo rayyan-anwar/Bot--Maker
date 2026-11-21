@@ -114,6 +114,7 @@ async function executeAutomationWorkflow(task) {
   for(let index=0;index<workflow.steps.length;index++){
     const current=await store.findByIdAsync('aiEngineerRuns',task.id);
     if(!current||current.status==='cancelled')throw new Error('Workflow execution cancelled.');
+    if(current.status!=='running'||current.leaseOwner!==task.leaseOwner||Date.parse(current.leaseExpiresAt)<=Date.now())throw new Error('Workflow worker lease lost.');
     const step=workflow.steps[index];
     const output=executeSafeTool(step.type,step.arguments||{});
     results.push({step:index+1,type:step.type,result:output,completedAt:new Date().toISOString()});
