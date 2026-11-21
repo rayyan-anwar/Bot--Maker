@@ -44,7 +44,7 @@ test('exports bounded goal and step limits', () => {
   assert.equal(MAX_STEPS, 12);
 });
 
-test('Agent Lab catalog is authenticated route metadata and execution remains disabled',()=>{
+test('Agent Lab catalog route and safe execution routes are registered',()=>{
  const {router}=require('../server/agents');
  const route=router.stack.find(layer=>layer.route?.path==='/tools'&&layer.route.methods.get);
  assert.ok(route);
