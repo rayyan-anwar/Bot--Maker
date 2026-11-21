@@ -43,7 +43,7 @@ function executeSafeTool(toolId, args = {}) {
   if (toolId === 'draft.create') {
     if (typeof args.title !== 'string' || !args.title.trim() || args.title.length > 160) throw new Error('Draft title must contain 1 to 160 characters.');
     if (typeof args.content !== 'string' || !args.content.trim() || args.content.length > MAX_TEXT_CHARS) throw new Error('Draft content must contain 1 to 12,000 characters.');
-    return { type: 'draft', title: args.title.trim(), content: args.content.trim(), status: 'created-for-review', createdAt: new Date().toISOString() };
+    return { type: 'draft', title: args.title.trim(), content: args.content.trim(), status: 'preview-only', createdAt: new Date().toISOString() };
   }
   throw new Error('This tool does not have an execution implementation.');
 }
