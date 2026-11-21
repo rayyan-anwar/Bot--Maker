@@ -35,6 +35,9 @@ function transitionPlanStep(steps, stepIndex, targetStatus, now = new Date().toI
   };
   return next;
 }
+function cancelPlanSteps(steps, now = new Date().toISOString()) {
+  return (Array.isArray(steps) ? steps : []).map(step => ['pending', 'running'].includes(step.status) ? { ...step, status: 'cancelled', completedAt: now } : { ...step });
+}
 function getPlanProgress(steps) {
   const safe = Array.isArray(steps) ? steps : [];
   const total = safe.length;
@@ -186,9 +189,15 @@ router.post('/:runId/steps/:stepIndex/status', requireAuth, async (req, res, nex
 
 router.post('/:runId/cancel', requireAuth, async (req, res, next) => {
   try {
+    const existing = await store.findByIdAsync('aiEngineerRuns', req.params.runId);
+    if (!existing || existing.kind !== 'agent-plan' || existing.userId !== req.user.id) return res.status(404).json({ error: 'Agent plan not found.' });
+    const cancelledAt = new Date().toISOString();
+    const steps = cancelPlanSteps(existing.plan?.steps, cancelledAt);
     const result = await store.transitionAgentRunStatus(req.params.runId, req.user.id, ['planned', 'approved'], 'cancelled', {
-      cancelledAt: new Date().toISOString(),
-      cancellation: { cancelledBy: req.user.id, cancelledAt: new Date().toISOString() },
+      cancelledAt,
+      cancellation: { cancelledBy: req.user.id, cancelledAt },
+      plan: { ...existing.plan, steps },
+      progress: getPlanProgress(steps),
     });
     if (result.state === 'not_found') return res.status(404).json({ error: 'Agent plan not found.' });
     if (result.state !== 'updated') return res.status(409).json({ error: 'This run can no longer be cancelled.', status: result.run?.status || null });
@@ -230,4 +239,4 @@ router.get('/:runId', requireAuth, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-module.exports = { router, parsePlan, initializePlanSteps, transitionPlanStep, getPlanProgress, STEP_RETRY_LIMIT, MAX_GOAL_CHARS, MAX_STEPS, ALLOWED_STEP_TYPES, planLimiter };
+module.exports = { router, parsePlan, initializePlanSteps, transitionPlanStep, cancelPlanSteps, getPlanProgress, STEP_RETRY_LIMIT, MAX_GOAL_CHARS, MAX_STEPS, ALLOWED_STEP_TYPES, planLimiter };
