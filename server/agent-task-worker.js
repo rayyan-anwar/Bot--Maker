@@ -135,10 +135,23 @@ async function processOneTask() {
   if(!task)return false;
   const handler=handlers.get(task.taskType);
   if(!handler){await taskService.failTask(task.id,WORKER_ID,'No handler registered for task type: '+task.taskType,new Date(),0);return true;}
-  const heartbeat=setInterval(()=>{taskService.heartbeatTask(task.id,WORKER_ID,new Date(),LEASE_MS).catch(()=>{});},Math.floor(LEASE_MS/3));
+  let leaseLost=false,heartbeatBusy=false;
+  const heartbeat=setInterval(async()=>{
+    if(heartbeatBusy||leaseLost)return;
+    heartbeatBusy=true;
+    try{
+      const renewed=await taskService.heartbeatTask(task.id,WORKER_ID,new Date(),LEASE_MS);
+      if(!renewed)leaseLost=true;
+    }catch(error){
+      leaseLost=true;
+      console.error('Agent task lease renewal failed:',safeError(error));
+    }finally{heartbeatBusy=false;}
+  },Math.max(1000,Math.floor(LEASE_MS/3)));
   try{
-    const result=await handler(task,{workerId:WORKER_ID,leaseMs:LEASE_MS});
-    await taskService.completeTask(task.id,WORKER_ID,result,new Date());
+    const result=await handler(task,{workerId:WORKER_ID,leaseMs:LEASE_MS,isLeaseLost:()=>leaseLost});
+    if(leaseLost)throw new Error('Worker lease renewal failed; task result was not committed.');
+    const completed=await taskService.completeTask(task.id,WORKER_ID,result,new Date());
+    if(!completed)throw new Error('Worker lease was lost before task completion.');
   }catch(error){
     const failed=await taskService.failTask(task.id,WORKER_ID,safeError(error),new Date(),Math.min(60000,1000*Math.pow(2,task.attempt-1))).catch(()=>null);
     if(failed&&failed.status==='failed'&&task.taskType==='agent.plan.execute'&&task.payload?.planId){
