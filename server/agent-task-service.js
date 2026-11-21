@@ -12,6 +12,7 @@ const DEFAULT_LEASE_MS = 30_000;
 const MAX_ATTEMPTS = 3;
 
 function boundedJson(value, maxBytes, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError(label + ' must be an object.');
   let serialized;
   try { serialized = JSON.stringify(value); } catch (_) { throw new TypeError(label + ' must be JSON serializable.'); }
   if (serialized === undefined || Buffer.byteLength(serialized, 'utf8') > maxBytes) throw new RangeError(label + ' exceeds the size limit.');
