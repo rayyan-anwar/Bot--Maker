@@ -233,6 +233,25 @@ async function insertDocumentWithinCapacity(record,{maxDocuments=50,maxCharacter
  }catch(error){try{await client.query('ROLLBACK');}catch(_){}throw error;}finally{client.release();}
 }
 
+async function transitionAgentRunStatus(id,userId,fromStatuses,toStatus,extra={}){
+ if(!isUuid(id)||typeof userId!=='string'||!userId||!Array.isArray(fromStatuses)||!fromStatuses.length||typeof toStatus!=='string')return {state:'invalid',run:null};
+ const allowed=new Set(['planned','approved','cancelled']);
+ if(!allowed.has(toStatus)||fromStatuses.some(status=>!allowed.has(status)))return {state:'invalid',run:null};
+ const now=new Date().toISOString();
+ if(!isPostgres()){
+  const current=findById('aiEngineerRuns',id);
+  if(!current||current.kind!=='agent-plan'||current.userId!==userId)return {state:'not_found',run:null};
+  if(!fromStatuses.includes(current.status))return {state:'conflict',run:current};
+  const updated=updateById('aiEngineerRuns',id,{status:toStatus,...extra,updatedAt:now});
+  return {state:'updated',run:updated};
+ }
+ await initialize();
+ const result=await pool.query("UPDATE botforge_records SET data=data || $4::jsonb || jsonb_build_object('status',$5::text,'updatedAt',$6::text),updated_at=now() WHERE collection='aiEngineerRuns' AND id=$1 AND data->>'kind'='agent-plan' AND data->>'userId'=$2 AND data->>'status'=ANY($3::text[]) RETURNING data",[id,userId,fromStatuses,JSON.stringify(extra),toStatus,now]);
+ if(result.rowCount)return {state:'updated',run:result.rows[0].data};
+ const current=await findByIdAsync('aiEngineerRuns',id);
+ if(!current||current.kind!=='agent-plan'||current.userId!==userId)return {state:'not_found',run:null};
+ return {state:'conflict',run:current};
+}
 async function consumeSocialOAuthState(stateHash,userId,platform,now=new Date()){
  if(typeof stateHash!=='string'||typeof userId!=='string'||typeof platform!=='string')return null;
  if(!isPostgres()){
@@ -249,4 +268,4 @@ async function consumeSocialOAuthState(stateHash,userId,platform,now=new Date())
 async function query(sql,values=[]){if(!isPostgres())throw new Error('Shared PostgreSQL storage is not configured.');await initialize();return pool.query(sql,values);}
 async function health(){if(!isPostgres())return {ok:true,database:'json-development'};try{await initialize();await pool.query('SELECT 1');return {ok:true,database:'postgres'};}catch(_){return {ok:false,database:'postgres'};}}
 async function close(){if(pool){await pool.end();pool=null;}initialized=false;}
-module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,consumeSocialOAuthState,insertDocumentWithinCapacity,query,health,load,persist};
+module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,transitionAgentRunStatus,consumeSocialOAuthState,insertDocumentWithinCapacity,query,health,load,persist};
