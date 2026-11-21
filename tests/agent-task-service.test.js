@@ -8,13 +8,14 @@ const service = require('../server/agent-task-service');
 const original = {};
 const records = [];
 function setup() {
-  for (const name of ['isPostgres','findManyAsync','findByIdAsync','insertAsync','insertAgentTaskIdempotent','updateByIdAsync','allAsync']) original[name]=store[name];
+  for (const name of ['isPostgres','findManyAsync','findByIdAsync','insertAsync','insertAgentTaskIdempotent','insertAgentTaskWithinCapacity','updateByIdAsync','allAsync']) original[name]=store[name];
   store.isPostgres=()=>false;
   store.findManyAsync=async (_collection,filter={})=>records.filter(row=>Object.entries(filter).every(([k,v])=>row[k]===v));
   store.allAsync=async()=>records;
   store.findByIdAsync=async (_collection,id)=>records.find(row=>row.id===id)||null;
   store.insertAsync=async (_collection,row)=>{records.push(row);return row;};
   store.insertAgentTaskIdempotent=async row=>{const prior=records.find(x=>x.kind==='agent-task'&&x.userId===row.userId&&x.idempotencyKey===row.idempotencyKey);if(prior)return{created:false,record:prior};records.push(row);return{created:true,record:row};};
+  store.insertAgentTaskWithinCapacity=async(row,maxActive)=>{if(row.idempotencyKey){const prior=records.find(x=>x.kind==='agent-task'&&x.userId===row.userId&&x.idempotencyKey===row.idempotencyKey);if(prior)return{created:false,record:prior};}const active=records.filter(x=>x.kind==='agent-task'&&x.userId===row.userId&&!['completed','failed','cancelled'].includes(x.status)).length;if(active>=maxActive)return{created:false,reason:'capacity'};records.push(row);return{created:true,record:row};};
   store.updateByIdAsync=async (_collection,id,patch)=>{const idx=records.findIndex(row=>row.id===id);if(idx<0)return null;records[idx]={...records[idx],...patch};return records[idx];};
 }
 function teardown(){for(const name of Object.keys(original))store[name]=original[name];records.length=0;}
