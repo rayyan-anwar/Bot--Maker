@@ -151,7 +151,7 @@ router.post('/plan', requireAuth, planLimiter, async (req, res, next) => {
   }
 });
 
-router.post('/tasks', requireAuth, async (req, res, next) => {
+router.post('/tasks', requireAuth, toolExecutionLimiter, async (req, res, next) => {
   try {
     const taskType = req.body?.taskType;
     const payload = req.body?.payload;
@@ -179,7 +179,7 @@ router.get('/tasks/:taskId', requireAuth, async (req, res, next) => {
     res.json({ task });
   } catch (error) { next(error); }
 });
-router.post('/tasks/:taskId/cancel', requireAuth, async (req, res, next) => {
+router.post('/tasks/:taskId/cancel', requireAuth, toolExecutionLimiter, async (req, res, next) => {
   try {
     const task = await agentTaskService.cancelTask(req.params.taskId, req.user.id);
     if (!task) return res.status(404).json({ error: 'Task not found or no longer cancellable.' });
