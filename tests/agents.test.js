@@ -55,10 +55,10 @@ test('Agent Lab catalog route and safe execution routes are registered',()=>{
  assert.equal(catalog.length,5);
  assert.equal(catalog.find(tool=>tool.id==='text.analyze').executionAvailable,true);
  assert.equal(catalog.find(tool=>tool.id==='draft.create').executionAvailable,true);
- assert.equal(catalog.find(tool=>tool.id==='knowledge.search').executionAvailable,false);
- const policy=validateToolRequest({toolId:'knowledge.search',arguments:{query:'x'}},{runStatus:'approved',approvedToolIds:['knowledge.search']});
- assert.equal(policy.valid,false);
- assert.equal(policy.executable,false);
+ assert.equal(catalog.find(tool=>tool.id==='knowledge.search').executionAvailable,true);
+ const policy=validateToolRequest({toolId:'knowledge.search',arguments:{botId:'bot-id',query:'x'}},{runStatus:'approved',approvedToolIds:['knowledge.search']});
+ assert.equal(policy.valid,true);
+ assert.equal(policy.executable,true);
 });
 
 test('Agent Lab execution history is bounded, timestamped and stores summaries only',()=>{
@@ -110,4 +110,9 @@ test('cancellation marks unfinished steps cancelled',()=>{
  const running=transitionPlanStep(initial,0,'running');
  const cancelled=cancelPlanSteps(running,'2026-11-21T12:00:00.000Z');
  assert.deepEqual(cancelled.map(s=>s.status),['cancelled','cancelled']);
+});
+
+test('Agent Lab exposes owner-scoped knowledge search route',()=>{
+ const {router}=require('../server/agents');
+ assert.ok(router.stack.some(layer=>layer.route?.path==='/:runId/tools/:toolId'&&layer.route.methods.post));
 });
