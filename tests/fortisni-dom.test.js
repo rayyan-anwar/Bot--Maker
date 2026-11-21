@@ -91,7 +91,7 @@ test('Fortisni session resets emotional continuity for explicit work and assista
   assert.equal(session.next('Build me a website', 'user'), 'thinking');
   assert.equal(session.next('Here is the result.', 'assistant'), 'speaking');
   assert.equal(session.reset(), 'idle');
-  assert.deepEqual(session.snapshot(), { state: 'idle', neutralTurns: 0 });
+  assert.deepEqual(session.snapshot(), { state: 'idle', neutralTurns: 0, recent: [] });
 });
 
 
