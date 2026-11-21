@@ -25,7 +25,7 @@ test('dashboard loads private plans and renders content using safe DOM text APIs
 test('dashboard exposes review and approved plan execution controls', () => {
   assert.match(html, /dataset\.agentAction='approve'/);
   assert.match(html, /dataset\.agentAction='cancel'/);
-  assert.match(html, /Approved\. Only explicitly approved local tools can run\./);
+  assert.match(html, /Approved\. Ready to queue model-only execution; this worker does not run external tools\./);
   assert.match(html, /execute\.dataset\.agentAction='run-tool'/);
 });
 
