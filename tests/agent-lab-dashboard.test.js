@@ -52,3 +52,10 @@ test('dashboard exposes per-run tool permission selection and execution UI',()=>
  assert.match(html,/writePermission:selected\.includes\('draft\.create'\)/);
  assert.match(html,/valid JSON/);
 });
+
+test('dashboard renders persisted Agent Lab execution history safely',()=>{
+ assert.match(html,/run\.toolExecutionHistory/);
+ assert.match(html,/Execution history/);
+ assert.match(html,/entry\.summary/);
+ assert.match(html,/line\.textContent=entry\.toolId/);
+});

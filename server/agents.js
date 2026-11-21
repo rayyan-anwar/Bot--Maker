@@ -11,6 +11,16 @@ const { PostgresRateLimitStore } = require('./rate-limit-store');
 const { getToolCatalog, validateToolRequest, executeSafeTool, TOOL_CATALOG } = require('./agent-tool-registry');
 
 const router = express.Router();
+function summarizeToolResult(toolId, result) {
+  if (toolId === 'text.analyze') return { characters: result.characters, words: result.words, lines: result.lines, sentences: result.sentences };
+  if (toolId === 'draft.create') return { title: result.title, status: result.status, characters: typeof result.content === 'string' ? result.content.length : 0 };
+  return { type: result && result.type ? result.type : 'result' };
+}
+function appendToolExecution(run, toolId, result, now = new Date().toISOString()) {
+  const entry = { id: uuidv4(), toolId, status: 'completed', executedAt: now, summary: summarizeToolResult(toolId, result) };
+  const previous = Array.isArray(run.toolExecutionHistory) ? run.toolExecutionHistory : [];
+  return { ...run, toolExecutionHistory: [...previous, entry].slice(-50), updatedAt: now };
+}
 const MAX_GOAL_CHARS = 4000;
 const MAX_STEPS = 12;
 const ALLOWED_STEP_TYPES = new Set(['research', 'analyze', 'draft', 'review', 'decide']);
@@ -22,6 +32,15 @@ const planLimiter = rateLimit({
   message: { error: 'Agent Lab planning limit reached. Try again in a minute.' },
   ...(store.isPostgres() ? { store: new PostgresRateLimitStore('agent-plan', store.query) } : {}),
 });
+const toolExecutionLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: process.env.NODE_ENV === 'test' ? 1000 : 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Agent Lab tool execution limit reached. Try again in a minute.' },
+  ...(store.isPostgres() ? { store: new PostgresRateLimitStore('agent-tool-execution', store.query) } : {}),
+});
+
 
 function parsePlan(text) {
   if (typeof text !== 'string' || text.length > 30000) throw new Error('Agent planner returned an invalid response.');
@@ -144,7 +163,7 @@ router.post('/:runId/cancel', requireAuth, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-router.post('/:runId/tools/:toolId', requireAuth, async (req, res, next) => {
+router.post('/:runId/tools/:toolId', requireAuth, toolExecutionLimiter, async (req, res, next) => {
   try {
     const run = await store.findByIdAsync('aiEngineerRuns', req.params.runId);
     if (!run || run.kind !== 'agent-plan' || run.userId !== req.user.id) return res.status(404).json({ error: 'Agent plan not found.' });
@@ -157,7 +176,9 @@ router.post('/:runId/tools/:toolId', requireAuth, async (req, res, next) => {
     });
     if (!policy.valid) return res.status(403).json({ error: 'Tool request blocked by policy.', reasons: policy.errors });
     const result = executeSafeTool(req.params.toolId, req.body?.arguments || {});
-    res.json({ result, tool: policy.tool, execution: 'completed' });
+    const updatedRun = appendToolExecution(run, req.params.toolId, result);
+    await store.updateByIdAsync('aiEngineerRuns', run.id, { toolExecutionHistory: updatedRun.toolExecutionHistory, updatedAt: updatedRun.updatedAt });
+    res.json({ result, tool: policy.tool, execution: 'completed', history: updatedRun.toolExecutionHistory });
   } catch (error) {
     if (error.message?.startsWith('Text must') || error.message?.startsWith('Draft title') || error.message?.startsWith('Draft content')) return res.status(400).json({ error: error.message });
     next(error);
@@ -178,4 +199,4 @@ router.get('/:runId', requireAuth, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-module.exports = { router, parsePlan, MAX_GOAL_CHARS, MAX_STEPS, ALLOWED_STEP_TYPES, planLimiter };
+module.exports = { router, parsePlan, summarizeToolResult, appendToolExecution, MAX_GOAL_CHARS, MAX_STEPS, ALLOWED_STEP_TYPES, planLimiter, toolExecutionLimiter };
