@@ -34,6 +34,25 @@ test('Fortisni recognises common Hindi messages', () => {
   }
 });
 
+test('Fortisni recognises common Roman Hindi and Hinglish messages', () => {
+  const cases = [
+    ['Main bahut dukhi hoon', 'sad'],
+    ['Yaar main akela feel kar raha hoon', 'sad'],
+    ['Mujhe dar lag raha hai', 'concerned'],
+    ['Bahut tension ho rahi hai', 'concerned'],
+    ['Mujhe gussa aa raha hai', 'angry'],
+    ['Ye bakwas hai', 'angry'],
+    ['Shukriya yaar', 'grateful'],
+    ['Bahut zabardast, maza aa gaya', 'excited'],
+    ['Aaj bahut achha laga', 'happy'],
+    ['Mujhe samajh nahi aa raha', 'confused'],
+    ['Ye kaise kaam karta hai?', 'curious']
+  ];
+  for (const [message, expected] of cases) {
+    assert.equal(Fortisni.classifyText(message, 'user'), expected, message);
+  }
+});
+
 test('Fortisni uses speaking state for neutral assistant replies', () => {
   assert.equal(Fortisni.classifyText('The result is ready.', 'assistant'), 'speaking');
 });
