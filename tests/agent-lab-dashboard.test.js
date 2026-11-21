@@ -18,7 +18,7 @@ test('dashboard exposes the Agent Lab planning form with bounded goal input', ()
 test('dashboard loads private plans and renders content using safe DOM text APIs', () => {
   assert.match(html, /api\('\/agents\/mine'\)/);
   assert.match(html, /document\.createElement\('article'\)/);
-  assert.match(html, /document\.createTextNode\(step\.description\)/);
+  assert.match(html, /document\.createTextNode\(step\.description\s*\+\s*['"]\s*['"]\)/);
   assert.match(html, /textContent=run\.plan\?\.title/);
 });
 
@@ -56,7 +56,7 @@ test('dashboard exposes per-run tool permission selection and execution UI',()=>
 test('dashboard renders step progress and approved-step transition controls',()=>{
  assert.match(html,/run\.progress/);
  assert.match(html,/data-agent-step-action/);
- assert.match(html,/data-step-index/);
+ assert.match(html,/dataset\.stepIndex=String\(index\)/);
  assert.match(html,/steps\/\+encodeURIComponent\(stepButton\.dataset\.stepIndex\)\/status/);
  assert.match(html,/label:'Complete',value:'completed'/);
 });
