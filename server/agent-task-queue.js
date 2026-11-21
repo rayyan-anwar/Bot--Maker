@@ -29,8 +29,10 @@ class AgentTaskQueue {
     if (typeof ownerId !== 'string' || !ownerId.trim() || ownerId.length > 128) throw new TypeError('ownerId is required and must be bounded.');
     if (typeof kind !== 'string' || !kind.trim() || kind.length > 80) throw new TypeError('Task kind is required and must be bounded.');
     if (payload === undefined) throw new TypeError('Task payload is required.');
-    if (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string' || !idempotencyKey.trim() || idempotencyKey.length > 160)) throw new TypeTypeError('idempotencyKey must be a non-empty string up to 160 characters.');
-    const serialized = JSON.stringify(payload);
+    if (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string' || !idempotencyKey.trim() || idempotencyKey.length > 160)) throw new TypeError('idempotencyKey must be a non-empty string up to 160 characters.');
+    let serialized;
+    try { serialized = JSON.stringify(payload); }
+    catch (_) { throw new RangeError('Task payload must be JSON serializable and at most 32 KB.'); }
     if (serialized === undefined || Buffer.byteLength(serialized, 'utf8') > 32 * 1024) throw new RangeError('Task payload must be JSON serializable and at most 32 KB.');
     if (this.tasks.has(id)) throw new Error('Task id already exists.');
     const idem = idempotencyKey ? ownerId + ':' + idempotencyKey : null;
@@ -44,7 +46,7 @@ class AgentTaskQueue {
 
   claim(workerId, now = Date.now()) {
     const timestamp = safeNow(now);
-    if (typeof workerId !== 'string' || !workerId.trim() || workerId.length > 128) throw new TypeTypeError('workerId is required and must be bounded.');
+    if (typeof workerId !== 'string' || !workerId.trim() || workerId.length > 128) throw new TypeError('workerId is required and must be bounded.');
     const task = [...this.tasks.values()].filter(item => item.status === 'queued' && item.availableAt <= timestamp).sort((a,b)=>a.createdAt-b.createdAt||a.id.localeCompare(b.id))[0];
     if (!task) return null;
     task.status = 'running'; task.attempt += 1; task.leaseOwner = workerId; task.leaseExpiresAt = timestamp + this.leaseMs; task.updatedAt = timestamp;
