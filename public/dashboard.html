@@ -273,6 +273,7 @@
     catch(error){window.alert(error.message);button.disabled=false;}
   });
   loadAgentPlans();
+  loadAgentToolCatalog();
 
   loadBots();
   document.getElementById('my-bots').addEventListener('click',async event=>{
