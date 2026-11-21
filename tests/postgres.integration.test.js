@@ -85,6 +85,24 @@ test('PostgreSQL integration: shared rate limits, atomic login lockout and quota
     assert.equal(results.filter(result=>result.reason==='duplicate').length,7);
    }finally{for(const doc of docs)await store.deleteByIdAsync('documents',doc.id);}
   });
+
+  await t.test('concurrent Agent Lab task inserts enforce per-user active capacity and idempotency',async()=>{
+   const taskRecords=Array.from({length:8},(_,i)=>({id:crypto.randomUUID(),userId,kind:'agent-task',taskType:'agent.plan.execute',payload:{index:i},status:'queued',attempt:0,maxAttempts:3,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),availableAt:new Date().toISOString(),idempotencyKey:null}));
+   try{
+    const limited=await Promise.all(taskRecords.map(record=>store.insertAgentTaskWithinCapacity(record,3)));
+    assert.equal(limited.filter(result=>result.created).length,3);
+    assert.equal(limited.filter(result=>result.reason==='capacity').length,5);
+    const duplicateKey='pg-agent-idempotency-'+crypto.randomUUID();
+    const duplicates=Array.from({length:8},(_,i)=>store.insertAgentTaskWithinCapacity({...taskRecords[i],id:crypto.randomUUID(),idempotencyKey:duplicateKey},10));
+    const duplicateResults=await Promise.all(duplicates);
+    assert.equal(duplicateResults.filter(result=>result.created).length,1);
+    assert.equal(duplicateResults.filter(result=>!result.created&&result.record).length,7);
+   }finally{
+    for(const record of taskRecords)await store.deleteByIdAsync('aiEngineerRuns',record.id);
+    const remaining=await store.findManyAsync('aiEngineerRuns',{userId});
+    for(const record of remaining.filter(row=>row.kind==='agent-task'))await store.deleteByIdAsync('aiEngineerRuns',record.id);
+   }
+  });
   await t.test('concurrent quota reservations never exceed the daily limit',async()=>{
    const day=new Date().toISOString().slice(0,10);
    const results=await Promise.all(Array.from({length:8},async()=>{
