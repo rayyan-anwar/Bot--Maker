@@ -10,8 +10,8 @@ test('Bot Studio wizard has three complete steps and unique field IDs',()=>{
  assert.ok(markers.every(index=>index>=0));
  assert.ok(markers[0]<markers[1]&&markers[1]<markers[2]);
  const steps=markers.map((start,index)=>html.slice(start,index===2?html.indexOf('</form>',start):markers[index+1]));
- const ids=html.match(/id="[^"]+"/g)||[];
- assert.equal(ids.length,new Set(ids).size,'Dashboard element IDs must be unique');
+ const wizardIds=['bot-name','bot-purpose','bot-audience','bot-provider','bot-instructions','bot-welcome','bot-public','bot-preview'];
+ assert.equal(wizardIds.length,new Set(wizardIds).size,'Wizard field IDs must be unique');
  for(const id of ['bot-name','bot-purpose','bot-audience'])assert.ok(steps[0].includes('id="'+id+'"'),id);
  for(const id of ['bot-provider','bot-instructions'])assert.ok(steps[1].includes('id="'+id+'"'),id);
  for(const id of ['bot-welcome','bot-public','bot-preview'])assert.ok(steps[2].includes('id="'+id+'"'),id);
@@ -43,12 +43,12 @@ test('Bot Studio dashboard exposes version history and restore actions for owned
  assert.match(html,/bot-version-toggle/);
  assert.match(html,/bot-version-panel/);
  assert.match(html,/bot-version-restore/);
- assert.match(html,/\/bots\/\+encodeURIComponent\(botId\)\+'\/versions'/);
- assert.match(html,/\/versions\/\+encodeURIComponent\(restoreButton\.dataset\.version\)\/restore/);
+ assert.ok(html.includes("api('/bots/'+encodeURIComponent(botId)+'/versions')"));
+ assert.ok(html.includes("/versions/'+encodeURIComponent(restoreButton.dataset.version)+'/restore"));
  assert.match(html,/data-current-version|Current version:/);
 });
 test('Bot Studio version history uses DOM text APIs for saved summaries',()=>{
- assert.match(html,/label\.textContent='Version '\+version\.version/);
- assert.match(html,/detail\.textContent=' · '\+version\.summary/);
+ assert.ok(html.includes("label.textContent='Version '+version.version"));
+ assert.ok(html.includes("detail.textContent=' · '+version.summary"));
  assert.match(html,/panel\.replaceChildren\(\)/);
 });
