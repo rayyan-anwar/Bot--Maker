@@ -32,7 +32,7 @@ test('rejects unsupported step types and malformed steps', () => {
 });
 
 test('rejects empty, oversized and excessive plans', () => {
-  assert.throws(() => parsePlan(''), /invalid response/);
+  assert.throws(() => parsePlan(''), /invalid structured output/);
   assert.throws(() => parsePlan('x'.repeat(30001)), /invalid response/);
   const steps = Array.from({ length: MAX_STEPS + 1 }, (_, i) => ({ type: 'research', title: 'Step ' + i, description: 'Research this.' }));
   assert.throws(() => parsePlan(JSON.stringify({ title: 'Plan', summary: 'Summary', steps })), /outside the supported format/);
