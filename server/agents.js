@@ -11,6 +11,39 @@ const { PostgresRateLimitStore } = require('./rate-limit-store');
 const { getToolCatalog, validateToolRequest, executeSafeTool, TOOL_CATALOG } = require('./agent-tool-registry');
 
 const router = express.Router();
+const STEP_RETRY_LIMIT = 2;
+function initializePlanSteps(steps) {
+  return steps.map(step => ({ ...step, status: 'pending', retryCount: 0, startedAt: null, completedAt: null, error: null }));
+}
+function transitionPlanStep(steps, stepIndex, targetStatus, now = new Date().toISOString()) {
+  if (!Array.isArray(steps) || !Number.isInteger(stepIndex) || stepIndex < 0 || stepIndex >= steps.length) throw new Error('Invalid step index.');
+  const allowed = new Set(['running', 'completed', 'failed', 'cancelled', 'pending']);
+  if (!allowed.has(targetStatus)) throw new Error('Unsupported step status.');
+  const current = steps[stepIndex];
+  const permitted = (current.status === 'pending' && targetStatus === 'running') ||
+    (current.status === 'running' && ['completed', 'failed', 'cancelled'].includes(targetStatus)) ||
+    (current.status === 'failed' && targetStatus === 'pending' && current.retryCount < STEP_RETRY_LIMIT);
+  if (!permitted) throw new Error('Invalid step state transition.');
+  const next = steps.map(step => ({ ...step }));
+  next[stepIndex] = {
+    ...current,
+    status: targetStatus,
+    retryCount: targetStatus === 'pending' && current.status === 'failed' ? current.retryCount + 1 : current.retryCount,
+    startedAt: targetStatus === 'running' ? now : current.startedAt,
+    completedAt: ['completed', 'failed', 'cancelled'].includes(targetStatus) ? now : null,
+    error: targetStatus === 'failed' ? (typeof current.error === 'string' ? current.error.slice(0, 500) : null) : targetStatus === 'pending' ? null : current.error,
+  };
+  return next;
+}
+function getPlanProgress(steps) {
+  const safe = Array.isArray(steps) ? steps : [];
+  const total = safe.length;
+  const completed = safe.filter(step => step.status === 'completed').length;
+  const failed = safe.filter(step => step.status === 'failed').length;
+  const running = safe.filter(step => step.status === 'running').length;
+  const pending = safe.filter(step => step.status === 'pending').length;
+  return { total, completed, failed, running, pending, percent: total ? Math.round(completed / total * 100) : 0 };
+}
 const MAX_GOAL_CHARS = 4000;
 const MAX_STEPS = 12;
 const ALLOWED_STEP_TYPES = new Set(['research', 'analyze', 'draft', 'review', 'decide']);
@@ -81,7 +114,8 @@ router.post('/plan', requireAuth, planLimiter, async (req, res, next) => {
       goal: goal.trim(),
       provider,
       model: generation.model,
-      plan,
+      plan: { ...plan, steps: initializePlanSteps(plan.steps) },
+      progress: getPlanProgress(initializePlanSteps(plan.steps)),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -132,6 +166,24 @@ router.post('/:runId/approve', requireAuth, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+router.post('/:runId/steps/:stepIndex/status', requireAuth, async (req, res, next) => {
+  try {
+    const run = await store.findByIdAsync('aiEngineerRuns', req.params.runId);
+    if (!run || run.kind !== 'agent-plan' || run.userId !== req.user.id) return res.status(404).json({ error: 'Agent plan not found.' });
+    if (run.status !== 'approved') return res.status(409).json({ error: 'Plan must be approved before step status can change.' });
+    const index = Number(req.params.stepIndex);
+    if (!Number.isInteger(index) || String(index) !== req.params.stepIndex) return res.status(400).json({ error: 'Invalid step index.' });
+    const steps = transitionPlanStep(run.plan?.steps, index, req.body?.status);
+    const progress = getPlanProgress(steps);
+    const updated = await store.updateByIdAsync('aiEngineerRuns', run.id, { plan: { ...run.plan, steps }, progress, updatedAt: new Date().toISOString() });
+    if (!updated) return res.status(404).json({ error: 'Agent plan not found.' });
+    res.json({ run: updated, progress });
+  } catch (error) {
+    if (error.message?.startsWith('Invalid step') || error.message?.startsWith('Unsupported step') || error.message?.startsWith('Invalid step state')) return res.status(400).json({ error: error.message });
+    next(error);
+  }
+});
+
 router.post('/:runId/cancel', requireAuth, async (req, res, next) => {
   try {
     const result = await store.transitionAgentRunStatus(req.params.runId, req.user.id, ['planned', 'approved'], 'cancelled', {
@@ -178,4 +230,4 @@ router.get('/:runId', requireAuth, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-module.exports = { router, parsePlan, MAX_GOAL_CHARS, MAX_STEPS, ALLOWED_STEP_TYPES, planLimiter };
+module.exports = { router, parsePlan, initializePlanSteps, transitionPlanStep, getPlanProgress, STEP_RETRY_LIMIT, MAX_GOAL_CHARS, MAX_STEPS, ALLOWED_STEP_TYPES, planLimiter };
