@@ -29,6 +29,10 @@ async function listUserTasks(userId, limit = 50) {
   return rows.filter(row => row.kind === TASK_KIND).sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, Math.max(1, Math.min(100, limit))).map(publicTask);
 }
 async function enqueueTask({ userId, taskType, payload, idempotencyKey }) {
+  if (!store.isPostgres()) return serializeJsonClaim(() => enqueueTaskInternal({ userId, taskType, payload, idempotencyKey }));
+  return enqueueTaskInternal({ userId, taskType, payload, idempotencyKey });
+}
+async function enqueueTaskInternal({ userId, taskType, payload, idempotencyKey }) {
   if (typeof userId !== 'string' || !userId) throw new TypeError('userId required');
   if (typeof taskType !== 'string' || !/^[a-z][a-z0-9.-]{1,79}$/.test(taskType)) throw new TypeError('Invalid task type.');
   const safePayload = boundedJson(payload, MAX_PAYLOAD_BYTES, 'Task payload');
