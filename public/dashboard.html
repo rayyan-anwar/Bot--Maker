@@ -31,6 +31,7 @@
   </div>
   <form id="agent-plan-form" style="margin-top:16px">
     <div class="field"><label for="agent-bot-context">Optional Bot Studio context</label><select id="agent-bot-context"><option value="">General Agent Lab (no bot context)</option></select><small class="muted">When selected, the plan uses your bot's instructions and relevant uploaded documents as context.</small></div>
+    <label class="muted" style="display:flex;gap:8px;align-items:center;margin-top:8px"><input id="agent-personal-memory" type="checkbox"> Include my saved personal memory in this plan and its execution</label>
     <div class="field"><label for="agent-goal">What do you want to accomplish?</label><textarea id="agent-goal" maxlength="4000" required rows="4" placeholder="Example: Research the market, compare competitors, and prepare a launch strategy."></textarea></div>
     <div class="flex-between"><small class="muted">Up to 4,000 characters · AI usage limits apply</small><button class="btn btn-primary" id="agent-plan-submit" type="submit">Create plan</button></div>
     <p id="agent-plan-error" class="error-msg" role="alert"></p>
@@ -347,7 +348,7 @@
   agentForm.addEventListener('submit',async event=>{
     event.preventDefault();agentError.textContent='';agentError.classList.remove('show');
     agentSubmit.disabled=true;agentSubmit.textContent='Creating…';
-    try{const botId=document.getElementById('agent-bot-context').value;await api('/agents/plan',{method:'POST',body:{goal:document.getElementById('agent-goal').value,...(botId?{botId}:{})}});document.getElementById('agent-goal').value='';await loadAgentPlans();}
+    try{const botId=document.getElementById('agent-bot-context').value;await api('/agents/plan',{method:'POST',body:{goal:document.getElementById('agent-goal').value,...(botId?{botId}:{}),includePersonalMemory:document.getElementById('agent-personal-memory').checked}});document.getElementById('agent-goal').value='';await loadAgentPlans();}
     catch(error){agentError.textContent=error.message;agentError.classList.add('show');}
     finally{agentSubmit.disabled=false;agentSubmit.textContent='Create plan';}
   });
