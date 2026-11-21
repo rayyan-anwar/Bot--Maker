@@ -78,5 +78,19 @@ test('dashboard exposes queued task monitoring, cancellation, and execution outp
  assert.match(html,/data-agent-task-cancel/);
  assert.match(html,/dataset\.agentAction='execute'/);
  assert.match(html,/Execution outputs/);
- assert.match(html,/setInterval\(\(\)=>\{loadAgentTasks\(\);loadAgentPlans\(\);\},10000\)/);
+ assert.match(html,/setInterval\(\(\)=>\{loadAgentTasks\(\);loadAgentPlans\(\);(?:loadFortisniEvents\(\);)?\},10000\)/);
+});
+
+
+test('dashboard exposes automation workflow creation, scheduling and execution controls',()=>{
+ assert.match(html,/id="automation-form"/);
+ assert.match(html,/id="automation-trigger"/);
+ assert.match(html,/loadAutomationWorkflows\(\)/);
+ assert.match(html,/Run now/);
+});
+
+test('dashboard exposes Fortisni activity and explicit personal-memory opt-in',()=>{
+ assert.match(html,/id="fortisni-agent-events"/);
+ assert.match(html,/id="agent-personal-memory"/);
+ assert.match(html,/includePersonalMemory/);
 });
