@@ -278,7 +278,7 @@
         const toolSelect=document.createElement('select');toolSelect.dataset.agentRunTool=run.id;
         run.approvedToolIds.filter(id=>['text.analyze','draft.create'].includes(id)).forEach(id=>{const option=document.createElement('option');option.value=id;option.textContent=id;toolSelect.appendChild(option);});
         const argsInput=document.createElement('textarea');argsInput.rows=4;argsInput.style.width='100%';argsInput.dataset.agentToolArguments=run.id;argsInput.value='{"text":"Paste text to analyze"}';
-        toolSelect.addEventListener('change',()=>{argsInput.value=toolSelect.value==='draft.create'?'{"title":"Draft title","content":"Draft content for review"}':'{"text":"Paste text to analyze"}';});
+        toolSelect.addEventListener('change',()=>{argsInput.value=toolSelect.value==='draft.create'?'{"title":"Draft title","content":"Draft content for review"}':toolSelect.value==='knowledge.search'?'{"botId":"YOUR_BOT_ID","query":"Search your knowledge base","limit":4}':'{"text":"Paste text to analyze"}';});
         const execute=document.createElement('button');execute.type='button';execute.className='btn btn-primary';execute.textContent='Run approved tool';execute.dataset.agentAction='run-tool';execute.dataset.runId=run.id;
         const result=document.createElement('pre');result.className='muted';result.style.whiteSpace='pre-wrap';result.style.wordBreak='break-word';result.dataset.agentToolResult=run.id;
         toolPanel.append(toolSelect,argsInput,execute,result);card.appendChild(toolPanel);

@@ -3,7 +3,7 @@
 const MAX_ARGUMENT_BYTES = 4096;
 const MAX_TEXT_CHARS = 12000;
 const TOOL_CATALOG = Object.freeze([
-  Object.freeze({ id: 'knowledge.search', title: 'Search bot knowledge', description: 'Search documents attached to a bot for relevant information.', category: 'knowledge', access: 'read', external: false, enabled: false }),
+  Object.freeze({ id: 'knowledge.search', title: 'Search bot knowledge', description: 'Search documents attached to a bot for relevant information.', category: 'knowledge', access: 'read', external: false, enabled: true }),
   Object.freeze({ id: 'web.search', title: 'Search public web', description: 'Retrieve public web information from an approved search provider.', category: 'research', access: 'read', external: true, enabled: false }),
   Object.freeze({ id: 'bot.read', title: 'Read bot configuration', description: 'Read configuration for a bot owned by the current user.', category: 'bot', access: 'read', external: false, enabled: false }),
   Object.freeze({ id: 'text.analyze', title: 'Analyze text', description: 'Analyze supplied text and return basic statistics.', category: 'analysis', access: 'read', external: false, enabled: true }),
