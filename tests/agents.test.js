@@ -48,6 +48,8 @@ test('Agent Lab catalog is authenticated route metadata and execution remains di
  const {router}=require('../server/agents');
  const route=router.stack.find(layer=>layer.route?.path==='/tools'&&layer.route.methods.get);
  assert.ok(route);
+ assert.ok(router.stack.some(layer=>layer.route?.path==='/:runId/tools/:toolId'&&layer.route.methods.post));
+ assert.ok(router.stack.some(layer=>layer.route?.path==='/:runId/approve'&&layer.route.methods.post));
  const catalog=getToolCatalog();
  assert.equal(catalog.length,5);
  assert.equal(catalog.find(tool=>tool.id==='text.analyze').executionAvailable,true);
