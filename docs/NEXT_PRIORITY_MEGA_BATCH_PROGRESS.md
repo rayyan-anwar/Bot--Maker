@@ -50,3 +50,21 @@ The staging smoke command is implemented, but no real staging URL was supplied o
 - Added a partial PostgreSQL expiry index for open reservations. No automatic release job is enabled because an expired reservation may still represent a billable provider call after an application crash.
 - Added rate limiting for admin AI budget mutations and integration coverage for over-reservation attempts retaining the original hold.
 - Added CI coverage that verifies admin budget routes fail closed when PostgreSQL is unavailable. Latest CI for the final rate-limit commit is pending.
+
+
+## Verified checkpoint — 2026-11-21
+
+- Main branch snapshot checked at `16e08ee94b0e8becc5e3abef36c2db93adf95c60`.
+- Latest BotForge CI run (#1096) for that commit completed successfully. This confirms the repository CI result only; it is not a substitute for staging or real-device verification.
+- Open PR queue checked: PR #40 is the only open PR and remains a draft, so it is not eligible for merge.
+- The previously pending follow-up work is present on main at this checkpoint. No open, non-draft PR was available to merge.
+
+## Next implementation batch — order of execution
+
+1. **Budget enforcement reliability:** complete the multi-scope reservation contract (global + user + model/tenant), atomic all-or-nothing reservation/settlement, and concurrency/idempotency tests before enabling real spend enforcement.
+2. **Social Intelligence live-provider groundwork:** add provider adapter contracts and safe callback/token lifecycle tests; keep live credentials, platform approval, and real account connections out of CI.
+3. **Knowledge Base quality gate:** add a repeatable golden evaluation dataset for retrieval recall, citation integrity, and grounded-answer behavior; publish thresholds and test results.
+4. **Release operations:** add alert rules and runbook validation; staging remains blocked until a real host, managed database, secrets, HTTPS, malware scanner and smoke test are available.
+5. **Cross-platform QA:** complete responsive/accessibility/browser test matrix first; native Capacitor/Tauri packaging remains a separate milestone and must not be represented as completed.
+
+These are sequencing decisions, not claims that the listed work is already implemented.
