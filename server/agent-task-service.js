@@ -69,29 +69,38 @@ async function workerOwnedTask(taskId, workerId, now = new Date()) {
   const task = taskRecord(await store.findByIdAsync('aiEngineerRuns', taskId));
   return task && task.status === 'running' && task.leaseOwner === workerId && Date.parse(task.leaseExpiresAt) > now.getTime() ? task : null;
 }
+async function conditionalWorkerUpdate(taskId, workerId, current, patch) {
+  const timestamp = current.toISOString();
+  if (store.isPostgres()) {
+    const result = await store.query(`UPDATE botforge_records SET data=data || $4::jsonb,updated_at=now() WHERE collection='aiEngineerRuns' AND id=$1 AND data->>'kind'='agent-task' AND data->>'status'='running' AND data->>'leaseOwner'=$2 AND (data->>'leaseExpiresAt')::timestamptz>$3 RETURNING data`, [taskId, workerId, timestamp, JSON.stringify(patch)]);
+    return result.rowCount ? publicTask(result.rows[0].data) : null;
+  }
+  const task = await workerOwnedTask(taskId, workerId, current);
+  if (!task) return null;
+  return publicTask(await store.updateByIdAsync('aiEngineerRuns', taskId, patch));
+}
 async function heartbeatTask(taskId, workerId, now = new Date(), leaseMs = DEFAULT_LEASE_MS) {
   const current = now instanceof Date ? now : new Date(now);
-  const task = await workerOwnedTask(taskId, workerId, current);
-  if (!task || !Number.isInteger(leaseMs) || leaseMs < 1000 || leaseMs > 900000) return null;
+  if (!Number.isFinite(current.getTime()) || !Number.isInteger(leaseMs) || leaseMs < 1000 || leaseMs > 900000) return null;
   const expires = new Date(current.getTime() + leaseMs).toISOString();
-  return publicTask(await store.updateByIdAsync('aiEngineerRuns', taskId, { leaseExpiresAt: expires, updatedAt: current.toISOString() }));
+  return conditionalWorkerUpdate(taskId, workerId, current, { leaseExpiresAt: expires, updatedAt: current.toISOString() });
 }
 async function completeTask(taskId, workerId, result, now = new Date()) {
   const safeResult = boundedJson(result, MAX_RESULT_BYTES, 'Task result');
   const current = now instanceof Date ? now : new Date(now);
-  const task = await workerOwnedTask(taskId, workerId, current);
-  if (!task) return null;
-  return publicTask(await store.updateByIdAsync('aiEngineerRuns', taskId, { status: 'completed', result: safeResult, completedAt: current.toISOString(), updatedAt: current.toISOString(), leaseOwner: null, leaseExpiresAt: null }));
+  if (!Number.isFinite(current.getTime())) throw new TypeError('Invalid completion time.');
+  return conditionalWorkerUpdate(taskId, workerId, current, { status: 'completed', result: safeResult, completedAt: current.toISOString(), updatedAt: current.toISOString(), leaseOwner: null, leaseExpiresAt: null });
 }
 async function failTask(taskId, workerId, error, now = new Date(), retryDelayMs = 1000) {
   const current = now instanceof Date ? now : new Date(now);
+  if (!Number.isFinite(current.getTime())) throw new TypeError('Invalid failure time.');
   if (!Number.isInteger(retryDelayMs) || retryDelayMs < 0 || retryDelayMs > 3600000) throw new RangeError('Invalid retry delay.');
   const task = await workerOwnedTask(taskId, workerId, current);
   if (!task) return null;
   const retry = task.attempt < task.maxAttempts, next = retry ? 'queued' : 'failed';
   const patch = { status: next, lastError: String(error || 'Task failed').slice(0, 500), updatedAt: current.toISOString(), leaseOwner: null, leaseExpiresAt: null, availableAt: retry ? new Date(current.getTime() + retryDelayMs).toISOString() : task.availableAt };
   if (!retry) patch.completedAt = current.toISOString();
-  return publicTask(await store.updateByIdAsync('aiEngineerRuns', taskId, patch));
+  return conditionalWorkerUpdate(taskId, workerId, current, patch);
 }
 async function cancelTask(taskId, userId, now = new Date()) {
   const task = taskRecord(await store.findByIdAsync('aiEngineerRuns', taskId));
