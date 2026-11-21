@@ -25,8 +25,8 @@ test('dashboard loads private plans and renders content using safe DOM text APIs
 test('dashboard exposes owner review lifecycle controls without claiming execution', () => {
   assert.match(html, /dataset\.agentAction='approve'/);
   assert.match(html, /dataset\.agentAction='cancel'/);
-  assert.match(html, /Approved for review only\. No tools have run\./);
-  assert.match(html, /api\('\/agents\/'\+encodeURIComponent\(button\.dataset\.runId\)\+'\/'\+button\.dataset\.agentAction/);
+  assert.match(html, /Approved\. Only explicitly approved local tools can run\./);
+  assert.match(html, /data-agent-action='run-tool'/);
 });
 
 test('Agent Lab dashboard displays a tool catalog without enabling execution',()=>{
@@ -42,4 +42,13 @@ test('dashboard fetches the Agent Lab catalog and keeps catalog actions non-exec
   assert.ok(html.includes('loadAgentToolCatalog();'));
   assert.ok(html.includes("state.textContent=tool.executionAvailable?'Available':'Planned'"));
   assert.ok(html.includes("message||'Catalog preview only. Tools cannot run yet.'"));
+});
+
+test('dashboard exposes per-run tool permission selection and execution UI',()=>{
+ assert.match(html,/data-agent-tool-approval/);
+ assert.match(html,/data-agent-run-tool/);
+ assert.match(html,/data-agent-tool-arguments/);
+ assert.match(html,/data-agent-tool-result/);
+ assert.match(html,/writePermission:selected\.includes\('draft\.create'\)/);
+ assert.match(html,/valid JSON/);
 });
