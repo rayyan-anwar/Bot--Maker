@@ -147,6 +147,7 @@ router.post('/plan', requireAuth, planLimiter, async (req, res, next) => {
       id: uuidv4(),
       userId: req.user.id,
       ...(botId ? { botId, botName } : {}),
+      includePersonalMemory: req.body?.includePersonalMemory === true,
       kind: 'agent-plan',
       status: 'planned',
       goal: goal.trim(),
