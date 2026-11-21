@@ -144,7 +144,7 @@ router.post('/:runId/cancel', requireAuth, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-router.post('/:runId/tools/:toolId', requireAuth, async (req, res, next) => {
+router.post('/:runId/tools/:toolId', requireAuth, toolExecutionLimiter, async (req, res, next) => {
   try {
     const run = await store.findByIdAsync('aiEngineerRuns', req.params.runId);
     if (!run || run.kind !== 'agent-plan' || run.userId !== req.user.id) return res.status(404).json({ error: 'Agent plan not found.' });
@@ -157,7 +157,9 @@ router.post('/:runId/tools/:toolId', requireAuth, async (req, res, next) => {
     });
     if (!policy.valid) return res.status(403).json({ error: 'Tool request blocked by policy.', reasons: policy.errors });
     const result = executeSafeTool(req.params.toolId, req.body?.arguments || {});
-    res.json({ result, tool: policy.tool, execution: 'completed' });
+    const updatedRun = appendToolExecution(run, req.params.toolId, result);
+    await store.updateByIdAsync('aiEngineerRuns', run.id, { toolExecutionHistory: updatedRun.toolExecutionHistory, updatedAt: updatedRun.updatedAt });
+    res.json({ result, tool: policy.tool, execution: 'completed', history: updatedRun.toolExecutionHistory });
   } catch (error) {
     if (error.message?.startsWith('Text must') || error.message?.startsWith('Draft title') || error.message?.startsWith('Draft content')) return res.status(400).json({ error: error.message });
     next(error);
@@ -178,4 +180,4 @@ router.get('/:runId', requireAuth, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-module.exports = { router, parsePlan, MAX_GOAL_CHARS, MAX_STEPS, ALLOWED_STEP_TYPES, planLimiter };
+module.exports = { router, parsePlan, summarizeToolResult, appendToolExecution, MAX_GOAL_CHARS, MAX_STEPS, ALLOWED_STEP_TYPES, planLimiter, toolExecutionLimiter };
