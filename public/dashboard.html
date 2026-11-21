@@ -22,7 +22,15 @@
     <h1 style="margin:0">Your bots</h1>
     <button class="btn btn-primary" id="new-bot-btn">+ New bot</button>
   </div>
-  <div class="ad-slot" aria-label="Advertisement"><span>ADVERTISEMENT</span><div>Sponsored placement · available after ad-network approval</div></div><div class="card usage-card" id="usage-card" style="margin-top:20px"><div class="flex-between"><div><h2 style="margin:0">Usage today</h2><p id="usage-copy" style="margin:4px 0 0">Loading usage…</p></div><strong id="usage-count">—</strong></div><div class="usage-track"><span id="usage-progress"></span></div></div><div id="my-bots" class="bot-grid"></div>
+  <div class="ad-slot" aria-label="Advertisement"><span>ADVERTISEMENT</span><div>Sponsored placement · available after ad-network approval</div></div><div class="card usage-card" id="usage-card" style="margin-top:20px"><div class="flex-between"><div><h2 style="margin:0">Usage today</h2><p id="usage-copy" style="margin:4px 0 0">Loading usage…</p></div><strong id="usage-count">—</strong></div><div class="usage-track"><span id="usage-progress"></span></div></div><div id="my-bots" class="bot-grid"></div><section class="card" id="agent-lab" style="margin-top:20px">
+  <div class="flex-between"><div><h2 style="margin:0">Agent Lab</h2><p class="muted" style="margin:4px 0 0">Turn a goal into a structured plan. Plans require your review; approval does not execute tools or external actions.</p></div><span class="tag">Planning</span></div>
+  <form id="agent-plan-form" style="margin-top:16px">
+    <div class="field"><label for="agent-goal">What do you want to accomplish?</label><textarea id="agent-goal" maxlength="4000" required rows="4" placeholder="Example: Research the market, compare competitors, and prepare a launch strategy."></textarea></div>
+    <div class="flex-between"><small class="muted">Up to 4,000 characters · AI usage limits apply</small><button class="btn btn-primary" id="agent-plan-submit" type="submit">Create plan</button></div>
+    <p id="agent-plan-error" class="error-msg" role="alert"></p>
+  </form>
+  <div style="margin-top:20px"><h3>Your plans</h3><div id="agent-plan-list"><p class="muted">Loading plans…</p></div></div>
+</section>
   <section class="card" style="margin-top:20px">
     <h2>Personal AI Memory</h2>
     <p class="muted">Notes you save here can provide context across your own bots. You control and can remove these notes.</p>
@@ -176,6 +184,57 @@
     pubEl.innerHTML = theirs.map((b) => botCard(b, false)).join('');
     document.getElementById('public-bots-empty').style.display = theirs.length ? 'none' : 'block';
   }
+  // Agent Lab: planning and owner-controlled review lifecycle.
+  const agentForm=document.getElementById('agent-plan-form');
+  const agentList=document.getElementById('agent-plan-list');
+  const agentError=document.getElementById('agent-plan-error');
+  const agentSubmit=document.getElementById('agent-plan-submit');
+  function renderAgentPlans(runs){
+    agentList.replaceChildren();
+    if(!runs.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='No plans yet. Describe a goal above to create your first plan.';agentList.appendChild(empty);return;}
+    runs.forEach(run=>{
+      const card=document.createElement('article');card.className='card';card.style.marginTop='12px';
+      const head=document.createElement('div');head.className='flex-between';
+      const title=document.createElement('h3');title.textContent=run.plan?.title||'Untitled plan';
+      const status=document.createElement('span');status.className='tag';status.textContent=String(run.status||'unknown').replace(/-/g,' ');
+      head.append(title,status);card.appendChild(head);
+      const summary=document.createElement('p');summary.className='muted';summary.textContent=run.plan?.summary||'';card.appendChild(summary);
+      const steps=document.createElement('ol');
+      (run.plan?.steps||[]).forEach(step=>{const li=document.createElement('li');const strong=document.createElement('strong');strong.textContent=step.title+' · ';li.append(strong,document.createTextNode(step.description));steps.appendChild(li);});
+      card.appendChild(steps);
+      const actions=document.createElement('div');actions.className='flex-between';
+      const note=document.createElement('small');note.className='muted';note.textContent=run.status==='approved'?'Approved for review only. No tools have run.':run.status==='cancelled'?'Cancelled':'Awaiting your review.';
+      actions.appendChild(note);
+      if(run.status==='planned'||run.status==='approved'){
+        const controls=document.createElement('div');controls.style.display='flex';controls.style.gap='8px';
+        if(run.status==='planned'){
+          const approve=document.createElement('button');approve.type='button';approve.className='btn btn-primary';approve.textContent='Approve plan';approve.dataset.agentAction='approve';approve.dataset.runId=run.id;controls.appendChild(approve);
+        }
+        const cancel=document.createElement('button');cancel.type='button';cancel.className='btn btn-ghost';cancel.textContent='Cancel';cancel.dataset.agentAction='cancel';cancel.dataset.runId=run.id;controls.appendChild(cancel);
+        actions.appendChild(controls);
+      }
+      card.appendChild(actions);agentList.appendChild(card);
+    });
+  }
+  async function loadAgentPlans(){
+    try{const {runs=[]}=await api('/agents/mine');renderAgentPlans(runs);}
+    catch(error){agentList.textContent='Agent Lab plans are temporarily unavailable.';}
+  }
+  agentForm.addEventListener('submit',async event=>{
+    event.preventDefault();agentError.textContent='';agentError.classList.remove('show');
+    agentSubmit.disabled=true;agentSubmit.textContent='Creating…';
+    try{await api('/agents/plan',{method:'POST',body:{goal:document.getElementById('agent-goal').value}});document.getElementById('agent-goal').value='';await loadAgentPlans();}
+    catch(error){agentError.textContent=error.message;agentError.classList.add('show');}
+    finally{agentSubmit.disabled=false;agentSubmit.textContent='Create plan';}
+  });
+  agentList.addEventListener('click',async event=>{
+    const button=event.target.closest('[data-agent-action]');if(!button)return;
+    button.disabled=true;
+    try{await api('/agents/'+encodeURIComponent(button.dataset.runId)+'/'+button.dataset.agentAction,{method:'POST'});await loadAgentPlans();}
+    catch(error){window.alert(error.message);button.disabled=false;}
+  });
+  loadAgentPlans();
+
   loadBots();
   document.getElementById('my-bots').addEventListener('click', async (event) => {
     const button=event.target.closest('.bot-publish-toggle');
