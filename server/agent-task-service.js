@@ -37,24 +37,15 @@ async function enqueueTaskInternal({ userId, taskType, payload, idempotencyKey }
   if (typeof taskType !== 'string' || !/^[a-z][a-z0-9.-]{1,79}$/.test(taskType)) throw new TypeError('Invalid task type.');
   const safePayload = boundedJson(payload, MAX_PAYLOAD_BYTES, 'Task payload');
   if (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string' || !idempotencyKey.trim() || idempotencyKey.length > 160)) throw new TypeError('Invalid idempotency key.');
-  const existing = await store.findManyAsync('aiEngineerRuns', { userId });
-  if (idempotencyKey) {
-    const prior = existing.find(row => row.kind === TASK_KIND && row.idempotencyKey === idempotencyKey);
-    if (prior) return { created: false, task: publicTask(prior) };
-  }
-  if (existing.filter(row => row.kind === TASK_KIND && !TERMINAL.has(row.status)).length >= MAX_TASKS_PER_USER) throw new Error('Your active task limit has been reached.');
   const now = new Date().toISOString();
   const task = {
     id: uuidv4(), userId, kind: TASK_KIND, taskType, payload: safePayload, status: 'queued',
     attempt: 0, maxAttempts: MAX_ATTEMPTS, createdAt: now, updatedAt: now, availableAt: now,
     leaseOwner: null, leaseExpiresAt: null, lastError: null, idempotencyKey: idempotencyKey || null,
   };
-  if(idempotencyKey){
-    const inserted=await store.insertAgentTaskIdempotent(task);
-    return {created:inserted.created,task:publicTask(inserted.record)};
-  }
-  await store.insertAsync('aiEngineerRuns', task);
-  return { created: true, task: publicTask(task) };
+  const inserted=await store.insertAgentTaskWithinCapacity(task,MAX_TASKS_PER_USER);
+  if(inserted.reason==='capacity')throw new Error('Your active task limit has been reached.');
+  return {created:inserted.created,task:publicTask(inserted.record)};
 }
 async function getTaskForUser(taskId, userId) {
   const task = taskRecord(await store.findByIdAsync('aiEngineerRuns', taskId));
