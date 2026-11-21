@@ -136,9 +136,19 @@ async function recoverExpiredTasks(now = new Date()) {
     const result = await store.query(`UPDATE botforge_records SET data=data || jsonb_build_object('status',CASE WHEN COALESCE((data->>'attempt')::int,0)<COALESCE((data->>'maxAttempts')::int,$1) THEN 'queued' ELSE 'failed' END,'availableAt',$2,'lastError','Worker lease expired.','leaseOwner',NULL,'leaseExpiresAt',NULL,'updatedAt',$2,'completedAt',CASE WHEN COALESCE((data->>'attempt')::int,0)>=COALESCE((data->>'maxAttempts')::int,$1) THEN $2 ELSE NULL END),updated_at=now() WHERE collection='aiEngineerRuns' AND data->>'kind'='agent-task' AND data->>'status'='running' AND (data->>'leaseExpiresAt')::timestamptz<=$2 RETURNING data`, [MAX_ATTEMPTS,current.toISOString()]);
     return result.rows.map(publicTask);
   }
-  const rows=(await store.allAsync('aiEngineerRuns')).filter(row=>row.kind===TASK_KIND&&row.status==='running'&&Date.parse(row.leaseExpiresAt)<=current.getTime());
-  const recovered=[];
-  for(const row of rows){const terminal=row.attempt>=row.maxAttempts;const patch={status:terminal?'failed':'queued',availableAt:current.toISOString(),lastError:'Worker lease expired.',leaseOwner:null,leaseExpiresAt:null,updatedAt:current.toISOString()};if(terminal)patch.completedAt=current.toISOString();const updated=await store.updateByIdAsync('aiEngineerRuns',row.id,patch);if(updated)recovered.push(publicTask(updated));}
-  return recovered;
+  return serializeJsonClaim(async () => {
+    const rows=(await store.allAsync('aiEngineerRuns')).filter(row=>row.kind===TASK_KIND&&row.status==='running'&&Date.parse(row.leaseExpiresAt)<=current.getTime());
+    const recovered=[];
+    for(const row of rows){
+      const fresh=taskRecord(await store.findByIdAsync('aiEngineerRuns',row.id));
+      if(!fresh||fresh.status!=='running'||Date.parse(fresh.leaseExpiresAt)>current.getTime())continue;
+      const terminal=fresh.attempt>=fresh.maxAttempts;
+      const patch={status:terminal?'failed':'queued',availableAt:current.toISOString(),lastError:'Worker lease expired.',leaseOwner:null,leaseExpiresAt:null,updatedAt:current.toISOString()};
+      if(terminal)patch.completedAt=current.toISOString();
+      const updated=await store.updateByIdAsync('aiEngineerRuns',fresh.id,patch);
+      if(updated)recovered.push(publicTask(updated));
+    }
+    return recovered;
+  });
 }
 module.exports = { TASK_KIND, MAX_TASKS_PER_USER, MAX_PAYLOAD_BYTES, MAX_RESULT_BYTES, DEFAULT_LEASE_MS, MAX_ATTEMPTS, enqueueTask, listUserTasks, getTaskForUser, claimTask, heartbeatTask, completeTask, failTask, cancelTask, recoverExpiredTasks };
