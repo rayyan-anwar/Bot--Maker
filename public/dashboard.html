@@ -219,6 +219,7 @@
       const card=document.createElement('article');card.className='card';card.style.marginTop='12px';
       const head=document.createElement('div');head.className='flex-between';
       const title=document.createElement('h3');title.textContent=run.plan?.title||'Untitled plan';
+      if(run.botName){const linkedBot=document.createElement('small');linkedBot.className='muted';linkedBot.textContent='Bot context: '+run.botName;head.appendChild(linkedBot);}
       const status=document.createElement('span');status.className='tag';status.textContent=String(run.status||'unknown').replace(/-/g,' ');
       head.append(title,status);card.appendChild(head);
       const summary=document.createElement('p');summary.className='muted';summary.textContent=run.plan?.summary||'';card.appendChild(summary);
