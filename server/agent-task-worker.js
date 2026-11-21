@@ -67,7 +67,7 @@ async function executeApprovedPlan(task, context) {
   }
   const finalRun=await store.findByIdAsync('aiEngineerRuns',planId);
   if(finalRun&&finalRun.executionTaskId===task.id)await store.updateByIdAsync('aiEngineerRuns',planId,{status:'completed',progress:{total:steps.length,completed:steps.length,failed:0,running:0,pending:0,percent:100},executionOutputs:outputs.sort((a,b)=>a.step-b.step),completedAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
-  return {planId,stepsCompleted:outputs.length,outputs:outputs.sort((a,b)=>a.step-b.step).map(item=>({step:item.step,text:item.text.slice(0,5000)}))};
+  return {planId,stepsCompleted:outputs.length,outputs:outputs.sort((a,b)=>a.step-b.step).map(item=>({step:item.step,text:item.text.slice(0,1800)}))};
 }
 registerTaskHandler('agent.plan.execute',executeApprovedPlan);
 
