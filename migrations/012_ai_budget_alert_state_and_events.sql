@@ -14,6 +14,21 @@ CREATE TABLE IF NOT EXISTS ai_budget_alert_events (
   snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE TABLE IF NOT EXISTS ai_budget_alert_outbox (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id UUID NOT NULL UNIQUE REFERENCES ai_budget_alert_events(id) ON DELETE CASCADE,
+  scope_id UUID NOT NULL REFERENCES ai_budget_scopes(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL CHECK (event_type IN ('initial','escalated','downgraded','recovered','evaluation_unavailable')),
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  delivery_state TEXT NOT NULL DEFAULT 'pending' CHECK (delivery_state IN ('pending','attempted','delivered','failed')),
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  last_error TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  available_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  delivered_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS ai_budget_alert_outbox_pending_idx
+  ON ai_budget_alert_outbox(available_at,created_at) WHERE delivery_state='pending';
 CREATE INDEX IF NOT EXISTS ai_budget_alert_events_scope_created_idx
   ON ai_budget_alert_events(scope_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS ai_budget_alert_events_created_idx
@@ -27,7 +42,7 @@ CREATE OR REPLACE FUNCTION botforge_record_ai_budget_alert(
 ) RETURNS JSONB LANGUAGE plpgsql AS $$
 DECLARE
   v_previous TEXT;
-  v_event TEXT;
+  v_event TEXT;\n  v_event_id UUID;
   v_changed BOOLEAN := FALSE;
 BEGIN
   IF p_status NOT IN ('normal','warning','critical','exhausted','unknown') THEN
