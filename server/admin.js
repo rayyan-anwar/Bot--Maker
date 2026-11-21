@@ -11,6 +11,9 @@ const engineerSandbox=require('./engineer-sandbox');
 const {isAllowedEngineerPath}=require('./engineer-path');
 const {PostgresRateLimitStore}=require('./rate-limit-store');
 const {requireAuth,isAdminEmail}=require('./auth');
+const {evaluateBudgetAlert}=require('./ai-budget-alerts');
+const {formatBudgetAlert}=require('./ai-budget-alert-message');
+const {recordBudgetAlertSnapshot}=require('./ai-budget-alert-store');
 const router=express.Router();
 const securityScanLimiter=rateLimit({windowMs:60*1000,limit:5,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'Security scan rate limit reached. Try again in a minute.'}});
 const aiBudgetWriteLimiter=rateLimit({windowMs:60*1000,limit:10,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'AI budget write limit reached. Try again in a minute.'},...(store.isPostgres()?{store:new PostgresRateLimitStore('ai-budget-write',store.query)}:{})});
@@ -205,7 +208,43 @@ router.get('/ai-budget/summary',async(req,res,next)=>{
     FROM ai_budget_scopes GROUP BY currency ORDER BY currency`
   );
   const pending=await store.query(`SELECT COUNT(*)::int AS count,COALESCE(SUM(reserved_amount),0)::numeric(20,8) AS amount FROM ai_budget_reservations WHERE state='reserved'`);
-  res.json({generatedAt:new Date().toISOString(),totals:result.rows,pendingReservations:pending.rows[0]});
+  const scopes=await store.query(`SELECT id,scope_type,scope_key,currency,limit_amount,reserved_amount,spent_amount,window_start,window_end FROM ai_budget_scopes ORDER BY scope_type,scope_key,currency LIMIT 5000`);
+  const alerts=[];
+  for(const scope of scopes.rows){
+   const evaluated=evaluateBudgetAlert({limitAmount:Number(scope.limit_amount),reservedAmount:Number(scope.reserved_amount),spentAmount:Number(scope.spent_amount)});
+   const snapshot={scopeId:scope.id,scopeType:scope.scope_type,scopeLabel:scope.scope_type+': '+scope.scope_key,currency:scope.currency,limitAmount:Number(scope.limit_amount),reservedAmount:Number(scope.reserved_amount),spentAmount:Number(scope.spent_amount),percentUsed:evaluated.percentUsed,threshold:evaluated.threshold,status:evaluated.status,message:evaluated.message,windowStart:scope.window_start,windowEnd:scope.window_end,generatedAt:new Date().toISOString()};
+   const transition=await recordBudgetAlertSnapshot(store.query,scope.id,evaluated.status,snapshot);
+   alerts.push({...formatBudgetAlert({status:evaluated.status,scopeLabel:snapshot.scopeLabel,percentUsed:evaluated.percentUsed,limitAmount:snapshot.limitAmount,reservedAmount:snapshot.reservedAmount,spentAmount:snapshot.spentAmount,currency:scope.currency}),scopeId:scope.id,scopeType:scope.scope_type,currency:scope.currency,threshold:evaluated.threshold,transition});
+  }
+  const counts={warning:0,critical:0,exhausted:0,unknown:0,normal:0};
+  for(const alert of alerts)if(Object.prototype.hasOwnProperty.call(counts,alert.status))counts[alert.status]++;
+  res.json({generatedAt:new Date().toISOString(),totals:result.rows,pendingReservations:pending.rows[0],budgetAlerts:{counts,items:alerts,scopeLimit:5000,scopeCount:scopes.rows.length,truncated:scopes.rows.length===5000}});
+ }catch(e){next(e);}
+});
+router.get('/ai-budget/alerts/history',async(req,res,next)=>{
+ try{
+  if(!store.isPostgres())return res.status(503).json({error:'AI budget controls require PostgreSQL storage.'});
+  const limitRaw=req.query.limit===undefined?'50':String(req.query.limit);
+  if(!/^\\d{1,3}$/.test(limitRaw)||Number(limitRaw)<1||Number(limitRaw)>100)return res.status(400).json({error:'limit must be an integer from 1 to 100.'});
+  const scopeId=req.query.scopeId===undefined?null:String(req.query.scopeId);
+  if(scopeId!==null&&! /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(scopeId))return res.status(400).json({error:'scopeId must be a valid UUID.'});
+  const result=await store.query(`SELECT id,scope_id,previous_status,current_status,event_type,snapshot,created_at
+    FROM ai_budget_alert_events WHERE ($1::uuid IS NULL OR scope_id=$1::uuid)
+    ORDER BY created_at DESC,id DESC LIMIT $2`,[scopeId,Number(limitRaw)]);
+  res.json({items:result.rows,limit:Number(limitRaw)});
+ }catch(e){next(e);}
+});
+router.get('/ai-budget/alerts/outbox',async(req,res,next)=>{
+ try{
+  if(!store.isPostgres())return res.status(503).json({error:'AI budget controls require PostgreSQL storage.'});
+  const limitRaw=req.query.limit===undefined?'50':String(req.query.limit);
+  if(!/^\d{1,3}$/.test(limitRaw)||Number(limitRaw)<1||Number(limitRaw)>100)return res.status(400).json({error:'limit must be an integer from 1 to 100.'});
+  const state=req.query.state===undefined?null:String(req.query.state);
+  if(state!==null&&!['pending','attempted','delivered','failed'].includes(state))return res.status(400).json({error:'state must be pending, attempted, delivered or failed.'});
+  const result=await store.query(`SELECT id,event_id,scope_id,event_type,payload,delivery_state,attempts,last_error,created_at,available_at,delivered_at
+    FROM ai_budget_alert_outbox WHERE ($1::text IS NULL OR delivery_state=$1)
+    ORDER BY available_at,created_at LIMIT $2`,[state,Number(limitRaw)]);
+  res.json({items:result.rows,limit:Number(limitRaw),deliveryEnabled:false,notice:'Outbox records are queued for a future delivery adapter; no messages are sent by this endpoint.'});
  }catch(e){next(e);}
 });
 router.get('/ai-budget/reservations',async(req,res,next)=>{

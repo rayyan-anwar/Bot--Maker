@@ -77,6 +77,8 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
  assert.equal((await fetch(base+'/api/admin/engineer/propose-fix',{method:'POST',headers:{cookie:customerCookie,'content-type':'application/json'},body:JSON.stringify({path:'server/auth.js',task:'Review session handling'})})).status,403);
  assert.equal((await fetch(base+'/api/admin/engineer/create-draft-pr',{method:'POST',headers:{cookie:customerCookie,'content-type':'application/json'},body:JSON.stringify({path:'server/auth.js',task:'Review session handling',proposedContent:'module.exports={};',baseSha:'a'.repeat(40),confirm:true})})).status,403);
  assert.equal((await fetch(base+'/api/admin/engineer/security-scan',{headers:{cookie:customerCookie}})).status,403);
+ assert.equal((await fetch(base+'/api/admin/ai-budget/alerts/history',{headers:{cookie:customerCookie}})).status,403);
+ assert.equal((await fetch(base+'/api/admin/ai-budget/alerts/outbox',{headers:{cookie:customerCookie}})).status,403);
  assert.equal(adminApi.status,403);
  assert.equal((await fetch(base+'/admin.html',{headers:{cookie:customerCookie}})).status,403);
  for(let i=0;i<2;i++)assert.equal((await post('/api/auth/login',{email:'customer@example.com',password:'wrong-password'})).status,401);
