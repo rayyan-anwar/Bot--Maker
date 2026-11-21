@@ -45,6 +45,10 @@ async function enqueueTask({ userId, taskType, payload, idempotencyKey }) {
     attempt: 0, maxAttempts: MAX_ATTEMPTS, createdAt: now, updatedAt: now, availableAt: now,
     leaseOwner: null, leaseExpiresAt: null, lastError: null, idempotencyKey: idempotencyKey || null,
   };
+  if(idempotencyKey){
+    const inserted=await store.insertAgentTaskIdempotent(task);
+    return {created:inserted.created,task:publicTask(inserted.record)};
+  }
   await store.insertAsync('aiEngineerRuns', task);
   return { created: true, task: publicTask(task) };
 }
