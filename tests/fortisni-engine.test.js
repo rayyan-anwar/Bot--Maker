@@ -17,6 +17,12 @@ test('server emotion engine recognizes Roman Hindi and Hinglish input',()=>{
  assert.equal(analyzeText('Ye kaise kaam karta hai?').emotion,'curiosity');
  assert.equal(analyzeText('Mujhe tumhari yaad aa rahi hai').emotion,'affection');
 });
+test('server emotion engine handles uppercase and mixed-case Roman Hindi',()=>{
+ assert.equal(analyzeText('SHUKRIYA YAAR').emotion,'joy');
+ assert.equal(analyzeText('Mujhe GUSSA aa raha hai').emotion,'anger');
+ assert.equal(analyzeText('DAR LAG RAHA HAI').emotion,'fear');
+ assert.equal(analyzeText('Ye KAISE kaam karta hai?').emotion,'curiosity');
+});
 test('server emotion engine preserves neutral fallback for unrelated Hinglish text',()=>{
  assert.equal(analyzeText('Kal meeting 4 baje hai').emotion,'neutral');
  assert.equal(analyzeText('').state,'idle');
