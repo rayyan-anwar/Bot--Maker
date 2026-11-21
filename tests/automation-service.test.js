@@ -45,3 +45,19 @@ test('scheduled workflow runs reuse the scheduler-observed slot as an idempotenc
   require('../server/agent-task-service').enqueueTask=originalEnqueue;
  }
 });
+
+test('concurrent scheduled workflow runs advance a schedule slot only once',async()=>{
+ const originalFind=store.findByIdAsync,originalUpdate=store.updateByIdAsync,originalEnqueue=require('../server/agent-task-service').enqueueTask;
+ const slot='2026-11-22T10:00:00.000Z';
+ const workflow={id:'schedule-race',kind:'automation-workflow',userId:'owner',enabled:true,trigger:{type:'schedule',intervalMinutes:60},nextRunAt:slot};
+ const keys=[];
+ store.findByIdAsync=async(_collection,id)=>id===workflow.id?{...workflow}:null;
+ store.updateByIdAsync=async(_collection,id,patch)=>{if(patch.nextRunAt&&workflow.nextRunAt===slot)Object.assign(workflow,patch);else Object.assign(workflow,Object.fromEntries(Object.entries(patch).filter(([key])=>key!=='nextRunAt')));return workflow;};
+ require('../server/agent-task-service').enqueueTask=async args=>{keys.push(args.idempotencyKey);return{created:keys.length===1,task:{id:'task-'+keys.length}};};
+ try{
+  await Promise.all(Array.from({length:8},()=>service.run('owner',workflow.id,{scheduled:true,scheduleSlot:slot})));
+  assert.equal(new Set(keys).size,1);
+  assert.equal(keys.length,8);
+  assert.equal(workflow.nextRunAt,new Date(Date.parse(slot)+60*60000).toISOString());
+ }finally{store.findByIdAsync=originalFind;store.updateByIdAsync=originalUpdate;require('../server/agent-task-service').enqueueTask=originalEnqueue;}
+});
