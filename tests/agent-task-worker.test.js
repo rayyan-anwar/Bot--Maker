@@ -67,7 +67,7 @@ test('stopWorker times out instead of waiting indefinitely for an active handler
 test('worker does not mark plan completed if cancellation arrives during final provider call',async()=>{setup();try{
  providers.generate=async()=>{generated++;records.set(taskId,{...records.get(taskId),status:'cancelled'});return{text:'Late output',usage:{}};};
  await assert.rejects(worker.executeApprovedPlan(records.get(taskId),{workerId:'test-worker'}),/Task cancelled/);
- const run=records.get(runId);assert.equal(run.status,'cancelled');assert.equal(run.plan.steps[0].status,'completed');assert.equal(run.progress.percent,100);
+ const run=records.get(runId);assert.equal(run.status,'cancelled');assert.equal(run.plan.steps[0].status,'cancelled');assert.equal(run.progress.running,0);assert.equal(run.progress.pending,0);assert.equal(run.progress.percent,0);
  }finally{teardown();}});
 
 test('execution cancellation route delegates cancellation to its linked task',()=>{
