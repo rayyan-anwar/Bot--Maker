@@ -44,13 +44,17 @@ test('exports bounded goal and step limits', () => {
   assert.equal(MAX_STEPS, 12);
 });
 
-test('Agent Lab catalog is authenticated route metadata and execution remains disabled',()=>{
+test('Agent Lab catalog route and safe execution routes are registered',()=>{
  const {router}=require('../server/agents');
  const route=router.stack.find(layer=>layer.route?.path==='/tools'&&layer.route.methods.get);
  assert.ok(route);
+ assert.ok(router.stack.some(layer=>layer.route?.path==='/:runId/tools/:toolId'&&layer.route.methods.post));
+ assert.ok(router.stack.some(layer=>layer.route?.path==='/:runId/approve'&&layer.route.methods.post));
  const catalog=getToolCatalog();
  assert.equal(catalog.length,5);
- assert.ok(catalog.every(tool=>tool.executionAvailable===false));
+ assert.equal(catalog.find(tool=>tool.id==='text.analyze').executionAvailable,true);
+ assert.equal(catalog.find(tool=>tool.id==='draft.create').executionAvailable,true);
+ assert.equal(catalog.find(tool=>tool.id==='knowledge.search').executionAvailable,false);
  const policy=validateToolRequest({toolId:'knowledge.search',arguments:{query:'x'}},{runStatus:'approved',approvedToolIds:['knowledge.search']});
  assert.equal(policy.valid,false);
  assert.equal(policy.executable,false);

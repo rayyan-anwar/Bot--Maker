@@ -8,7 +8,7 @@ const usage = require('./usage');
 const { requireAuth } = require('./auth');
 const rateLimit = require('express-rate-limit');
 const { PostgresRateLimitStore } = require('./rate-limit-store');
-const { getToolCatalog } = require('./agent-tool-registry');
+const { getToolCatalog, validateToolRequest, executeSafeTool, TOOL_CATALOG } = require('./agent-tool-registry');
 
 const router = express.Router();
 const MAX_GOAL_CHARS = 4000;
@@ -108,13 +108,27 @@ router.get('/mine', requireAuth, async (req, res, next) => {
 
 router.post('/:runId/approve', requireAuth, async (req, res, next) => {
   try {
+    const requestedToolIds = req.body?.toolIds === undefined ? [] : req.body.toolIds;
+    if (!Array.isArray(requestedToolIds) || requestedToolIds.length > 5 || requestedToolIds.some(id => typeof id !== 'string') || new Set(requestedToolIds).size !== requestedToolIds.length) {
+      return res.status(400).json({ error: 'toolIds must be a unique list of up to 5 tool IDs.' });
+    }
+    const knownToolIds = new Set(TOOL_CATALOG.map(tool => tool.id));
+    if (requestedToolIds.some(id => !knownToolIds.has(id))) return res.status(400).json({ error: 'Approval contains an unknown tool.' });
+    const writePermission = req.body?.writePermission === true;
+    const externalPermission = req.body?.externalPermission === true;
+    if (requestedToolIds.some(id => TOOL_CATALOG.find(tool => tool.id === id)?.access === 'write') && !writePermission) return res.status(400).json({ error: 'Write tools require writePermission=true.' });
+    if (requestedToolIds.some(id => TOOL_CATALOG.find(tool => tool.id === id)?.external) && !externalPermission) return res.status(400).json({ error: 'External tools require externalPermission=true.' });
+    const approvedAt = new Date().toISOString();
     const result = await store.transitionAgentRunStatus(req.params.runId, req.user.id, ['planned'], 'approved', {
-      approvedAt: new Date().toISOString(),
-      approval: { approvedBy: req.user.id, approvedAt: new Date().toISOString(), scope: 'plan-only' },
+      approvedAt,
+      approvedToolIds: requestedToolIds,
+      writePermission,
+      externalPermission,
+      approval: { approvedBy: req.user.id, approvedAt, scope: requestedToolIds.length ? 'explicit-tool-approval' : 'plan-only', approvedToolIds: requestedToolIds, writePermission, externalPermission },
     });
     if (result.state === 'not_found') return res.status(404).json({ error: 'Agent plan not found.' });
     if (result.state !== 'updated') return res.status(409).json({ error: 'Only a planned run can be approved.', status: result.run?.status || null });
-    res.json({ run: result.run, message: 'Plan approved. No tools or external actions have been executed.' });
+    res.json({ run: result.run, message: requestedToolIds.length ? 'Plan approved with explicit tool permissions. Tools run only when requested.' : 'Plan approved. No tools or external actions have been executed.' });
   } catch (error) { next(error); }
 });
 
@@ -130,8 +144,30 @@ router.post('/:runId/cancel', requireAuth, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+router.post('/:runId/tools/:toolId', requireAuth, async (req, res, next) => {
+  try {
+    const run = await store.findByIdAsync('aiEngineerRuns', req.params.runId);
+    if (!run || run.kind !== 'agent-plan' || run.userId !== req.user.id) return res.status(404).json({ error: 'Agent plan not found.' });
+    const approvedToolIds = Array.isArray(run.approvedToolIds) ? run.approvedToolIds : [];
+    const policy = validateToolRequest({ toolId: req.params.toolId, arguments: req.body?.arguments }, {
+      runStatus: run.status,
+      approvedToolIds,
+      writePermission: run.writePermission === true,
+      externalPermission: run.externalPermission === true,
+    });
+    if (!policy.valid) return res.status(403).json({ error: 'Tool request blocked by policy.', reasons: policy.errors });
+    const result = executeSafeTool(req.params.toolId, req.body?.arguments || {});
+    res.json({ result, tool: policy.tool, execution: 'completed' });
+  } catch (error) {
+    if (error.message?.startsWith('Text must') || error.message?.startsWith('Draft title') || error.message?.startsWith('Draft content')) return res.status(400).json({ error: error.message });
+    next(error);
+  }
+});
+
 router.get('/tools', requireAuth, (req, res) => {
-  res.json({ tools: getToolCatalog(), executionEnabled: false, message: 'Catalog only. Tool execution is not enabled yet.' });
+  const tools = getToolCatalog();
+  const executionEnabled = tools.some(tool => tool.executionAvailable);
+  res.json({ tools, executionEnabled, message: executionEnabled ? 'Safe local tools are available after per-run approval; external tools remain disabled.' : 'Catalog only. Tool execution is not enabled yet.' });
 });
 
 router.get('/:runId', requireAuth, async (req, res, next) => {
