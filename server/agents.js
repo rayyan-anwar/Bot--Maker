@@ -251,4 +251,4 @@ router.get('/:runId', requireAuth, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-module.exports = { router, parsePlan, summarizeToolResult, appendToolExecution, MAX_GOAL_CHARS, MAX_STEPS, ALLOWED_STEP_TYPES, planLimiter, toolExecutionLimiter };
+module.exports = { router, parsePlan, initializePlanSteps, transitionPlanStep, cancelPlanSteps, getPlanProgress, STEP_RETRY_LIMIT, summarizeToolResult, appendToolExecution, MAX_GOAL_CHARS, MAX_STEPS, ALLOWED_STEP_TYPES, planLimiter, toolExecutionLimiter };
