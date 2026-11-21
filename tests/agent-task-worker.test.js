@@ -50,3 +50,11 @@ test('terminal task failure synchronizes executing plan to failed',async()=>{
  try{await worker.processOneTask();assert.equal(plan.status,'failed');assert.equal(plan.plan.steps[0].status,'failed');assert.equal(plan.plan.steps[1].status,'pending');assert.equal(plan.progress.failed,1);}
  finally{taskService.claimTask=savedClaim;taskService.failTask=savedFail;store.findByIdAsync=savedFind;store.updateByIdAsync=savedUpdate;}
 });
+
+test('stopWorker returns within configured timeout when handler remains active',async()=>{
+ const service=require('../server/agent-task-service');
+ const originalClaim=service.claimTask, originalRecover=service.recoverExpiredTasks;
+ service.claimTask=async()=>null;service.recoverExpiredTasks=async()=>{};
+ try{worker.startWorker();const start=Date.now();const stopped=await worker.stopWorker(200);assert.equal(stopped,true);assert.ok(Date.now()-start<1000);}
+ finally{service.claimTask=originalClaim;service.recoverExpiredTasks=originalRecover;}
+});
