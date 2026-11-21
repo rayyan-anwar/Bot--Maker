@@ -34,7 +34,7 @@
     <div class="flex-between"><small class="muted">Up to 4,000 characters · AI usage limits apply</small><button class="btn btn-primary" id="agent-plan-submit" type="submit">Create plan</button></div>
     <p id="agent-plan-error" class="error-msg" role="alert"></p>
   </form>
-  <div style="margin-top:20px"><h3>Your plans</h3><div id="agent-plan-list"><p class="muted">Loading plans…</p></div></div>
+  <div style="margin-top:20px"><h3>Your plans</h3><div id="agent-plan-list"><p class="muted">Loading plans…</p></div></div><div style="margin-top:20px"><div class="flex-between"><h3>Your queued tasks</h3><button type="button" class="btn btn-ghost" id="agent-task-refresh">Refresh</button></div><div id="agent-task-list"><p class="muted">Loading tasks…</p></div></div>
 </section>
   <section class="card" style="margin-top:20px">
     <h2>Personal AI Memory</h2>
@@ -254,6 +254,9 @@
           card.appendChild(approvalChoices);
           const approve=document.createElement('button');approve.type='button';approve.className='btn btn-primary';approve.textContent='Approve plan';approve.dataset.agentAction='approve';approve.dataset.runId=run.id;controls.appendChild(approve);
         }
+        if(run.status==='approved'){
+          const execute=document.createElement('button');execute.type='button';execute.className='btn btn-primary';execute.textContent='Execute plan';execute.dataset.agentAction='execute';execute.dataset.runId=run.id;controls.appendChild(execute);
+        }
         const cancel=document.createElement('button');cancel.type='button';cancel.className='btn btn-ghost';cancel.textContent='Cancel';cancel.dataset.agentAction='cancel';cancel.dataset.runId=run.id;controls.appendChild(cancel);
         actions.appendChild(controls);
       }
@@ -286,6 +289,14 @@
       agentList.appendChild(card);
     });
   }
+  function renderAgentTasks(tasks){
+    const host=document.getElementById('agent-task-list');host.replaceChildren();
+    if(!tasks.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='No queued tasks yet.';host.appendChild(empty);return;}
+    tasks.forEach(task=>{const card=document.createElement('article');card.className='card';card.style.marginTop='10px';const row=document.createElement('div');row.className='flex-between';const name=document.createElement('strong');name.textContent=task.taskType+' · '+task.status;row.appendChild(name);const created=document.createElement('small');created.className='muted';created.textContent=task.createdAt?new Date(task.createdAt).toLocaleString():'';row.appendChild(created);card.appendChild(row);const detail=document.createElement('p');detail.className='muted';detail.textContent='Attempt '+(task.attempt||0)+'/'+(task.maxAttempts||3)+(task.lastError?' · '+task.lastError:'');card.appendChild(detail);if(['queued','running'].includes(task.status)){const cancel=document.createElement('button');cancel.type='button';cancel.className='btn btn-ghost';cancel.textContent='Cancel task';cancel.dataset-agent-task-cancel=task.id;card.appendChild(cancel);}host.appendChild(card);});
+  }
+  async function loadAgentTasks(){try{const {tasks=[]}=await api('/agents/tasks?limit=30');renderAgentTasks(tasks);}catch(error){document.getElementById('agent-task-list').textContent='Task list unavailable.';}}
+  document.getElementById('agent-task-refresh').addEventListener('click',loadAgentTasks);
+  document.getElementById('agent-task-list').addEventListener('click',async event=>{const button=event.target.closest('[data-agent-task-cancel]');if(!button)return;button.disabled=true;try{await api('/agents/tasks/'+encodeURIComponent(button.dataset.agentTaskCancel)+'/cancel',{method:'POST'});await loadAgentTasks();await loadAgentPlans();}catch(error){window.alert(error.message);button.disabled=false;}});
   async function loadAgentToolCatalog(){
     const status=document.getElementById('agent-tool-catalog-status');
     const list=document.getElementById('agent-tool-catalog-list');
@@ -333,7 +344,7 @@
         const body={toolIds:selected,writePermission:selected.includes('draft.create'),externalPermission:false};
         await api('/agents/'+encodeURIComponent(runId)+'/approve',{method:'POST',body});
         await loadAgentPlans();
-      }else if(button.dataset.agentAction==='run-tool'){
+      }else if(button.dataset.agentAction==='execute'){const result=await api('/agents/'+encodeURIComponent(runId)+'/execute',{method:'POST'});await loadAgentTasks();await loadAgentPlans();}else if(button.dataset.agentAction==='run-tool'){
         const select=agentList.querySelector('[data-agent-run-tool="'+runId+'"]');
         const argsField=agentList.querySelector('[data-agent-tool-arguments="'+runId+'"]');
         const output=agentList.querySelector('[data-agent-tool-result="'+runId+'"]');
@@ -349,6 +360,8 @@
     }catch(error){window.alert(error.message);button.disabled=false;}
   });
   loadAgentPlans();
+  loadAgentTasks();
+  setInterval(loadAgentTasks,10000);
   loadAgentToolCatalog();
 
   loadBots();
