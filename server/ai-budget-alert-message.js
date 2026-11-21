@@ -9,7 +9,7 @@ const LABELS = Object.freeze({
 });
 function safeText(value, fallback = 'unknown', maxLength = 120) {
   if (typeof value !== 'string' || !value.trim()) return fallback;
-  const cleaned = value.replace(/<[^>]*>/g, '').replace(/[\\r\\n\\t]+/g, ' ').replace(/[\\u0000-\\u001f\\u007f]/g, ' ').trim().slice(0, maxLength);
+  const cleaned = value.replace(/<[^>]*>/g, '').replace(/[\\x0d\\x0a\\x09]+/g, ' ').replace(/[\\u0000-\\u001f\\u007f]/g, ' ').trim().slice(0, maxLength);
   return cleaned || fallback;
 }
 function money(value, currency) {
