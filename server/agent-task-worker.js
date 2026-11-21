@@ -125,7 +125,7 @@ async function enqueueDueSchedules(){
   const rows=await store.allAsync('aiEngineerRuns');
   const now=Date.now();
   for(const workflow of rows.filter(row=>row.kind==='automation-workflow'&&row.enabled&&row.trigger?.type==='schedule'&&Number.isFinite(Date.parse(row.nextRunAt))&&Date.parse(row.nextRunAt)<=now)){
-    await automationService.run(workflow.userId,workflow.id,{scheduled:true}).catch(()=>{});
+    await automationService.run(workflow.userId,workflow.id,{scheduled:true,scheduleSlot:workflow.nextRunAt}).catch(()=>{});
   }
 }
 registerTaskHandler('automation.workflow.execute',executeAutomationWorkflow);
