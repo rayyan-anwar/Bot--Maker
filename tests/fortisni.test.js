@@ -69,3 +69,23 @@ test('Fortisni exposes a fixed set of safe visual states', () => {
   assert.ok(Fortisni.STATES.excited);
   assert.ok(Fortisni.STATES.error);
 });
+
+test('Fortisni session snapshot keeps bounded recent turn context',()=>{
+ const session=Fortisni.createSession();
+ session.next('I feel sad','user');
+ session.next('I am here to help','assistant');
+ session.next('Okay','user');
+ session.next('Thanks','user');
+ session.next('One more neutral turn','user');
+ const snap=session.snapshot();
+ assert.equal(snap.recent.length,4);
+ assert.deepEqual(snap.recent.map(item=>item.source),['assistant','user','user','user']);
+ assert.equal(snap.state,'grateful');
+ assert.equal(snap.neutralTurns,1);
+});
+test('Fortisni reset clears mood and recent context',()=>{
+ const session=Fortisni.createSession();
+ session.next('I am excited','user');
+ session.reset();
+ assert.deepEqual(session.snapshot(),{state:'idle',neutralTurns:0,recent:[]});
+});
