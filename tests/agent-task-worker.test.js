@@ -88,6 +88,11 @@ test('provider cancellation updates the plan even when the provider call rejects
  await assert.rejects(worker.executeApprovedPlan(records.get(taskId),{workerId:'test-worker'}),/provider request aborted/);
  const run=records.get(runId);assert.equal(run.status,'cancelled');assert.equal(run.plan.steps[0].status,'cancelled');assert.equal(run.progress.running,0);assert.equal(run.progress.pending,0);
  }finally{teardown();}});
+test('provider usage settlement failure retains the AI budget hold for reconciliation',async()=>{setup();try{
+ let releases=0;usage.settleAiBudget=async()=>{throw new Error('provider token usage is missing');};usage.releaseAiBudget=async()=>{releases++;return true;};
+ await assert.rejects(worker.executeApprovedPlan(records.get(taskId),{workerId:'test-worker'}),/provider token usage is missing/);
+ assert.equal(releases,0);assert.equal(records.get(runId).plan.steps[0].status,'pending');
+ }finally{teardown();}});
 test('provider cancellation never resets a cancelled task step to pending',async()=>{setup();try{
  providers.generate=async()=>{generated++;records.set(taskId,{...records.get(taskId),status:'cancelled',leaseOwner:null,leaseExpiresAt:null});throw new Error('cancelled while provider was running');};
  await assert.rejects(worker.executeApprovedPlan(records.get(taskId),{workerId:'test-worker'}),/cancelled while provider/);
