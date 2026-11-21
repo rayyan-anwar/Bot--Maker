@@ -225,17 +225,37 @@
       (run.plan?.steps||[]).forEach(step=>{const li=document.createElement('li');const strong=document.createElement('strong');strong.textContent=step.title+' · ';li.append(strong,document.createTextNode(step.description));steps.appendChild(li);});
       card.appendChild(steps);
       const actions=document.createElement('div');actions.className='flex-between';
-      const note=document.createElement('small');note.className='muted';note.textContent=run.status==='approved'?'Approved for review only. No tools have run.':run.status==='cancelled'?'Cancelled':'Awaiting your review.';
+      const note=document.createElement('small');note.className='muted';note.textContent=run.status==='approved'?'Approved. Only explicitly approved local tools can run.':run.status==='cancelled'?'Cancelled':'Awaiting your review.';
       actions.appendChild(note);
       if(run.status==='planned'||run.status==='approved'){
         const controls=document.createElement('div');controls.style.display='flex';controls.style.gap='8px';
         if(run.status==='planned'){
+          const approvalChoices=document.createElement('div');approvalChoices.style.display='grid';approvalChoices.style.gap='6px';approvalChoices.style.margin='12px 0';
+          const approvalLabel=document.createElement('small');approvalLabel.className='muted';approvalLabel.textContent='Optional tool permissions (review before approving):';approvalChoices.appendChild(approvalLabel);
+          ['text.analyze','draft.create'].forEach(toolId=>{
+            const label=document.createElement('label');label.style.display='flex';label.style.gap='8px';label.style.alignItems='center';
+            const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.dataset.agentToolApproval=toolId;checkbox.dataset.runId=run.id;
+            const text=document.createElement('span');text.textContent=toolId==='text.analyze'?'Text analysis (read-only)':'Draft preview (write permission)';
+            label.append(checkbox,text);approvalChoices.appendChild(label);
+          });
+          card.appendChild(approvalChoices);
           const approve=document.createElement('button');approve.type='button';approve.className='btn btn-primary';approve.textContent='Approve plan';approve.dataset.agentAction='approve';approve.dataset.runId=run.id;controls.appendChild(approve);
         }
         const cancel=document.createElement('button');cancel.type='button';cancel.className='btn btn-ghost';cancel.textContent='Cancel';cancel.dataset.agentAction='cancel';cancel.dataset.runId=run.id;controls.appendChild(cancel);
         actions.appendChild(controls);
       }
-      card.appendChild(actions);agentList.appendChild(card);
+      card.appendChild(actions);
+      if(run.status==='approved'&&Array.isArray(run.approvedToolIds)&&run.approvedToolIds.some(id=>['text.analyze','draft.create'].includes(id))){
+        const toolPanel=document.createElement('div');toolPanel.style.marginTop='12px';toolPanel.style.display='grid';toolPanel.style.gap='8px';
+        const toolSelect=document.createElement('select');toolSelect.dataset.agentRunTool=run.id;
+        run.approvedToolIds.filter(id=>['text.analyze','draft.create'].includes(id)).forEach(id=>{const option=document.createElement('option');option.value=id;option.textContent=id;toolSelect.appendChild(option);});
+        const argsInput=document.createElement('textarea');argsInput.rows=4;argsInput.style.width='100%';argsInput.dataset.agentToolArguments=run.id;argsInput.value='{"text":"Paste text to analyze"}';
+        toolSelect.addEventListener('change',()=>{argsInput.value=toolSelect.value==='draft.create'?'{"title":"Draft title","content":"Draft content for review"}':'{"text":"Paste text to analyze"}';});
+        const execute=document.createElement('button');execute.type='button';execute.className='btn btn-primary';execute.textContent='Run approved tool';execute.dataset.agentAction='run-tool';execute.dataset.runId=run.id;
+        const result=document.createElement('pre');result.className='muted';result.style.whiteSpace='pre-wrap';result.style.wordBreak='break-word';result.dataset.agentToolResult=run.id;
+        toolPanel.append(toolSelect,argsInput,execute,result);card.appendChild(toolPanel);
+      }
+      agentList.appendChild(card);
     });
   }
   async function loadAgentToolCatalog(){
