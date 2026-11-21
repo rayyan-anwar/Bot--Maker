@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { parsePlan, MAX_GOAL_CHARS, MAX_STEPS } = require('../server/agents');
+const { getToolCatalog, validateToolRequest } = require('../server/agent-tool-registry');
 
 test('parses a valid bounded Agent Lab plan', () => {
   const plan = parsePlan(JSON.stringify({
@@ -41,4 +42,16 @@ test('rejects empty, oversized and excessive plans', () => {
 test('exports bounded goal and step limits', () => {
   assert.equal(MAX_GOAL_CHARS, 4000);
   assert.equal(MAX_STEPS, 12);
+});
+
+test('Agent Lab catalog is authenticated route metadata and execution remains disabled',()=>{
+ const {router}=require('../server/agents');
+ const route=router.stack.find(layer=>layer.route?.path==='/tools'&&layer.route.methods.get);
+ assert.ok(route);
+ const catalog=getToolCatalog();
+ assert.equal(catalog.length,5);
+ assert.ok(catalog.every(tool=>tool.executionAvailable===false));
+ const policy=validateToolRequest({toolId:'knowledge.search',arguments:{query:'x'}},{runStatus:'approved',approvedToolIds:['knowledge.search']});
+ assert.equal(policy.valid,false);
+ assert.equal(policy.executable,false);
 });
