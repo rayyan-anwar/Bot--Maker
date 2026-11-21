@@ -245,6 +245,21 @@
         actions.appendChild(controls);
       }
       card.appendChild(actions);
+      if(Array.isArray(run.toolExecutionHistory)&&run.toolExecutionHistory.length){
+        const history=document.createElement('section');history.style.marginTop='12px';
+        const heading=document.createElement('strong');heading.textContent='Execution history';history.appendChild(heading);
+        const historyList=document.createElement('ol');
+        run.toolExecutionHistory.slice(-10).reverse().forEach(entry=>{
+          const item=document.createElement('li');const line=document.createElement('span');
+          const when=entry.executedAt?new Date(entry.executedAt).toLocaleString():'Time unavailable';
+          line.textContent=entry.toolId+' · '+entry.status+' · '+when;
+          item.appendChild(line);
+          const summary=document.createElement('small');summary.className='muted';
+          summary.textContent=entry.summary?Object.entries(entry.summary).map(([key,value])=>key+': '+String(value)).join(' · '):'';
+          item.appendChild(summary);historyList.appendChild(item);
+        });
+        history.appendChild(historyList);card.appendChild(history);
+      }
       if(run.status==='approved'&&Array.isArray(run.approvedToolIds)&&run.approvedToolIds.some(id=>['text.analyze','draft.create'].includes(id))){
         const toolPanel=document.createElement('div');toolPanel.style.marginTop='12px';toolPanel.style.display='grid';toolPanel.style.gap='8px';
         const toolSelect=document.createElement('select');toolSelect.dataset.agentRunTool=run.id;
