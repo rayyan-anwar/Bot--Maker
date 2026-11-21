@@ -6,11 +6,21 @@ const store = require('./store');
 const providers = require('./providers');
 const usage = require('./usage');
 const { requireAuth } = require('./auth');
+const rateLimit = require('express-rate-limit');
+const { PostgresRateLimitStore } = require('./rate-limit-store');
 
 const router = express.Router();
 const MAX_GOAL_CHARS = 4000;
 const MAX_STEPS = 12;
 const ALLOWED_STEP_TYPES = new Set(['research', 'analyze', 'draft', 'review', 'decide']);
+const planLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: process.env.NODE_ENV === 'test' ? 1000 : 5,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Agent Lab planning limit reached. Try again in a minute.' },
+  ...(store.isPostgres() ? { store: new PostgresRateLimitStore('agent-plan', store.query) } : {}),
+});
 
 function parsePlan(text) {
   if (typeof text !== 'string' || text.length > 30000) throw new Error('Agent planner returned an invalid response.');
@@ -35,7 +45,7 @@ function parsePlan(text) {
   return { title: value.title.trim(), summary: value.summary.trim(), steps };
 }
 
-router.post('/plan', requireAuth, async (req, res, next) => {
+router.post('/plan', requireAuth, planLimiter, async (req, res, next) => {
   let budgetReservation = null;
   let providerStarted = false;
   try {
@@ -103,4 +113,4 @@ router.get('/:runId', requireAuth, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-module.exports = { router, parsePlan, MAX_GOAL_CHARS, MAX_STEPS, ALLOWED_STEP_TYPES };
+module.exports = { router, parsePlan, MAX_GOAL_CHARS, MAX_STEPS, ALLOWED_STEP_TYPES, planLimiter };
