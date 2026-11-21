@@ -237,6 +237,7 @@
         steps.appendChild(li);
       });
       card.appendChild(steps);
+      if(Array.isArray(run.executionOutputs)&&run.executionOutputs.length){const outputPanel=document.createElement('details');outputPanel.style.marginTop='12px';const outputSummary=document.createElement('summary');outputSummary.textContent='Execution outputs ('+run.executionOutputs.length+')';outputPanel.appendChild(outputSummary);run.executionOutputs.slice().sort((a,b)=>a.step-b.step).forEach(item=>{const section=document.createElement('section');section.style.marginTop='10px';const label=document.createElement('strong');label.textContent='Step '+item.step;const output=document.createElement('pre');output.style.whiteSpace='pre-wrap';output.style.wordBreak='break-word';output.textContent=String(item.text||'');section.append(label,output);outputPanel.appendChild(section);});card.appendChild(outputPanel);}
       const actions=document.createElement('div');actions.className='flex-between';
       const note=document.createElement('small');note.className='muted';note.textContent=run.status==='approved'?'Approved. Only explicitly approved local tools can run.':run.status==='cancelled'?'Cancelled':'Awaiting your review.';
       actions.appendChild(note);
