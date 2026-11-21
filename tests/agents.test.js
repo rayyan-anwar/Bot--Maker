@@ -56,8 +56,8 @@ test('Agent Lab catalog route and safe execution routes are registered',()=>{
  assert.equal(catalog.find(tool=>tool.id==='draft.create').executionAvailable,true);
  assert.equal(catalog.find(tool=>tool.id==='knowledge.search').executionAvailable,true);
  const policy=validateToolRequest({toolId:'knowledge.search',arguments:{botId:'bot-id',query:'x'}},{runStatus:'approved',approvedToolIds:['knowledge.search']});
- assert.equal(policy.valid,false);
- assert.equal(policy.executable,false);
+ assert.equal(policy.valid,true);
+ assert.equal(policy.executable,true);
 });
 
 test('Agent Lab execution history is bounded, timestamped and stores summaries only',()=>{
