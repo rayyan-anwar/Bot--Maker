@@ -47,6 +47,7 @@ async function executeApprovedPlan(task, context) {
   }
   let outputs=Array.isArray(run.executionOutputs)?run.executionOutputs.slice():[];
   run=await store.updateByIdAsync('aiEngineerRuns',planId,{status:'executing',executionTaskId:task.id,updatedAt:new Date().toISOString()});
+  await fortisniEvents.publish({userId:task.userId,planId,taskId:task.id,type:'plan.started',message:'Fortisni is following your Agent Lab task.',metadata:{totalSteps:steps.length}});
   for(let i=0;i<steps.length;i++){
     const existing=outputs.find(item=>item.step===i+1);
     if(existing)continue;
@@ -96,6 +97,7 @@ async function executeApprovedPlan(task, context) {
     const cancelledAt=new Date().toISOString();
     const cancelledSteps=finalRun.plan.steps.map(step=>['pending','running'].includes(step.status)?{...step,status:'cancelled',completedAt:cancelledAt,error:null}:step);
     await store.updateByIdAsync('aiEngineerRuns',planId,{status:'cancelled',plan:{...finalRun.plan,steps:cancelledSteps},progress:{total:steps.length,completed:outputs.length,failed:0,running:0,pending:0,percent:Math.round(outputs.length/steps.length*100)},cancelledAt,updatedAt:cancelledAt});
+    await fortisniEvents.publish({userId:task.userId,planId,taskId:task.id,type:'plan.cancelled',message:'Your Agent Lab task was cancelled.',metadata:{totalSteps:steps.length}});
     throw new Error('Task cancelled.');
   }
   if(finalRun&&finalRun.executionTaskId===task.id&&finalRun.status==='executing'){await store.updateByIdAsync('aiEngineerRuns',planId,{status:'completed',progress:{total:steps.length,completed:steps.length,failed:0,running:0,pending:0,percent:100},executionOutputs:outputs.sort((a,b)=>a.step-b.step),completedAt:new Date().toISOString(),updatedAt:new Date().toISOString()});await fortisniEvents.publish({userId:task.userId,planId,taskId:task.id,type:'plan.completed',message:'Your Agent Lab plan is complete.',metadata:{totalSteps:steps.length}});}
