@@ -117,6 +117,12 @@ async function executeApprovedPlan(task, context) {
     await fortisniEvents.publish({userId:task.userId,planId,taskId:task.id,type:'plan.cancelled',message:'Your Agent Lab task was cancelled.',metadata:{totalSteps:steps.length}});
     throw new Error('Task cancelled.');
   }
+  // A plan must not become terminal before its durable task has safely
+  // completed. The lease can expire after the final step output is stored.
+  if(!finalTask||finalTask.status!=='running'||finalTask.leaseOwner!==context.workerId||
+     Date.parse(finalTask.leaseExpiresAt)<=Date.now()||context.isLeaseLost?.()){
+    throw new Error('Worker lease lost before plan completion.');
+  }
   if(finalRun&&finalRun.executionTaskId===task.id&&finalRun.status==='executing'){await store.updateByIdAsync('aiEngineerRuns',planId,{status:'completed',progress:{total:steps.length,completed:steps.length,failed:0,running:0,pending:0,percent:100},executionOutputs:outputs.sort((a,b)=>a.step-b.step),completedAt:new Date().toISOString(),updatedAt:new Date().toISOString()});await fortisniEvents.publish({userId:task.userId,planId,taskId:task.id,type:'plan.completed',message:'Your Agent Lab plan is complete.',metadata:{totalSteps:steps.length}});}
   return {planId,stepsCompleted:outputs.length,outputs:outputs.sort((a,b)=>a.step-b.step).map(item=>({step:item.step,text:item.text.slice(0,1800)}))};
 }
