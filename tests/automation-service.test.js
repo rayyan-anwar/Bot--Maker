@@ -139,3 +139,8 @@ test('schedule intervals must be numeric and trigger data must be bounded JSON',
   await assert.rejects(service.run('owner','s',{payload:'x'.repeat(9000)}),/Invalid automation trigger data/);
  }finally{store.findByIdAsync=original;}
 });
+
+test('workflow JSON validation rejects extra enumerable array properties',()=>{
+ const args={items:['ok']};args.items.extra='unsafe';
+ assert.throws(()=>service.validateDefinition({name:'Extra array prop',steps:[{type:'text.analyze',arguments:args}]}),/valid JSON data/);
+});
