@@ -46,7 +46,7 @@ test('scheduled workflow runs reuse the scheduler-observed slot as an idempotenc
  }
 });
 
-test('concurrent scheduled workflow runs advance a schedule slot only once',async()=>{
+test('concurrent scheduled workflow enqueues reuse the slot and leave advancement to the fenced scheduler',async()=>{
  const originalFind=store.findByIdAsync,originalUpdate=store.updateByIdAsync,originalEnqueue=require('../server/agent-task-service').enqueueTask;
  const slot='2026-11-22T10:00:00.000Z';
  const workflow={id:'schedule-race',kind:'automation-workflow',userId:'owner',enabled:true,trigger:{type:'schedule',intervalMinutes:60},nextRunAt:slot};
@@ -58,7 +58,7 @@ test('concurrent scheduled workflow runs advance a schedule slot only once',asyn
   await Promise.all(Array.from({length:8},()=>service.run('owner',workflow.id,{scheduled:true,scheduleSlot:slot})));
   assert.equal(new Set(keys).size,1);
   assert.equal(keys.length,8);
-  assert.equal(workflow.nextRunAt,new Date(Date.parse(slot)+60*60000).toISOString());
+  assert.equal(workflow.nextRunAt,slot);
  }finally{store.findByIdAsync=originalFind;store.updateByIdAsync=originalUpdate;require('../server/agent-task-service').enqueueTask=originalEnqueue;}
 });
 
