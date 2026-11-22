@@ -8,6 +8,20 @@ const MAX_WORKFLOWS_PER_USER = 50;
 const MAX_STEPS = 8;
 const TYPES = new Set(['text.analyze','draft.create','knowledge.search']);
 
+function isJsonValue(value, depth = 0, seen = new Set()) {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value !== 'object' || depth > 20 || seen.has(value)) return false;
+  if (!Array.isArray(value) && Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) return false;
+  seen.add(value);
+  const valid = Array.isArray(value)
+    ? value.every(item => isJsonValue(item, depth + 1, seen))
+    : Object.keys(value).every(key => isJsonValue(value[key], depth + 1, seen));
+  seen.delete(value);
+  return valid;
+}
+
+
 function validateDefinition(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new TypeError('Workflow definition is required.');
   const name = String(input.name || '').trim();
@@ -18,6 +32,7 @@ function validateDefinition(input) {
     let args = {};
     if (step.arguments && typeof step.arguments === 'object' && !Array.isArray(step.arguments)) {
       try {
+        if (!isJsonValue(step.arguments)) throw new TypeError('Workflow step arguments must be valid JSON data.');
         const serialized = JSON.stringify(step.arguments);
         if (serialized === undefined) throw new TypeError('Workflow step arguments must be JSON serializable.');
         if (Buffer.byteLength(serialized) > 4000) throw new RangeError('Workflow step arguments are too large.');
