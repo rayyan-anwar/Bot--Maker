@@ -144,6 +144,9 @@ async function executeAutomationWorkflow(task) {
     const current=await store.findByIdAsync('aiEngineerRuns',task.id);
     if(!current||current.status==='cancelled')throw new Error('Workflow execution cancelled.');
     if(current.status!=='running'||current.leaseOwner!==task.leaseOwner||Date.parse(current.leaseExpiresAt)<=Date.now())throw new Error('Workflow worker lease lost.');
+    const latestWorkflow=await automationService.getOwned(task.userId,workflow.id);
+    if(!latestWorkflow||!latestWorkflow.enabled)throw new Error('Workflow was disabled during execution.');
+    if(!Array.isArray(latestWorkflow.steps)||latestWorkflow.steps.length!==workflow.steps.length)throw new Error('Workflow definition changed during execution.');
     const step=workflow.steps[index];
     const output=executeSafeTool(step.type,step.arguments||{});
     results.push({step:index+1,type:step.type,result:output,completedAt:new Date().toISOString()});
