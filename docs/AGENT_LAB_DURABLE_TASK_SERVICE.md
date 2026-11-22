@@ -1,35 +1,39 @@
-# Agent Lab Durable Task Service and Worker (foundation)
+# Agent Lab Durable Task Service and Worker
 
-This module adds persistent task records to the existing `aiEngineerRuns` store without changing the current plan lifecycle.
+This service adds durable task records to the existing `aiEngineerRuns` store and provides an opt-in worker for approved plan execution.
 
-## Included
-- Owner-scoped task creation and listing
-- Idempotency key deduplication scoped to user
-- Bounded JSON payload/result sizes
-- Active task cap per owner
-- PostgreSQL atomic claim using `FOR UPDATE SKIP LOCKED`
-- Worker leases, heartbeat, completion, retry/failure and expiry recovery
-- Owner-only cancellation and public task projection
-- Authenticated task create/list/detail/cancel/execute HTTP endpoints
-- Rate limiting on task creation, cancellation, and execution queueing
-- Background worker with registered task handlers and opt-in startup
-- Approved plan execution with per-step status, output persistence, budget reservations, and retry resumption
-- JSON development adapter for local test/development
+## Implemented foundation
+- Owner-scoped enqueue, list, detail, cancel and approved-plan execute endpoints.
+- Idempotency keys scoped by owner. PostgreSQL insertion uses a transaction-scoped advisory lock and a uniqueness index; JSON adapter serializes enqueue mutations within a single process.
+- Payload/result bounds and per-owner active-task limits.
+- PostgreSQL atomic task claim using row locking and `SKIP LOCKED`.
+- Worker leases, heartbeat, guarded status transitions, retries/backoff and expired-lease recovery.
+- Worker lifecycle is opt-in with `BOTFORGE_AGENT_WORKER=1`.
+- Sequential approved-plan execution with step status, output persistence, retry resumption, cancellation checks, budget reservations and Fortisni event/log updates.
+- JSON adapter for development and single-process use. Unique temporary filenames reduce write-file rename collisions, but this adapter is not safe for multi-process/multi-worker coordination.
 
-## Task record
-Tasks use `kind: agent-task` in the existing record store and include `taskType`, `payload`, status, attempt/maxAttempts, availability, lease fields, timestamps, last error and optional idempotency key.
+## Task API
+- `POST /api/agents/tasks`: enqueue an allowed task type.
+- `GET /api/agents/tasks`: list tasks owned by the current user.
+- `GET /api/agents/tasks/:taskId`: fetch an owned task.
+- `POST /api/agents/tasks/:taskId/cancel`: cancel an owned task.
+- `POST /api/agents/:runId/execute`: queue an approved plan.
 
-## Status
-This is a service foundation, not a complete background execution system yet. The worker is opt-in and starts only with `BOTFORGE_AGENT_WORKER=1`. The built-in `agent.plan.execute` handler executes approved plan steps using the configured AI provider, records step outputs/progress, and resumes completed steps after task retries. It does not execute external tools, browse, or take external actions. Idempotency remains application-level and can race under concurrent enqueue; a database uniqueness guard is still needed. The JSON development store is not concurrency-safe for multi-worker operation. PostgreSQL is required for reliable concurrent claims.
+## Task record and worker
+Tasks are stored with `kind: agent-task`, `taskType`, bounded payload, status, attempts, availability, lease owner/expiry, timestamps, error summary and optional idempotency key. Worker handlers are explicitly registered. The built-in plan executor supports research/analyze/draft/review/decide steps, but provider generation is not external browsing and cannot perform arbitrary real-world actions. It must not claim tools or external actions it did not execute.
 
-## API and worker
+## Configuration
+- `BOTFORGE_AGENT_WORKER=1`: enable worker startup.
+- `AGENT_WORKER_POLL_MS`: polling interval.
+- `AGENT_WORKER_LEASE_MS`: worker lease duration.
+- `AGENT_WORKER_SHUTDOWN_TIMEOUT_MS`: graceful worker stop timeout.
 
-- `POST /api/agents/tasks` enqueues an allowed task type (authenticated).
-- `GET /api/agents/tasks` lists tasks owned by the user.
-- `GET /api/agents/tasks/:taskId` returns a task only for its owner.
-- `POST /api/agents/tasks/:taskId/cancel` cancels an owned task.
-- `POST /api/agents/:runId/execute` queues an approved plan using a stable idempotency key.
-- Set `BOTFORGE_AGENT_WORKER=1` to start the worker; worker polling/lease settings are configurable via `AGENT_WORKER_POLL_MS` and `AGENT_WORKER_LEASE_MS`.
+PostgreSQL is the intended backend for reliable concurrent claims, shared worker coordination, and production use. JSON storage is a development fallback only.
 
-## Service functions
-`enqueueTask`, `listUserTasks`, `getTaskForUser`, `claimTask`, `heartbeatTask`, `completeTask`, `failTask`, `cancelTask`, `recoverExpiredTasks`.
+## Production validation still required
+- Run the full CI matrix on the current PR head and resolve all failures.
+- Validate PostgreSQL integration tests against a provisioned test database.
+- Exercise staging enqueue/claim/heartbeat/retry/cancel/recovery and shutdown behavior with multiple workers.
+- Verify budget ledger reconciliation and provider failure paths.
+- Review tenant isolation, rate limits, secrets, monitoring and deployment configuration before production.
+- Do not merge or deploy based solely on unit tests.
