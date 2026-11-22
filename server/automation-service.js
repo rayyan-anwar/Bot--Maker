@@ -80,7 +80,7 @@ async function run(userId,id,triggerData={},requestId) {
   const latest=await store.findByIdAsync('aiEngineerRuns',id);
   if(latest&&latest.kind==='automation-workflow'&&latest.userId===userId){
     const patch={lastRunAt:new Date().toISOString(),lastTaskId:created.task.id,updatedAt:new Date().toISOString()};
-    if(scheduleSlot&&latest.nextRunAt===scheduleSlot)patch.nextRunAt=new Date(Date.parse(scheduleSlot)+workflow.trigger.intervalMinutes*60000).toISOString();
+    // The scheduler advances the slot only after its fenced claim is completed.
     await store.updateByIdAsync('aiEngineerRuns',id,patch);
   }
   return created.task;
