@@ -24,13 +24,15 @@ function isJsonValue(value, depth = 0, seen = new Set()) {
 
 function validateDefinition(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new TypeError('Workflow definition is required.');
-  const name = String(input.name || '').trim();
+  if (typeof input.name !== 'string') throw new TypeError('Workflow name must be 1 to 100 characters.');
+  const name = input.name.trim();
   if (!name || name.length > 100) throw new TypeError('Workflow name must be 1 to 100 characters.');
   if (!Array.isArray(input.steps) || input.steps.length < 1 || input.steps.length > MAX_STEPS) throw new TypeError('Workflows require 1 to 8 steps.');
   const steps = input.steps.map((step, index) => {
-    if (!step || !TYPES.has(step.type)) throw new TypeError('Unsupported workflow step at position ' + (index + 1) + '.');
+    if (!step || typeof step !== 'object' || Array.isArray(step) || !TYPES.has(step.type)) throw new TypeError('Unsupported workflow step at position ' + (index + 1) + '.');
     let args = {};
-    if (step.arguments && typeof step.arguments === 'object' && !Array.isArray(step.arguments)) {
+    if (Object.prototype.hasOwnProperty.call(step, 'arguments')) {
+      if (!step.arguments || typeof step.arguments !== 'object' || Array.isArray(step.arguments)) throw new TypeError('Workflow step arguments must be a JSON object.');
       try {
         if (!isJsonValue(step.arguments)) throw new TypeError('Workflow step arguments must be valid JSON data.');
         const serialized = JSON.stringify(step.arguments);
@@ -44,7 +46,9 @@ function validateDefinition(input) {
     }
     return { id: uuidv4(), type: step.type, arguments: args };
   });
-  const trigger = input.trigger && typeof input.trigger === 'object' ? input.trigger : { type: 'manual' };
+  const hasTrigger = Object.prototype.hasOwnProperty.call(input, 'trigger');
+  const trigger = hasTrigger ? input.trigger : { type: 'manual' };
+  if (!trigger || typeof trigger !== 'object' || Array.isArray(trigger)) throw new TypeError('Trigger must be an object.');
   if (!['manual','webhook','schedule'].includes(trigger.type)) throw new TypeError('Trigger must be manual, webhook or schedule.');
   if (trigger.type === 'schedule') {
     const intervalMinutes = Number(trigger.intervalMinutes);
