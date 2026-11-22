@@ -61,3 +61,16 @@ test('concurrent scheduled workflow runs advance a schedule slot only once',asyn
   assert.equal(workflow.nextRunAt,new Date(Date.parse(slot)+60*60000).toISOString());
  }finally{store.findByIdAsync=originalFind;store.updateByIdAsync=originalUpdate;require('../server/agent-task-service').enqueueTask=originalEnqueue;}
 });
+
+
+test('automation validator rejects unknown trigger fields and oversized step arguments',()=>{
+ assert.throws(()=>service.validateDefinition({name:'Too big',steps:[{type:'draft.create',arguments:{data:'x'.repeat(4100)}}]}),/arguments are too large/);
+ assert.throws(()=>service.validateDefinition({name:'Bad trigger',steps:[{type:'text.analyze'}],trigger:{type:'cron'}}),/manual, webhook or schedule/);
+});
+
+test('automation validator does not retain caller-owned argument objects',()=>{
+ const args={text:'original',nested:{value:1}};
+ const result=service.validateDefinition({name:'Clone test',steps:[{type:'text.analyze',arguments:args}]});
+ args.nested.value=99;args.text='mutated';
+ assert.equal(result.steps[0].arguments.text,'original');assert.equal(result.steps[0].arguments.nested.value,1);
+});
