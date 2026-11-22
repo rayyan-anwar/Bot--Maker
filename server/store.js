@@ -14,7 +14,7 @@ function load(){
  try{cache=JSON.parse(fs.readFileSync(DB_PATH,'utf8'));for(const key of COLLECTIONS)if(!Array.isArray(cache[key]))cache[key]=[];return cache;}
  catch(err){throw new Error('Database file is unreadable; restore from backup before restarting: '+err.message);}
 }
-function persist(){fs.mkdirSync(path.dirname(DB_PATH),{recursive:true});const temp=DB_PATH+'.tmp';fs.writeFileSync(temp,JSON.stringify(cache,null,2),{mode:0o600});fs.renameSync(temp,DB_PATH);}
+function persist(){fs.mkdirSync(path.dirname(DB_PATH),{recursive:true});const temp=DB_PATH+'.'+process.pid+'.'+require('node:crypto').randomUUID()+'.tmp';try{fs.writeFileSync(temp,JSON.stringify(cache,null,2),{mode:0o600});fs.renameSync(temp,DB_PATH);}finally{try{if(fs.existsSync(temp))fs.unlinkSync(temp);}catch(_){}}}
 function isPostgres(){return !!process.env.DATABASE_URL;}
 async function initialize(){
  if(initialized)return;
