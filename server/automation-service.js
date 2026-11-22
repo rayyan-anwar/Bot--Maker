@@ -12,11 +12,23 @@ function isJsonValue(value, depth = 0, seen = new Set()) {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
   if (typeof value === 'number') return Number.isFinite(value);
   if (typeof value !== 'object' || depth > 20 || seen.has(value)) return false;
-  if (!Array.isArray(value) && Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) return false;
+  const prototype = Object.getPrototypeOf(value);
+  if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) return false;
+  if (Object.getOwnPropertySymbols(value).length) return false;
   seen.add(value);
-  const valid = Array.isArray(value)
-    ? value.every(item => isJsonValue(item, depth + 1, seen))
-    : Object.keys(value).every(key => isJsonValue(value[key], depth + 1, seen));
+  let valid = true;
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
+      if (!Object.prototype.hasOwnProperty.call(value, i) || !isJsonValue(value[i], depth + 1, seen)) { valid = false; break; }
+    }
+    if (valid && Object.keys(value).some(key => !/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= value.length)) valid = false;
+  } else {
+    for (const key of Object.keys(value)) {
+      if (['__proto__', 'prototype', 'constructor'].includes(key)) { valid = false; break; }
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || !isJsonValue(descriptor.value, depth + 1, seen)) { valid = false; break; }
+    }
+  }
   seen.delete(value);
   return valid;
 }
@@ -24,13 +36,15 @@ function isJsonValue(value, depth = 0, seen = new Set()) {
 
 function validateDefinition(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new TypeError('Workflow definition is required.');
-  const name = String(input.name || '').trim();
+  if (typeof input.name !== 'string') throw new TypeError('Workflow name must be 1 to 100 characters.');
+  const name = input.name.trim();
   if (!name || name.length > 100) throw new TypeError('Workflow name must be 1 to 100 characters.');
   if (!Array.isArray(input.steps) || input.steps.length < 1 || input.steps.length > MAX_STEPS) throw new TypeError('Workflows require 1 to 8 steps.');
   const steps = input.steps.map((step, index) => {
-    if (!step || !TYPES.has(step.type)) throw new TypeError('Unsupported workflow step at position ' + (index + 1) + '.');
+    if (!step || typeof step !== 'object' || Array.isArray(step) || !TYPES.has(step.type)) throw new TypeError('Unsupported workflow step at position ' + (index + 1) + '.');
     let args = {};
-    if (step.arguments && typeof step.arguments === 'object' && !Array.isArray(step.arguments)) {
+    if (Object.prototype.hasOwnProperty.call(step, 'arguments')) {
+      if (!step.arguments || typeof step.arguments !== 'object' || Array.isArray(step.arguments)) throw new TypeError('Workflow step arguments must be a JSON object.');
       try {
         if (!isJsonValue(step.arguments)) throw new TypeError('Workflow step arguments must be valid JSON data.');
         const serialized = JSON.stringify(step.arguments);
@@ -44,11 +58,12 @@ function validateDefinition(input) {
     }
     return { id: uuidv4(), type: step.type, arguments: args };
   });
-  const trigger = input.trigger && typeof input.trigger === 'object' ? input.trigger : { type: 'manual' };
+  const trigger = Object.prototype.hasOwnProperty.call(input, 'trigger') ? input.trigger : { type: 'manual' };
+  if (!trigger || typeof trigger !== 'object' || Array.isArray(trigger)) throw new TypeError('Trigger must be an object.');
   if (!['manual','webhook','schedule'].includes(trigger.type)) throw new TypeError('Trigger must be manual, webhook or schedule.');
   if (trigger.type === 'schedule') {
-    const intervalMinutes = Number(trigger.intervalMinutes);
-    if (!Number.isInteger(intervalMinutes) || intervalMinutes < 15 || intervalMinutes > 10080) throw new TypeError('Schedule interval must be 15 to 10080 minutes.');
+    const intervalMinutes = trigger.intervalMinutes;
+    if (typeof intervalMinutes !== 'number' || !Number.isInteger(intervalMinutes) || intervalMinutes < 15 || intervalMinutes > 10080) throw new TypeError('Schedule interval must be 15 to 10080 minutes.');
     return { name, steps, trigger: { type: 'schedule', intervalMinutes } };
   }
   if (trigger.type === 'webhook') return { name, steps, trigger: { type: 'webhook', secret: uuidv4() } };
@@ -70,11 +85,15 @@ async function create(userId,input) {
   return record;
 }
 async function run(userId,id,triggerData={},requestId) {
+  if(!triggerData||typeof triggerData!=='object'||Array.isArray(triggerData)||!isJsonValue(triggerData))throw new TypeError('Automation trigger data must be a JSON object.');
+  const triggerBytes=Buffer.byteLength(JSON.stringify(triggerData),'utf8');
+  if(triggerBytes>8000)throw new RangeError('Automation trigger data exceeds the 8 KB limit.');
   if(requestId!==undefined&&(typeof requestId!=='string'||!requestId.trim()||requestId.length>100))throw new TypeError('Invalid automation request ID.');
   const workflow=await store.findByIdAsync('aiEngineerRuns',id);
   if(!workflow||workflow.kind!=='automation-workflow'||workflow.userId!==userId) return null;
   if(!workflow.enabled)throw new Error('Workflow is disabled.');
   const scheduleSlot=triggerData.scheduled===true&&workflow.trigger?.type==='schedule'?(triggerData.scheduleSlot||workflow.nextRunAt):null;
+  if(scheduleSlot!==null&&(typeof scheduleSlot!=='string'||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$/.test(scheduleSlot)||!Number.isFinite(Date.parse(scheduleSlot))||new Date(scheduleSlot).toISOString()!==scheduleSlot))throw new TypeError('Invalid automation schedule slot.');
   const idempotencyKey=scheduleSlot?'automation:'+id+':schedule:'+scheduleSlot:requestId?'automation:'+id+':request:'+requestId:'automation:'+id+':'+Date.now()+':'+uuidv4();
   const created=await taskService.enqueueTask({userId,taskType:'automation.workflow.execute',payload:{workflowId:id,triggerData},idempotencyKey});
   const latest=await store.findByIdAsync('aiEngineerRuns',id);
