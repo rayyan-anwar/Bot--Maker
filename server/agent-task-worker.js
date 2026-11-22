@@ -96,7 +96,8 @@ async function executeApprovedPlan(task, context) {
           if(transition.state==='updated')await fortisniEvents.publish({userId:task.userId,planId,taskId:task.id,type:'plan.cancelled',message:'Your Agent Lab task was cancelled.',metadata:{totalSteps:steps.length}});
         }else if(taskState?.leaseOwner===context.workerId&&Date.parse(taskState.leaseExpiresAt)>Date.now()){
           const reset=latest.plan.steps.map((s,j)=>j===i?{...s,status:'pending',completedAt:null,error:safeError(error)}:s);
-          await store.updateByIdAsync('aiEngineerRuns',planId,{plan:{...latest.plan,steps:reset},progress:{total:steps.length,completed:outputs.length,failed:0,running:0,pending:steps.length-outputs.length,percent:Math.round(outputs.length/steps.length*100)},updatedAt:new Date().toISOString()});
+          const resetTransition=await store.transitionAgentRunStatus(planId,task.userId,['executing'],'executing',{executionTaskId:task.id,plan:{...latest.plan,steps:reset},progress:{total:steps.length,completed:outputs.length,failed:0,running:0,pending:steps.length-outputs.length,percent:Math.round(outputs.length/steps.length*100)},updatedAt:new Date().toISOString()});
+          if(resetTransition.state!=='updated')throw new Error('Plan state changed before retry progress could be reset.');
         }
       }
       throw error;
