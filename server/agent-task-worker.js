@@ -89,7 +89,7 @@ async function executeApprovedPlan(task, context) {
         if(taskState?.status==='cancelled'){
           const cancelledAt=new Date().toISOString();
           const cancelledSteps=latest.plan.steps.map(s=>['pending','running'].includes(s.status)?{...s,status:'cancelled',completedAt:cancelledAt,error:null}:s);
-          await store.updateByIdAsync('aiEngineerRuns',planId,{status:'cancelled',plan:{...latest.plan,steps:cancelledSteps},progress:{total:steps.length,completed:outputs.length,failed:0,running:0,pending:0,percent:Math.round(outputs.length/steps.length*100)},cancelledAt,updatedAt:cancelledAt});
+          await store.transitionAgentRunStatus(planId,task.userId,['executing'],'cancelled',{plan:{...latest.plan,steps:cancelledSteps},progress:{total:steps.length,completed:outputs.length,failed:0,running:0,pending:0,percent:Math.round(outputs.length/steps.length*100)},cancelledAt});
           await fortisniEvents.publish({userId:task.userId,planId,taskId:task.id,type:'plan.cancelled',message:'Your Agent Lab task was cancelled.',metadata:{totalSteps:steps.length}});
         }else if(taskState?.leaseOwner===context.workerId&&Date.parse(taskState.leaseExpiresAt)>Date.now()){
           const reset=latest.plan.steps.map((s,j)=>j===i?{...s,status:'pending',completedAt:null,error:safeError(error)}:s);
@@ -113,7 +113,7 @@ async function executeApprovedPlan(task, context) {
   if(finalTask?.status==='cancelled'&&finalRun&&finalRun.executionTaskId===task.id&&finalRun.status==='executing'){
     const cancelledAt=new Date().toISOString();
     const cancelledSteps=finalRun.plan.steps.map(step=>['pending','running'].includes(step.status)?{...step,status:'cancelled',completedAt:cancelledAt,error:null}:step);
-    await store.updateByIdAsync('aiEngineerRuns',planId,{status:'cancelled',plan:{...finalRun.plan,steps:cancelledSteps},progress:{total:steps.length,completed:outputs.length,failed:0,running:0,pending:0,percent:Math.round(outputs.length/steps.length*100)},cancelledAt,updatedAt:cancelledAt});
+    await store.transitionAgentRunStatus(planId,task.userId,['executing'],'cancelled',{plan:{...finalRun.plan,steps:cancelledSteps},progress:{total:steps.length,completed:outputs.length,failed:0,running:0,pending:0,percent:Math.round(outputs.length/steps.length*100)},cancelledAt});
     await fortisniEvents.publish({userId:task.userId,planId,taskId:task.id,type:'plan.cancelled',message:'Your Agent Lab task was cancelled.',metadata:{totalSteps:steps.length}});
     throw new Error('Task cancelled.');
   }
@@ -123,7 +123,12 @@ async function executeApprovedPlan(task, context) {
      Date.parse(finalTask.leaseExpiresAt)<=Date.now()||context.isLeaseLost?.()){
     throw new Error('Worker lease lost before plan completion.');
   }
-  if(finalRun&&finalRun.executionTaskId===task.id&&finalRun.status==='executing'){await store.updateByIdAsync('aiEngineerRuns',planId,{status:'completed',progress:{total:steps.length,completed:steps.length,failed:0,running:0,pending:0,percent:100},executionOutputs:outputs.sort((a,b)=>a.step-b.step),completedAt:new Date().toISOString(),updatedAt:new Date().toISOString()});await fortisniEvents.publish({userId:task.userId,planId,taskId:task.id,type:'plan.completed',message:'Your Agent Lab plan is complete.',metadata:{totalSteps:steps.length}});}
+  if(finalRun&&finalRun.executionTaskId===task.id&&finalRun.status==='executing'){
+    const completedAt=new Date().toISOString();
+    const transition=await store.transitionAgentRunStatus(planId,task.userId,['executing'],'completed',{progress:{total:steps.length,completed:steps.length,failed:0,running:0,pending:0,percent:100},executionOutputs:outputs.sort((a,b)=>a.step-b.step),completedAt});
+    if(transition.state==='updated')await fortisniEvents.publish({userId:task.userId,planId,taskId:task.id,type:'plan.completed',message:'Your Agent Lab plan is complete.',metadata:{totalSteps:steps.length}});
+    else throw new Error('Plan state changed before completion.');
+  }
   return {planId,stepsCompleted:outputs.length,outputs:outputs.sort((a,b)=>a.step-b.step).map(item=>({step:item.step,text:item.text.slice(0,1800)}))};
 }
 registerTaskHandler('agent.plan.execute',executeApprovedPlan);
@@ -180,7 +185,7 @@ async function processOneTask() {
       if(plan&&plan.userId===task.userId&&plan.executionTaskId===task.id&&plan.status==='executing'){
         const now=new Date().toISOString();
         const steps=Array.isArray(plan.plan?.steps)?plan.plan.steps.map(step=>step.status==='running'?{...step,status:'failed',completedAt:now,error:safeError(error)}:step):[];
-        await store.updateByIdAsync('aiEngineerRuns',plan.id,{status:'failed',plan:{...plan.plan,steps},progress:{total:steps.length,completed:plan.executionOutputs?.length||0,failed:steps.filter(step=>step.status==='failed').length,running:0,pending:steps.filter(step=>step.status==='pending').length,percent:steps.length?Math.round((plan.executionOutputs?.length||0)/steps.length*100):0},lastError:safeError(error),failedAt:now,updatedAt:now}).catch(()=>{});
+        await store.transitionAgentRunStatus(plan.id,task.userId,['executing'],'failed',{plan:{...plan.plan,steps},progress:{total:steps.length,completed:plan.executionOutputs?.length||0,failed:steps.filter(step=>step.status==='failed').length,running:0,pending:steps.filter(step=>step.status==='pending').length,percent:steps.length?Math.round((plan.executionOutputs?.length||0)/steps.length*100):0},lastError:safeError(error),failedAt:now}).catch(()=>{});
         await appendPlanLog(plan.id,task.id,task.userId,'plan.failed','error',safeError(error)).catch(()=>{});
         await fortisniEvents.publish({userId:task.userId,planId:plan.id,taskId:task.id,type:'plan.failed',message:'Your Agent Lab plan failed after retries.',metadata:{error:safeError(error)}}).catch(()=>{});
       }
