@@ -120,3 +120,29 @@ test('manual automation trigger request IDs deduplicate retried requests',async(
  try{const first=await service.run('owner',workflow.id,{},'client-request-123');const retry=await service.run('owner',workflow.id,{},'client-request-123');assert.equal(first.id,retry.id);assert.equal(keys[0],keys[1]);assert.equal(keys[0],'automation:request-dedupe:request:client-request-123');await assert.rejects(service.run('owner',workflow.id,{},'x'.repeat(101)),/Invalid automation request ID/);}
  finally{store.findByIdAsync=originalFind;store.updateByIdAsync=originalUpdate;require('../server/agent-task-service').enqueueTask=originalEnqueue;}
 });
+
+test('strict workflow validation rejects malformed argument containers and accessors',()=>{
+ for(const value of ['text',42,true,[],null])assert.throws(()=>service.validateDefinition({name:'Bad args',steps:[{type:'text.analyze',arguments:value}]}),/arguments must be a JSON object/);
+ const getter={};Object.defineProperty(getter,'secret',{enumerable:true,get(){throw new Error('getter should not run');}});
+ assert.throws(()=>service.validateDefinition({name:'Getter',steps:[{type:'text.analyze',arguments:getter}]}),/valid JSON data/);
+ const sparse=[];sparse.length=2;sparse[1]='x';
+ assert.throws(()=>service.validateDefinition({name:'Sparse',steps:[{type:'text.analyze',arguments:{items:sparse}}]}),/valid JSON data/);
+ const symbol={ok:true};symbol[Symbol('hidden')]=1;
+ assert.throws(()=>service.validateDefinition({name:'Symbol',steps:[{type:'text.analyze',arguments:symbol}]}),/valid JSON data/);
+});
+test('workflow validation requires correctly typed names, step and trigger containers',()=>{
+ assert.throws(()=>service.validateDefinition({name:12,steps:[{type:'text.analyze'}]}),/Workflow name/);
+ assert.throws(()=>service.validateDefinition({name:'Bad step',steps:[['text.analyze']]}),/Unsupported workflow step/);
+ for(const trigger of [null,[], 'schedule'])assert.throws(()=>service.validateDefinition({name:'Bad trigger',steps:[{type:'text.analyze'}],trigger}),/Trigger must be an object/);
+ assert.throws(()=>service.validateDefinition({name:'String interval',steps:[{type:'text.analyze'}],trigger:{type:'schedule',intervalMinutes:'60'}}),/Schedule interval/);
+});
+test('automation run rejects oversized, non-JSON and malformed schedule trigger inputs',async()=>{
+ const original=store.findByIdAsync;
+ store.findByIdAsync=async()=>({id:'strict-run',kind:'automation-workflow',userId:'owner',enabled:true,trigger:{type:'schedule',intervalMinutes:60},nextRunAt:'2026-11-22T10:00:00.000Z'});
+ try{
+  await assert.rejects(service.run('owner','strict-run',[]),/JSON object/);
+  await assert.rejects(service.run('owner','strict-run',{value:undefined}),/JSON object/);
+  await assert.rejects(service.run('owner','strict-run',{text:'x'.repeat(8100)}),/8 KB/);
+  await assert.rejects(service.run('owner','strict-run',{scheduled:true,scheduleSlot:'not-a-date'}),/schedule slot/);
+ }finally{store.findByIdAsync=original;}
+});
