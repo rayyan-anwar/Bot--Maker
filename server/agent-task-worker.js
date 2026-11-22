@@ -96,7 +96,8 @@ async function executeApprovedPlan(task, context) {
           if(transition.state==='updated')await fortisniEvents.publish({userId:task.userId,planId,taskId:task.id,type:'plan.cancelled',message:'Your Agent Lab task was cancelled.',metadata:{totalSteps:steps.length}});
         }else if(taskState?.leaseOwner===context.workerId&&Date.parse(taskState.leaseExpiresAt)>Date.now()){
           const reset=latest.plan.steps.map((s,j)=>j===i?{...s,status:'pending',completedAt:null,error:safeError(error)}:s);
-          await store.updateByIdAsync('aiEngineerRuns',planId,{plan:{...latest.plan,steps:reset},progress:{total:steps.length,completed:outputs.length,failed:0,running:0,pending:steps.length-outputs.length,percent:Math.round(outputs.length/steps.length*100)},updatedAt:new Date().toISOString()});
+          const resetTransition=await store.transitionAgentRunStatus(planId,task.userId,['executing'],'executing',{executionTaskId:task.id,plan:{...latest.plan,steps:reset},progress:{total:steps.length,completed:outputs.length,failed:0,running:0,pending:steps.length-outputs.length,percent:Math.round(outputs.length/steps.length*100)},updatedAt:new Date().toISOString()});
+          if(resetTransition.state!=='updated')throw new Error('Plan state changed before retry progress could be reset.');
         }
       }
       throw error;
@@ -144,6 +145,9 @@ async function executeAutomationWorkflow(task) {
     const current=await store.findByIdAsync('aiEngineerRuns',task.id);
     if(!current||current.status==='cancelled')throw new Error('Workflow execution cancelled.');
     if(current.status!=='running'||current.leaseOwner!==task.leaseOwner||Date.parse(current.leaseExpiresAt)<=Date.now())throw new Error('Workflow worker lease lost.');
+    const latestWorkflow=await automationService.getOwned(task.userId,workflow.id);
+    if(!latestWorkflow||!latestWorkflow.enabled)throw new Error('Workflow was disabled during execution.');
+    if(!Array.isArray(latestWorkflow.steps)||latestWorkflow.steps.length!==workflow.steps.length)throw new Error('Workflow definition changed during execution.');
     const step=workflow.steps[index];
     const output=executeSafeTool(step.type,step.arguments||{});
     results.push({step:index+1,type:step.type,result:output,completedAt:new Date().toISOString()});
