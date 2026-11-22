@@ -159,3 +159,16 @@ test('workflow definition rejects accessor properties without executing them',()
  assert.throws(()=>service.validateDefinition({name:'Accessor step',steps:[step]}),/accessor properties/);
  assert.equal(invoked,false);
 });
+
+
+test('workflow JSON validation rejects hidden properties and array accessors',()=>{
+ let invoked=false;
+ const hidden={visible:true};
+ Object.defineProperty(hidden,'secret',{value:'hidden',enumerable:false});
+ assert.throws(()=>service.validateDefinition({name:'Hidden',steps:[{type:'text.analyze',arguments:hidden}]}),/valid JSON data/);
+ const array=[];
+ Object.defineProperty(array,'0',{enumerable:true,get(){invoked=true;return 'unsafe';}});
+ array.length=1;
+ assert.throws(()=>service.validateDefinition({name:'Array getter',steps:[{type:'text.analyze',arguments:{items:array}}]}),/valid JSON data/);
+ assert.equal(invoked,false);
+});
