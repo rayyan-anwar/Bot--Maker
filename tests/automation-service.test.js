@@ -120,3 +120,11 @@ test('manual automation trigger request IDs deduplicate retried requests',async(
  try{const first=await service.run('owner',workflow.id,{},'client-request-123');const retry=await service.run('owner',workflow.id,{},'client-request-123');assert.equal(first.id,retry.id);assert.equal(keys[0],keys[1]);assert.equal(keys[0],'automation:request-dedupe:request:client-request-123');await assert.rejects(service.run('owner',workflow.id,{},'x'.repeat(101)),/Invalid automation request ID/);}
  finally{store.findByIdAsync=originalFind;store.updateByIdAsync=originalUpdate;require('../server/agent-task-service').enqueueTask=originalEnqueue;}
 });
+
+
+test('webhook authentication uses fixed-length digest comparison for UTF-8 secrets',()=>{
+ const source=require('fs').readFileSync(require('path').join(__dirname,'../server/automation-routes.js'),'utf8');
+ assert.match(source,/createHash\('sha256'\)/);
+ assert.match(source,/timingSafeEqual\(crypto\.createHash/);
+ assert.match(source,/if\(!expected\|\|!supplied\|\|!/);
+});
