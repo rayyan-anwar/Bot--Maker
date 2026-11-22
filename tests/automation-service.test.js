@@ -89,3 +89,23 @@ test('automation validator rejects undefined, functions, non-finite numbers and 
  let deep={};let cursor=deep;for(let i=0;i<22;i++){cursor.next={};cursor=cursor.next;}
  assert.throws(()=>service.validateDefinition({name:'Deep',steps:[{type:'text.analyze',arguments:deep}]}),/valid JSON data/);
 });
+
+
+test('public webhook lookup returns only webhook workflows and does not require owner lookup',async()=>{
+ const original=store.findByIdAsync;
+ store.findByIdAsync=async(_collection,id)=>id==='hook-1'?{id,kind:'automation-workflow',userId:'owner',trigger:{type:'webhook',secret:'private-secret'}}:id==='schedule-1'?{id,kind:'automation-workflow',userId:'owner',trigger:{type:'schedule',intervalMinutes:60}}:null;
+ try{
+  const hook=await service.getWebhookWorkflow('hook-1');assert.equal(hook.userId,'owner');assert.equal(hook.trigger.type,'webhook');
+  assert.equal(await service.getWebhookWorkflow('schedule-1'),null);
+  assert.equal(await service.getWebhookWorkflow('missing'),null);
+ }finally{store.findByIdAsync=original;}
+});
+
+test('webhook endpoint is secret-authenticated without requiring session auth',()=>{
+ const source=require('fs').readFileSync(require('path').join(__dirname,'../server/automation-routes.js'),'utf8');
+ assert.match(source,/router\.post\('\/:id\/webhook',async/);
+ assert.match(source,/x-botforge-webhook-secret/);
+ assert.match(source,/timingSafeEqual/);
+ assert.match(source,/getWebhookWorkflow/);
+ assert.match(source,/service\.run\(workflow\.userId/);
+});
