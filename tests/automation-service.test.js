@@ -172,3 +172,11 @@ test('workflow JSON validation rejects hidden properties and array accessors',()
  assert.throws(()=>service.validateDefinition({name:'Array getter',steps:[{type:'text.analyze',arguments:{items:array}}]}),/valid JSON data/);
  assert.equal(invoked,false);
 });
+
+
+test('webhook authentication uses fixed-length digest comparison for UTF-8 secrets',()=>{
+ const source=require('fs').readFileSync(require('path').join(__dirname,'../server/automation-routes.js'),'utf8');
+ assert.match(source,/createHash\('sha256'\)/);
+ assert.match(source,/timingSafeEqual\(crypto\.createHash/);
+ assert.match(source,/if\(!expected\|\|!supplied\|\|!/);
+});
