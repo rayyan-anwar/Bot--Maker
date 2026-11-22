@@ -70,6 +70,9 @@ async function create(userId,input) {
   return record;
 }
 async function run(userId,id,triggerData={},requestId) {
+  if(!triggerData||typeof triggerData!=='object'||Array.isArray(triggerData)||!isJsonValue(triggerData))throw new TypeError('Automation trigger data must be a JSON object.');
+  const triggerSerialized=JSON.stringify(triggerData);
+  if(Buffer.byteLength(triggerSerialized)>8000)throw new RangeError('Automation trigger data is too large.');
   if(requestId!==undefined&&(typeof requestId!=='string'||!requestId.trim()||requestId.length>100))throw new TypeError('Invalid automation request ID.');
   const workflow=await store.findByIdAsync('aiEngineerRuns',id);
   if(!workflow||workflow.kind!=='automation-workflow'||workflow.userId!==userId) return null;
