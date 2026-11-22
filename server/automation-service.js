@@ -15,8 +15,18 @@ function validateDefinition(input) {
   if (!Array.isArray(input.steps) || input.steps.length < 1 || input.steps.length > MAX_STEPS) throw new TypeError('Workflows require 1 to 8 steps.');
   const steps = input.steps.map((step, index) => {
     if (!step || !TYPES.has(step.type)) throw new TypeError('Unsupported workflow step at position ' + (index + 1) + '.');
-    const args = step.arguments && typeof step.arguments === 'object' && !Array.isArray(step.arguments) ? JSON.parse(JSON.stringify(step.arguments)) : {};
-    if (Buffer.byteLength(JSON.stringify(args)) > 4000) throw new RangeError('Workflow step arguments are too large.');
+    let args = {};
+    if (step.arguments && typeof step.arguments === 'object' && !Array.isArray(step.arguments)) {
+      try {
+        const serialized = JSON.stringify(step.arguments);
+        if (serialized === undefined) throw new TypeError('Workflow step arguments must be JSON serializable.');
+        if (Buffer.byteLength(serialized) > 4000) throw new RangeError('Workflow step arguments are too large.');
+        args = JSON.parse(serialized);
+      } catch (error) {
+        if (error instanceof RangeError) throw error;
+        throw new TypeError('Workflow step arguments must be valid JSON data.');
+      }
+    }
     return { id: uuidv4(), type: step.type, arguments: args };
   });
   const trigger = input.trigger && typeof input.trigger === 'object' ? input.trigger : { type: 'manual' };
