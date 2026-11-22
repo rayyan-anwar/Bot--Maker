@@ -120,3 +120,44 @@ test('manual automation trigger request IDs deduplicate retried requests',async(
  try{const first=await service.run('owner',workflow.id,{},'client-request-123');const retry=await service.run('owner',workflow.id,{},'client-request-123');assert.equal(first.id,retry.id);assert.equal(keys[0],keys[1]);assert.equal(keys[0],'automation:request-dedupe:request:client-request-123');await assert.rejects(service.run('owner',workflow.id,{},'x'.repeat(101)),/Invalid automation request ID/);}
  finally{store.findByIdAsync=originalFind;store.updateByIdAsync=originalUpdate;require('../server/agent-task-service').enqueueTask=originalEnqueue;}
 });
+
+
+test('strict automation validation rejects malformed containers and accessor properties',()=>{
+ for(const value of ['text',42,true,[],null])assert.throws(()=>service.validateDefinition({name:'Bad args',steps:[{type:'text.analyze',arguments:value}]}),/arguments must be a JSON object/);
+ const getter={};Object.defineProperty(getter,'secret',{enumerable:true,get(){throw new Error('getter must not execute');}});
+ assert.throws(()=>service.validateDefinition({name:'Getter',steps:[{type:'text.analyze',arguments:getter}]}),/valid JSON data/);
+ const sparse=[];sparse.length=2;sparse[1]='x';
+ assert.throws(()=>service.validateDefinition({name:'Sparse',steps:[{type:'text.analyze',arguments:{items:sparse}}]}),/valid JSON data/);
+ const symbol={ok:true};symbol[Symbol('hidden')]=1;
+ assert.throws(()=>service.validateDefinition({name:'Symbol',steps:[{type:'text.analyze',arguments:symbol}]}),/valid JSON data/);
+});
+
+test('automation definition requires plain typed names, steps and trigger records',()=>{
+ assert.throws(()=>service.validateDefinition({name:12,steps:[{type:'text.analyze'}]}),/Workflow name/);
+ assert.throws(()=>service.validateDefinition({name:'Bad step',steps:[['text.analyze']]}),/Unsupported workflow step/);
+ for(const trigger of [null,[],'schedule'])assert.throws(()=>service.validateDefinition({name:'Bad trigger',steps:[{type:'text.analyze'}],trigger}),/Trigger must be an object/);
+ assert.throws(()=>service.validateDefinition({name:'String interval',steps:[{type:'text.analyze'}],trigger:{type:'schedule',intervalMinutes:'60'}}),/Schedule interval/);
+});
+
+test('automation run rejects malformed trigger data and invalid schedule slots',async()=>{
+ const original=store.findByIdAsync;
+ store.findByIdAsync=async()=>({id:'strict-run',kind:'automation-workflow',userId:'owner',enabled:true,trigger:{type:'schedule',intervalMinutes:60},nextRunAt:'2026-11-22T10:00:00.000Z'});
+ try{
+  await assert.rejects(service.run('owner','strict-run',[]),/Invalid automation trigger data/);
+  await assert.rejects(service.run('owner','strict-run',{value:undefined}),/Invalid automation trigger data/);
+  await assert.rejects(service.run('owner','strict-run',{text:'x'.repeat(8100)}),/8 KB/);
+  await assert.rejects(service.run('owner','strict-run',{scheduled:true,scheduleSlot:'not-a-date'}),/schedule slot/);
+ }finally{store.findByIdAsync=original;}
+});
+
+test('workflow definitions reject accessors without executing them',()=>{
+ let invoked=false;
+ const input={steps:[{type:'text.analyze'}]};
+ Object.defineProperty(input,'name',{enumerable:true,get(){invoked=true;return 'unsafe';}});
+ assert.throws(()=>service.validateDefinition(input),/accessor properties/);
+ assert.equal(invoked,false);
+ const step={type:'text.analyze'};
+ Object.defineProperty(step,'arguments',{enumerable:true,get(){invoked=true;return {secret:'x'};}});
+ assert.throws(()=>service.validateDefinition({name:'Accessor step',steps:[step]}),/accessor properties/);
+ assert.equal(invoked,false);
+});
