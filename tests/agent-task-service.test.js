@@ -125,3 +125,25 @@ test('JSON fallback lease recovery rechecks state before resetting an expired wo
   assert.equal(recovered[0].leaseOwner,null);
  }finally{teardown();}
 });
+
+
+test('durable tasks reject failure updates from wrong workers and expired leases',async()=>{
+ setup();try{
+  const queued=await service.enqueueTask({userId:'u-lease',taskType:'agent.plan',payload:{}});
+  const claimed=await service.claimTask('worker-owner',new Date(Date.parse(queued.task.createdAt)+5),1000);
+  assert.equal(await service.failTask(claimed.id,'worker-other','wrong worker',new Date(Date.parse(claimed.leaseExpiresAt)-1),0),null);
+  assert.equal(await service.failTask(claimed.id,'worker-owner','lease expired',new Date(Date.parse(claimed.leaseExpiresAt)+1),0),null);
+  const fresh=await store.findByIdAsync('aiEngineerRuns',claimed.id);
+  assert.equal(fresh.status,'running');assert.equal(fresh.leaseOwner,'worker-owner');
+ }finally{teardown();}
+});
+
+test('expired lease recovery fails tasks that exhausted attempts instead of requeueing',async()=>{
+ setup();try{
+  const queued=await service.enqueueTask({userId:'u-final-attempt',taskType:'agent.plan',payload:{}});
+  const claimed=await service.claimTask('worker-final',new Date(Date.parse(queued.task.createdAt)+5),1000);
+  records[0].attempt=records[0].maxAttempts;
+  const recovered=await service.recoverExpiredTasks(new Date(Date.parse(claimed.leaseExpiresAt)+1));
+  assert.equal(recovered.length,1);assert.equal(recovered[0].status,'failed');assert.ok(recovered[0].completedAt);
+ }finally{teardown();}
+});
