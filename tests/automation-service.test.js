@@ -120,3 +120,21 @@ test('manual automation trigger request IDs deduplicate retried requests',async(
  try{const first=await service.run('owner',workflow.id,{},'client-request-123');const retry=await service.run('owner',workflow.id,{},'client-request-123');assert.equal(first.id,retry.id);assert.equal(keys[0],keys[1]);assert.equal(keys[0],'automation:request-dedupe:request:client-request-123');await assert.rejects(service.run('owner',workflow.id,{},'x'.repeat(101)),/Invalid automation request ID/);}
  finally{store.findByIdAsync=originalFind;store.updateByIdAsync=originalUpdate;require('../server/agent-task-service').enqueueTask=originalEnqueue;}
 });
+
+test('automation trigger payload rejects non-object, non-JSON and oversized values',async()=>{
+ const original=store.findByIdAsync;
+ store.findByIdAsync=async()=>({id:'payload-guard',kind:'automation-workflow',userId:'owner',enabled:true,trigger:{type:'manual'},nextRunAt:null});
+ try{
+  await assert.rejects(service.run('owner','payload-guard',[]),/JSON object/);
+  await assert.rejects(service.run('owner','payload-guard',{bad:undefined}),/JSON object/);
+  await assert.rejects(service.run('owner','payload-guard',{text:'x'.repeat(8100)}),/too large/);
+ }finally{store.findByIdAsync=original;}
+});
+test('webhook secret comparison uses byte lengths and rejects empty configured secrets',()=>{
+ const source=require('fs').readFileSync(require('path').join(__dirname,'../server/automation-routes.js'),'utf8');
+ assert.match(source,/Buffer\.from\(String\(req\.get\('x-botforge-webhook-secret'/);
+ assert.match(source,/!expected\.length/);
+ assert.match(source,/timingSafeEqual\(supplied,expected\)/);
+ assert.match(source,/Webhook payload must be a JSON object/);
+ assert.match(source,/Invalid webhook event ID/);
+});
