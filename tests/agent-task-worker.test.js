@@ -149,3 +149,18 @@ test('scheduler releases a failed claim without advancing its schedule slot',asy
   assert.deepEqual(calls,[[workflow.id,workflow.scheduleClaimSlot,'claim-token-fail',false]]);
  }finally{store.claimDueAutomationWorkflows=savedClaim;store.finishAutomationScheduleClaim=savedFinish;automation.run=savedRun;}
 });
+
+
+test('automation worker stops before the next step when workflow is disabled',async()=>{
+ const automation=require('../server/automation-service');
+ const savedGet=automation.getOwned,savedFind=store.findByIdAsync;
+ const task={id:'automation-task-disabled',userId:owner,leaseOwner:'worker-1',payload:{workflowId:'workflow-disabled'}};
+ const taskRow={id:task.id,status:'running',leaseOwner:task.leaseOwner,leaseExpiresAt:new Date(Date.now()+60000).toISOString()};
+ let lookups=0;
+ automation.getOwned=async()=>{lookups++;return lookups===1?{id:'workflow-disabled',name:'Two steps',enabled:true,steps:[{type:'text.analyze',arguments:{text:'first'}},{type:'text.analyze',arguments:{text:'second'}}]}:{id:'workflow-disabled',name:'Two steps',enabled:false,steps:[]};};
+ store.findByIdAsync=async(_collection,id)=>id===task.id?taskRow:null;
+ try{
+  await assert.rejects(worker.handlers.get('automation.workflow.execute')(task),/disabled during execution/);
+  assert.equal(lookups,2);
+ }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;}
+});
