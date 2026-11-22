@@ -120,3 +120,32 @@ test('atomic plan terminal transition cannot overwrite a concurrent cancellation
  assert.equal(result.state,'conflict');
  assert.equal(records.get(runId).status,'cancelled');
  }finally{teardown();}});
+
+test('automation worker stops before the next step when workflow is disabled',async()=>{
+ const automation=require('../server/automation-service'),events=require('../server/fortisni-events');
+ const originals={find:store.findByIdAsync,getOwned:automation.getOwned,publish:events.publish};
+ let taskReads=0,workflowReads=0;
+ const workflow={id:'wf-guard',userId:owner,enabled:true,name:'Guarded',steps:[{type:'text.analyze',arguments:{text:'first'}},{type:'text.analyze',arguments:{text:'second'}}]};
+ const task={id:'task-guard',userId:owner,leaseOwner:'worker-a',status:'running',leaseExpiresAt:new Date(Date.now()+60000).toISOString()};
+ store.findByIdAsync=async()=>{taskReads++;return task;};
+ automation.getOwned=async()=>{workflowReads++;return workflowReads===1?workflow:{...workflow,enabled:false};};
+ events.publish=async()=>true;
+ try{
+  await assert.rejects(worker.executeAutomationWorkflow(task),/Workflow was disabled during execution/);
+  assert.equal(taskReads,2);
+  assert.equal(workflowReads,2);
+ }finally{store.findByIdAsync=originals.find;automation.getOwned=originals.getOwned;events.publish=originals.publish;}
+});
+test('automation worker stops when its lease expires between steps',async()=>{
+ const automation=require('../server/automation-service'),events=require('../server/fortisni-events');
+ const originals={find:store.findByIdAsync,getOwned:automation.getOwned,publish:events.publish};
+ let taskReads=0;
+ const workflow={id:'wf-lease',userId:owner,enabled:true,name:'Lease',steps:[{type:'text.analyze',arguments:{text:'first'}},{type:'text.analyze',arguments:{text:'second'}}]};
+ const task={id:'task-lease',userId:owner,leaseOwner:'worker-a',status:'running',leaseExpiresAt:new Date(Date.now()+60000).toISOString()};
+ store.findByIdAsync=async()=>{taskReads++;return taskReads===1?task:{...task,leaseExpiresAt:new Date(Date.now()-1000).toISOString()};};
+ automation.getOwned=async()=>workflow;events.publish=async()=>true;
+ try{
+  await assert.rejects(worker.executeAutomationWorkflow(task),/Workflow worker lease lost/);
+  assert.equal(taskReads,2);
+ }finally{store.findByIdAsync=originals.find;automation.getOwned=originals.getOwned;events.publish=originals.publish;}
+});
