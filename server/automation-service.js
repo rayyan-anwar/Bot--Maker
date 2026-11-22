@@ -13,10 +13,27 @@ function isJsonValue(value, depth = 0, seen = new Set()) {
   if (typeof value === 'number') return Number.isFinite(value);
   if (typeof value !== 'object' || depth > 20 || seen.has(value)) return false;
   if (!Array.isArray(value) && Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) return false;
+  if (Object.getOwnPropertySymbols(value).length) return false;
   seen.add(value);
-  const valid = Array.isArray(value)
-    ? value.every(item => isJsonValue(item, depth + 1, seen))
-    : Object.keys(value).every(key => isJsonValue(value[key], depth + 1, seen));
+  let valid = true;
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index++) {
+      if (!Object.prototype.hasOwnProperty.call(value, index) || !isJsonValue(value[index], depth + 1, seen)) {
+        valid = false;
+        break;
+      }
+    }
+    if (valid && Object.keys(value).some(key => !/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= value.length)) valid = false;
+  } else {
+    for (const key of Object.keys(value)) {
+      if (key === '__proto__' || key === 'prototype' || key === 'constructor') { valid = false; break; }
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || !isJsonValue(descriptor.value, depth + 1, seen)) {
+        valid = false;
+        break;
+      }
+    }
+  }
   seen.delete(value);
   return valid;
 }
@@ -47,8 +64,8 @@ function validateDefinition(input) {
   const trigger = input.trigger && typeof input.trigger === 'object' ? input.trigger : { type: 'manual' };
   if (!['manual','webhook','schedule'].includes(trigger.type)) throw new TypeError('Trigger must be manual, webhook or schedule.');
   if (trigger.type === 'schedule') {
-    const intervalMinutes = Number(trigger.intervalMinutes);
-    if (!Number.isInteger(intervalMinutes) || intervalMinutes < 15 || intervalMinutes > 10080) throw new TypeError('Schedule interval must be 15 to 10080 minutes.');
+    const intervalMinutes = trigger.intervalMinutes;
+    if (typeof intervalMinutes !== 'number' || !Number.isInteger(intervalMinutes) || intervalMinutes < 15 || intervalMinutes > 10080) throw new TypeError('Schedule interval must be 15 to 10080 minutes.');
     return { name, steps, trigger: { type: 'schedule', intervalMinutes } };
   }
   if (trigger.type === 'webhook') return { name, steps, trigger: { type: 'webhook', secret: uuidv4() } };
@@ -70,11 +87,13 @@ async function create(userId,input) {
   return record;
 }
 async function run(userId,id,triggerData={},requestId) {
+  if(!triggerData||typeof triggerData!=='object'||Array.isArray(triggerData)||!isJsonValue(triggerData)||Buffer.byteLength(JSON.stringify(triggerData))>8000)throw new TypeError('Invalid automation trigger data.');
   if(requestId!==undefined&&(typeof requestId!=='string'||!requestId.trim()||requestId.length>100))throw new TypeError('Invalid automation request ID.');
   const workflow=await store.findByIdAsync('aiEngineerRuns',id);
   if(!workflow||workflow.kind!=='automation-workflow'||workflow.userId!==userId) return null;
   if(!workflow.enabled)throw new Error('Workflow is disabled.');
   const scheduleSlot=triggerData.scheduled===true&&workflow.trigger?.type==='schedule'?(triggerData.scheduleSlot||workflow.nextRunAt):null;
+  if(scheduleSlot!==null&&(typeof scheduleSlot!=='string'||!/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(scheduleSlot)||!Number.isFinite(Date.parse(scheduleSlot))||new Date(scheduleSlot).toISOString()!==scheduleSlot))throw new TypeError('Invalid automation schedule slot.');
   const idempotencyKey=scheduleSlot?'automation:'+id+':schedule:'+scheduleSlot:requestId?'automation:'+id+':request:'+requestId:'automation:'+id+':'+Date.now()+':'+uuidv4();
   const created=await taskService.enqueueTask({userId,taskType:'automation.workflow.execute',payload:{workflowId:id,triggerData},idempotencyKey});
   const latest=await store.findByIdAsync('aiEngineerRuns',id);
