@@ -207,7 +207,7 @@ async function claimDueAutomationWorkflows(now=new Date(),limit=50,leaseMs=60000
    AND (data->>'nextRunAt')::timestamptz <= $1::timestamptz
    AND (data->>'scheduleClaimUntil' IS NULL OR (data->>'scheduleClaimUntil')::timestamptz <= $1::timestamptz)
   ORDER BY (data->>'nextRunAt')::timestamptz,id
-  FOR UPDATE SKIP LOCKED LIMIT $2
+  LIMIT $2 FOR UPDATE SKIP LOCKED
  )
  UPDATE botforge_records AS target
  SET data=target.data || jsonb_build_object('scheduleClaimSlot',target.data->>'nextRunAt','scheduleClaimUntil',$3::text,'scheduleClaimToken',gen_random_uuid()::text,'updatedAt',$1::text),updated_at=now()
