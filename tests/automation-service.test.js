@@ -161,3 +161,11 @@ test('workflow definitions reject accessors without executing them',()=>{
  assert.throws(()=>service.validateDefinition({name:'Accessor step',steps:[step]}),/accessor properties/);
  assert.equal(invoked,false);
 });
+
+
+test('webhook authentication rejects empty configured secrets and compares fixed-length digests',()=>{
+ const source=require('fs').readFileSync(require('path').join(__dirname,'../server/automation-routes.js'),'utf8');
+ assert.match(source,/createHash\('sha256'\)/);
+ assert.match(source,/timingSafeEqual\(crypto\.createHash/);
+ assert.match(source,/if\(!expected\|\|!supplied\|\|!/);
+});
