@@ -84,5 +84,6 @@ async function run(userId,id,triggerData={}) {
   }
   return created.task;
 }
+async function getWebhookWorkflow(id){const row=await store.findByIdAsync('aiEngineerRuns',id);return row&&row.kind==='automation-workflow'&&row.trigger?.type==='webhook'?row:null;}
 async function getOwned(userId,id){const row=await store.findByIdAsync('aiEngineerRuns',id);return row&&row.kind==='automation-workflow'&&row.userId===userId?row:null;}
-module.exports={validateDefinition,list,create,run,getOwned,MAX_WORKFLOWS_PER_USER,MAX_STEPS,TYPES};
+module.exports={validateDefinition,list,create,run,getOwned,getWebhookWorkflow,MAX_WORKFLOWS_PER_USER,MAX_STEPS,TYPES};
