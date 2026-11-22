@@ -152,12 +152,21 @@ async function executeAutomationWorkflow(task) {
   return {workflowId:workflow.id,workflowName:workflow.name,results,completedAt:new Date().toISOString()};
 }
 async function enqueueDueSchedules(){
-  const rows=await store.allAsync('aiEngineerRuns');
-  const now=Date.now();
-  for(const workflow of rows.filter(row=>row.kind==='automation-workflow'&&row.enabled&&row.trigger?.type==='schedule'&&Number.isFinite(Date.parse(row.nextRunAt))&&Date.parse(row.nextRunAt)<=now)){
-    await automationService.run(workflow.userId,workflow.id,{scheduled:true,scheduleSlot:workflow.nextRunAt}).catch(()=>{});
+  const claims=await store.claimDueAutomationWorkflows(new Date(),50,LEASE_MS);
+  for(const workflow of claims){
+    const slot=workflow.scheduleClaimSlot||workflow.nextRunAt;
+    const token=workflow.scheduleClaimToken;
+    if(!slot||!token)continue;
+    try{
+      await automationService.run(workflow.userId,workflow.id,{scheduled:true,scheduleSlot:slot});
+      await store.finishAutomationScheduleClaim(workflow.id,slot,token,true);
+    }catch(error){
+      await store.finishAutomationScheduleClaim(workflow.id,slot,token,false).catch(()=>null);
+      console.error('Scheduled automation enqueue failed:',safeError(error));
+    }
   }
 }
+
 registerTaskHandler('automation.workflow.execute',executeAutomationWorkflow);
 
 async function processOneTask() {
