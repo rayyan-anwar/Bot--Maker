@@ -122,7 +122,7 @@ test('manual automation trigger request IDs deduplicate retried requests',async(
 });
 
 test('automation validator rejects malformed provided arguments instead of silently dropping them',()=>{
- for(const argumentsValue of ['text',42,true,[],null])assert.throws(()=>service.validateDefinition({name:'Malformed args',steps:[{type:'text.analyze,arguments:argumentsValue}]}),/arguments must be a JSON object/);
+ for(const argumentsValue of ['text',42,true,[],null])assert.throws(()=>service.validateDefinition({name:'Malformed args',steps:[{type:'text.analyze',arguments:argumentsValue}]}),/arguments must be a JSON object/);
 });
 test('automation validator rejects malformed names, steps and trigger containers',()=>{
  assert.throws(()=>service.validateDefinition({name:42,steps:[{type:'text.analyze'}]}),/Workflow name/);
