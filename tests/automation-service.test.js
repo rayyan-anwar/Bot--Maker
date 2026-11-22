@@ -146,3 +146,16 @@ test('automation run rejects oversized, non-JSON and malformed schedule trigger 
   await assert.rejects(service.run('owner','strict-run',{scheduled:true,scheduleSlot:'not-a-date'}),/schedule slot/);
  }finally{store.findByIdAsync=original;}
 });
+
+
+test('workflow definition rejects accessor properties without executing them',()=>{
+ let invoked=false;
+ const input={steps:[{type:'text.analyze'}]};
+ Object.defineProperty(input,'name',{enumerable:true,get(){invoked=true;return 'unsafe';}});
+ assert.throws(()=>service.validateDefinition(input),/accessor properties/);
+ assert.equal(invoked,false);
+ const step={type:'text.analyze'};
+ Object.defineProperty(step,'arguments',{enumerable:true,get(){invoked=true;return {secret:'x'};}});
+ assert.throws(()=>service.validateDefinition({name:'Accessor step',steps:[step]}),/accessor properties/);
+ assert.equal(invoked,false);
+});
