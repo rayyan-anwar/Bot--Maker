@@ -80,3 +80,12 @@ test('automation validator rejects circular and non-JSON step arguments with cle
  assert.throws(()=>service.validateDefinition({name:'Circular',steps:[{type:'text.analyze',arguments:circular}]}),/valid JSON data/);
  assert.throws(()=>service.validateDefinition({name:'BigInt',steps:[{type:'text.analyze',arguments:{value:1n}}]}),/valid JSON data/);
 });
+
+
+test('automation validator rejects undefined, functions, non-finite numbers and deep arguments',()=>{
+ assert.throws(()=>service.validateDefinition({name:'Undefined',steps:[{type:'text.analyze',arguments:{value:undefined}}]}),/valid JSON data/);
+ assert.throws(()=>service.validateDefinition({name:'Function',steps:[{type:'text.analyze',arguments:{value:()=>1}}]}),/valid JSON data/);
+ assert.throws(()=>service.validateDefinition({name:'NaN',steps:[{type:'text.analyze',arguments:{value:NaN}}]}),/valid JSON data/);
+ let deep={};let cursor=deep;for(let i=0;i<22;i++){cursor.next={};cursor=cursor.next;}
+ assert.throws(()=>service.validateDefinition({name:'Deep',steps:[{type:'text.analyze',arguments:deep}]}),/valid JSON data/);
+});
