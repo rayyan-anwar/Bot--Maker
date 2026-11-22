@@ -18,15 +18,23 @@ function isJsonValue(value, depth = 0, seen = new Set()) {
   seen.add(value);
   let valid = true;
   if (Array.isArray(value)) {
-    for (let i = 0; i < value.length; i++) {
-      if (!Object.prototype.hasOwnProperty.call(value, i) || !isJsonValue(value[i], depth + 1, seen)) { valid = false; break; }
-    }
-    if (valid && Object.keys(value).some(key => !/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= value.length)) valid = false;
-  } else {
-    for (const key of Object.keys(value)) {
-      if (['__proto__', 'prototype', 'constructor'].includes(key)) { valid = false; break; }
+    const keys = Reflect.ownKeys(value);
+    for (const key of keys) {
+      if (key === 'length') continue;
+      if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= value.length) { valid = false; break; }
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
-      if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || !isJsonValue(descriptor.value, depth + 1, seen)) { valid = false; break; }
+      if (!descriptor || !descriptor.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || !isJsonValue(descriptor.value, depth + 1, seen)) { valid = false; break; }
+    }
+    if (valid) {
+      for (let i = 0; i < value.length; i++) {
+        if (!Object.prototype.hasOwnProperty.call(value, i)) { valid = false; break; }
+      }
+    }
+  } else {
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key !== 'string' || ['__proto__', 'prototype', 'constructor'].includes(key)) { valid = false; break; }
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !descriptor.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || !isJsonValue(descriptor.value, depth + 1, seen)) { valid = false; break; }
     }
   }
   seen.delete(value);
