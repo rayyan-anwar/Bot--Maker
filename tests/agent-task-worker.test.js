@@ -42,15 +42,16 @@ test('worker retries resume completed steps without repeating successful work',a
 test('terminal task failure synchronizes executing plan to failed',async()=>{
  const taskService=require('../server/agent-task-service');
  const savedClaim=taskService.claimTask,savedFail=taskService.failTask,savedHandler=worker.handlers.get('agent.plan.execute');
- const savedFind=store.findByIdAsync,savedUpdate=store.updateByIdAsync;
+ const savedFind=store.findByIdAsync,savedUpdate=store.updateByIdAsync,savedTransition=store.transitionAgentRunStatus;
  const task={id:'task-fail-1',userId:owner,taskType:'agent.plan.execute',status:'running',attempt:3,payload:{planId:runId}};
  const plan={id:runId,userId:owner,kind:'agent-plan',status:'executing',executionTaskId:task.id,plan:{steps:[{type:'draft',status:'running'},{type:'analyze',status:'pending'}]},executionOutputs:[]};
  taskService.claimTask=async()=>task;taskService.failTask=async()=>({...task,status:'failed'});
  worker.handlers.set('agent.plan.execute',async()=>{throw new Error('expected handler failure');});
  store.findByIdAsync=async(_collection,id)=>id===runId?plan:null;
  store.updateByIdAsync=async(_collection,id,patch)=>{Object.assign(plan,patch);return plan;};
+ store.transitionAgentRunStatus=async(id,userId,from,to,extra={})=>{if(id!==plan.id||userId!==plan.userId)return{state:'not_found',run:null};if(!from.includes(plan.status))return{state:'conflict',run:plan};Object.assign(plan,extra,{status:to,updatedAt:new Date().toISOString()});return{state:'updated',run:plan};};
  try{await worker.processOneTask();assert.equal(plan.status,'failed');assert.equal(plan.plan.steps[0].status,'failed');assert.equal(plan.plan.steps[1].status,'pending');assert.equal(plan.progress.failed,1);assert.ok(plan.executionLogs.some(log=>log.event==='plan.failed'&&log.level==='error'));}
- finally{taskService.claimTask=savedClaim;taskService.failTask=savedFail;worker.handlers.set('agent.plan.execute',savedHandler);store.findByIdAsync=savedFind;store.updateByIdAsync=savedUpdate;}
+ finally{taskService.claimTask=savedClaim;taskService.failTask=savedFail;worker.handlers.set('agent.plan.execute',savedHandler);store.findByIdAsync=savedFind;store.updateByIdAsync=savedUpdate;store.transitionAgentRunStatus=savedTransition;}
 });
 
 
