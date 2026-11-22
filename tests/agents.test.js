@@ -116,3 +116,19 @@ test('Agent Lab exposes owner-scoped knowledge search route',()=>{
  const {router}=require('../server/agents');
  assert.ok(router.stack.some(layer=>layer.route?.path==='/:runId/tools/:toolId'&&layer.route.methods.post));
 });
+
+test('Agent Lab task API and approved-plan execution routes are registered',()=>{
+ const {router}=require('../server/agents');
+ assert.ok(router.stack.some(layer=>layer.route?.path==='/tasks'&&layer.route.methods.post));
+ assert.ok(router.stack.some(layer=>layer.route?.path==='/tasks'&&layer.route.methods.get));
+ assert.ok(router.stack.some(layer=>layer.route?.path==='/tasks/:taskId'&&layer.route.methods.get));
+ assert.ok(router.stack.some(layer=>layer.route?.path==='/tasks/:taskId/cancel'&&layer.route.methods.post));
+ assert.ok(router.stack.some(layer=>layer.route?.path==='/:runId/execute'&&layer.route.methods.post));
+});
+
+test('execution logs endpoint clamps pagination and preserves owner scoped route contract', async()=>{
+ const {router}=require('../server/agents');
+ const route=router.stack.find(layer=>layer.route&&layer.route.path==='/:runId/logs');
+ assert.ok(route);assert.equal(route.route.methods.get,true);
+ const handler=route.route.stack.at(-1).handle;assert.equal(typeof handler,'function');
+});

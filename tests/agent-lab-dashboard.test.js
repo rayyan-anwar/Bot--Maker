@@ -22,10 +22,10 @@ test('dashboard loads private plans and renders content using safe DOM text APIs
   assert.match(html, /textContent=run\.plan\?\.title/);
 });
 
-test('dashboard exposes owner review lifecycle controls without claiming execution', () => {
+test('dashboard exposes review and approved plan execution controls', () => {
   assert.match(html, /dataset\.agentAction='approve'/);
   assert.match(html, /dataset\.agentAction='cancel'/);
-  assert.match(html, /Approved\. Only explicitly approved local tools can run\./);
+  assert.match(html, /Approved\. Ready to queue model-only execution; this worker does not run external tools\./);
   assert.match(html, /execute\.dataset\.agentAction='run-tool'/);
 });
 
@@ -70,4 +70,27 @@ test('dashboard renders step status, completion progress and approved controls',
 test('dashboard offers owner-scoped knowledge search template',()=>{
  assert.match(html,/YOUR_BOT_ID/);
  assert.match(html,/Search your knowledge base/);
+});
+
+test('dashboard exposes queued task monitoring, cancellation, and execution output panel',()=>{
+ assert.match(html,/id="agent-task-list"/);
+ assert.match(html,/id="agent-task-refresh"/);
+ assert.match(html,/data-agent-task-cancel/);
+ assert.match(html,/dataset\.agentAction='execute'/);
+ assert.match(html,/Execution outputs/);
+ assert.match(html,/setInterval\(\(\)=>\{loadAgentTasks\(\);loadAgentPlans\(\);(?:loadFortisniEvents\(\);)?\},10000\)/);
+});
+
+
+test('dashboard exposes automation workflow creation, scheduling and execution controls',()=>{
+ assert.match(html,/id="automation-form"/);
+ assert.match(html,/id="automation-trigger"/);
+ assert.match(html,/loadAutomationWorkflows\(\)/);
+ assert.match(html,/Run now/);
+});
+
+test('dashboard exposes Fortisni activity and explicit personal-memory opt-in',()=>{
+ assert.match(html,/id="fortisni-agent-events"/);
+ assert.match(html,/id="agent-personal-memory"/);
+ assert.match(html,/includePersonalMemory/);
 });

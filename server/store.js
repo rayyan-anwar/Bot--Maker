@@ -14,7 +14,7 @@ function load(){
  try{cache=JSON.parse(fs.readFileSync(DB_PATH,'utf8'));for(const key of COLLECTIONS)if(!Array.isArray(cache[key]))cache[key]=[];return cache;}
  catch(err){throw new Error('Database file is unreadable; restore from backup before restarting: '+err.message);}
 }
-function persist(){fs.mkdirSync(path.dirname(DB_PATH),{recursive:true});const temp=DB_PATH+'.tmp';fs.writeFileSync(temp,JSON.stringify(cache,null,2),{mode:0o600});fs.renameSync(temp,DB_PATH);}
+function persist(){fs.mkdirSync(path.dirname(DB_PATH),{recursive:true});const temp=DB_PATH+'.'+process.pid+'.'+require('node:crypto').randomUUID()+'.tmp';try{fs.writeFileSync(temp,JSON.stringify(cache,null,2),{mode:0o600});fs.renameSync(temp,DB_PATH);}finally{try{if(fs.existsSync(temp))fs.unlinkSync(temp);}catch(_){}}}
 function isPostgres(){return !!process.env.DATABASE_URL;}
 async function initialize(){
  if(initialized)return;
@@ -33,6 +33,7 @@ async function initialize(){
     await pool.query('ALTER TABLE botforge_webhook_events ADD COLUMN IF NOT EXISTS processing_until timestamptz');
     await pool.query('ALTER TABLE botforge_webhook_events ADD COLUMN IF NOT EXISTS processed_at timestamptz');
     await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS botforge_records_user_email_uidx ON botforge_records((lower(data->>'email'))) WHERE collection='users'");
+    await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS botforge_agent_task_idempotency_uidx ON botforge_records((data->>'userId'),(data->>'idempotencyKey')) WHERE collection='aiEngineerRuns' AND data->>'kind'='agent-task' AND data->>'idempotencyKey' IS NOT NULL");
     await pool.query('CREATE TABLE IF NOT EXISTS botforge_quota_reservations (id uuid PRIMARY KEY, user_id uuid NOT NULL, usage_day date NOT NULL, expires_at timestamptz NOT NULL)');
     await pool.query('CREATE INDEX IF NOT EXISTS botforge_quota_user_day_idx ON botforge_quota_reservations(user_id,usage_day,expires_at)');
     await pool.query('CREATE TABLE IF NOT EXISTS botforge_rate_limits (rate_key text PRIMARY KEY, window_started_at timestamptz NOT NULL, hits integer NOT NULL CHECK(hits>=0), expires_at timestamptz NOT NULL)');
@@ -54,6 +55,45 @@ async function allAsync(c){assertCollection(c);if(!isPostgres())return all(c);aw
 async function findManyAsync(c,filters={}){assertCollection(c);const allowed=new Set(['ownerId','botId','userId','isPublic','email']);const entries=Object.entries(filters);if(entries.some(([key,value])=>!allowed.has(key)||value===undefined||value===null))throw new Error('Unsupported data filter.');if(!isPostgres())return all(c).filter(row=>entries.every(([key,value])=>row[key]===value));await initialize();if(!entries.length)return allAsync(c);const clauses=entries.map((_,i)=>`data->>$${i*2+3}=$${i*2+2}`);const values=[c,...entries.flatMap(([key,value])=>[String(value),key])];const result=await pool.query(`SELECT data FROM botforge_records WHERE collection=$1 AND ${clauses.join(' AND ')} ORDER BY updated_at,id`,values);return result.rows.map(row=>row.data);}
 async function findByIdAsync(c,id){assertCollection(c);if(!isUuid(id))return null;if(!isPostgres())return findById(c,id);await initialize();const r=await pool.query('SELECT data FROM botforge_records WHERE collection=$1 AND id=$2',[c,id]);return r.rowCount?r.rows[0].data:null;}
 async function insertAsync(c,record){assertCollection(c);if(!isPostgres()){if(c==='users'&&all('users').some(u=>String(u.email).toLowerCase()===String(record.email).toLowerCase())){const e=new Error('Duplicate user email.');e.code='23505';throw e;}return insert(c,record);}await initialize();await pool.query('INSERT INTO botforge_records(collection,id,data) VALUES($1,$2,$3::jsonb)',[c,record.id,JSON.stringify(record)]);return record;}
+async function insertAgentTaskIdempotent(record){
+ if(!record||record.kind!=='agent-task'||typeof record.userId!=='string'||typeof record.idempotencyKey!=='string'||!record.idempotencyKey)throw new TypeError('Agent task idempotency fields are required.');
+ if(!isPostgres()){
+  const prior=all('aiEngineerRuns').find(row=>row.kind==='agent-task'&&row.userId===record.userId&&row.idempotencyKey===record.idempotencyKey);
+  if(prior)return {created:false,record:prior};
+  insert('aiEngineerRuns',record);return {created:true,record};
+ }
+ await initialize();
+ const inserted=await pool.query("INSERT INTO botforge_records(collection,id,data) VALUES('aiEngineerRuns',$1,$2::jsonb) ON CONFLICT DO NOTHING RETURNING data",[record.id,JSON.stringify(record)]);
+ if(inserted.rowCount)return {created:true,record:inserted.rows[0].data};
+ const prior=await pool.query("SELECT data FROM botforge_records WHERE collection='aiEngineerRuns' AND data->>'kind'='agent-task' AND data->>'userId'=$1 AND data->>'idempotencyKey'=$2 LIMIT 1",[record.userId,record.idempotencyKey]);
+ if(prior.rowCount)return {created:false,record:prior.rows[0].data};
+ throw new Error('Idempotent task insertion conflicted without a matching task.');
+}
+
+async function insertAgentTaskWithinCapacity(record,maxActive=100){
+ if(!record||record.kind!=='agent-task'||typeof record.userId!=='string'||!record.userId||!Number.isInteger(maxActive)||maxActive<1)throw new TypeError('Invalid agent task capacity request.');
+ if(!isPostgres()){
+  const rows=all('aiEngineerRuns');
+  if(record.idempotencyKey){const prior=rows.find(row=>row.kind==='agent-task'&&row.userId===record.userId&&row.idempotencyKey===record.idempotencyKey);if(prior)return {created:false,record:prior};}
+  const active=rows.filter(row=>row.kind==='agent-task'&&row.userId===record.userId&&!['completed','failed','cancelled'].includes(row.status)).length;
+  if(active>=maxActive)return {created:false,reason:'capacity'};
+  insert('aiEngineerRuns',record);return {created:true,record};
+ }
+ await initialize();
+ const client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+  await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',['botforge-agent-task-capacity:'+record.userId]);
+  if(record.idempotencyKey){
+   const prior=await client.query("SELECT data FROM botforge_records WHERE collection='aiEngineerRuns' AND data->>'kind'='agent-task' AND data->>'userId'=$1 AND data->>'idempotencyKey'=$2 LIMIT 1",[record.userId,record.idempotencyKey]);
+   if(prior.rowCount){await client.query('COMMIT');return {created:false,record:prior.rows[0].data};}
+  }
+  const count=await client.query("SELECT count(*)::int AS active FROM botforge_records WHERE collection='aiEngineerRuns' AND data->>'kind'='agent-task' AND data->>'userId'=$1 AND data->>'status' NOT IN ('completed','failed','cancelled')",[record.userId]);
+  if(count.rows[0].active>=maxActive){await client.query('ROLLBACK');return {created:false,reason:'capacity'};}
+  await client.query("INSERT INTO botforge_records(collection,id,data) VALUES('aiEngineerRuns',$1,$2::jsonb)",[record.id,JSON.stringify(record)]);
+  await client.query('COMMIT');return {created:true,record};
+ }catch(error){try{await client.query('ROLLBACK');}catch(_){}throw error;}finally{client.release();}
+}
 async function updateByIdAsync(c,id,patch){assertCollection(c);if(!isUuid(id))return null;if(!isPostgres())return updateById(c,id,patch);await initialize();const r=await pool.query("UPDATE botforge_records SET data=data || $3::jsonb,updated_at=now() WHERE collection=$1 AND id=$2 RETURNING data",[c,id,JSON.stringify(patch)]);return r.rowCount?r.rows[0].data:null;}
 async function deleteByIdAsync(c,id){assertCollection(c);if(!isUuid(id))return false;if(!isPostgres())return deleteById(c,id);await initialize();const r=await pool.query('DELETE FROM botforge_records WHERE collection=$1 AND id=$2',[c,id]);return r.rowCount>0;}
 async function findUserByPasswordResetTokenHash(tokenHash){
@@ -235,7 +275,7 @@ async function insertDocumentWithinCapacity(record,{maxDocuments=50,maxCharacter
 
 async function transitionAgentRunStatus(id,userId,fromStatuses,toStatus,extra={}){
  if(!isUuid(id)||typeof userId!=='string'||!userId||!Array.isArray(fromStatuses)||!fromStatuses.length||typeof toStatus!=='string')return {state:'invalid',run:null};
- const allowed=new Set(['planned','approved','cancelled']);
+ const allowed=new Set(['planned','approved','executing','completed','failed','cancelled']);
  if(!allowed.has(toStatus)||fromStatuses.some(status=>!allowed.has(status)))return {state:'invalid',run:null};
  const now=new Date().toISOString();
  if(!isPostgres()){
@@ -268,4 +308,4 @@ async function consumeSocialOAuthState(stateHash,userId,platform,now=new Date())
 async function query(sql,values=[]){if(!isPostgres())throw new Error('Shared PostgreSQL storage is not configured.');await initialize();return pool.query(sql,values);}
 async function health(){if(!isPostgres())return {ok:true,database:'json-development'};try{await initialize();await pool.query('SELECT 1');return {ok:true,database:'postgres'};}catch(_){return {ok:false,database:'postgres'};}}
 async function close(){if(pool){await pool.end();pool=null;}initialized=false;}
-module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,updateByIdAsync,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,transitionAgentRunStatus,consumeSocialOAuthState,insertDocumentWithinCapacity,query,health,load,persist};
+module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,insertAgentTaskIdempotent,insertAgentTaskWithinCapacity,updateByIdAsync,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,transitionAgentRunStatus,consumeSocialOAuthState,insertDocumentWithinCapacity,query,health,load,persist};

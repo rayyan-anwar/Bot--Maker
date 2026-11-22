@@ -7,6 +7,7 @@ test('PostgreSQL integration: shared rate limits, atomic login lockout and quota
  process.env.DATABASE_URL=databaseUrl;
  process.env.PGSSL='disable';
  const store=require('../server/store');
+ const agentTaskService=require('../server/agent-task-service');
  const {PostgresRateLimitStore}=require('../server/rate-limit-store');
  await Promise.all(Array.from({length:12},()=>store.initialize()));
  const userId=crypto.randomUUID();
@@ -84,6 +85,43 @@ test('PostgreSQL integration: shared rate limits, atomic login lockout and quota
     assert.equal(results.filter(result=>result.inserted).length,1);
     assert.equal(results.filter(result=>result.reason==='duplicate').length,7);
    }finally{for(const doc of docs)await store.deleteByIdAsync('documents',doc.id);}
+  });
+
+  await t.test('concurrent Agent Lab task inserts enforce per-user active capacity and idempotency',async()=>{
+   const taskRecords=Array.from({length:8},(_,i)=>({id:crypto.randomUUID(),userId,kind:'agent-task',taskType:'agent.plan.execute',payload:{index:i},status:'queued',attempt:0,maxAttempts:3,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),availableAt:new Date().toISOString(),idempotencyKey:null}));
+   try{
+    const limited=await Promise.all(taskRecords.map(record=>store.insertAgentTaskWithinCapacity(record,3)));
+    assert.equal(limited.filter(result=>result.created).length,3);
+    assert.equal(limited.filter(result=>result.reason==='capacity').length,5);
+    const duplicateKey='pg-agent-idempotency-'+crypto.randomUUID();
+    const duplicates=Array.from({length:8},(_,i)=>store.insertAgentTaskWithinCapacity({...taskRecords[i],id:crypto.randomUUID(),idempotencyKey:duplicateKey},10));
+    const duplicateResults=await Promise.all(duplicates);
+    assert.equal(duplicateResults.filter(result=>result.created).length,1);
+    assert.equal(duplicateResults.filter(result=>!result.created&&result.record).length,7);
+   }finally{
+    for(const record of taskRecords)await store.deleteByIdAsync('aiEngineerRuns',record.id);
+    const remaining=await store.findManyAsync('aiEngineerRuns',{userId});
+    for(const record of remaining.filter(row=>row.kind==='agent-task'))await store.deleteByIdAsync('aiEngineerRuns',record.id);
+   }
+  });
+
+  await t.test('concurrent PostgreSQL workers claim one task once and expired leases recover',async()=>{
+   const taskId=crypto.randomUUID(),now=new Date();
+   const record={id:taskId,userId,kind:'agent-task',taskType:'agent.plan.execute',payload:{planId:'pg-recovery-test'},status:'queued',attempt:0,maxAttempts:3,createdAt:now.toISOString(),updatedAt:now.toISOString(),availableAt:new Date(now.getTime()-1000).toISOString(),leaseOwner:null,leaseExpiresAt:null,idempotencyKey:null};
+   try{
+    await store.insertAsync('aiEngineerRuns',record);
+    const claims=await Promise.all(Array.from({length:12},(_,i)=>agentTaskService.claimTask('pg-worker-'+i,new Date(),1000)));
+    const winners=claims.filter(Boolean);
+    assert.equal(winners.length,1);
+    assert.equal(winners[0].id,taskId);
+    assert.equal(winners[0].attempt,1);
+    const expiredAt=new Date(Date.parse(winners[0].leaseExpiresAt)+1);
+    const recovered=await agentTaskService.recoverExpiredTasks(expiredAt);
+    assert.equal(recovered.length,1);
+    assert.equal(recovered[0].id,taskId);
+    assert.equal(recovered[0].status,'queued');
+    assert.equal(recovered[0].leaseOwner,null);
+   }finally{await store.deleteByIdAsync('aiEngineerRuns',taskId);}
   });
   await t.test('concurrent quota reservations never exceed the daily limit',async()=>{
    const day=new Date().toISOString().slice(0,10);

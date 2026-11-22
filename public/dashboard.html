@@ -30,11 +30,22 @@
     <div id="agent-tool-catalog-list"></div>
   </div>
   <form id="agent-plan-form" style="margin-top:16px">
+    <div class="field"><label for="agent-bot-context">Optional Bot Studio context</label><select id="agent-bot-context"><option value="">General Agent Lab (no bot context)</option></select><small class="muted">When selected, the plan uses your bot's instructions and relevant uploaded documents as context.</small></div>
+    <label class="muted" style="display:flex;gap:8px;align-items:center;margin-top:8px"><input id="agent-personal-memory" type="checkbox"> Include my saved personal memory in this plan and its execution</label>
     <div class="field"><label for="agent-goal">What do you want to accomplish?</label><textarea id="agent-goal" maxlength="4000" required rows="4" placeholder="Example: Research the market, compare competitors, and prepare a launch strategy."></textarea></div>
     <div class="flex-between"><small class="muted">Up to 4,000 characters · AI usage limits apply</small><button class="btn btn-primary" id="agent-plan-submit" type="submit">Create plan</button></div>
     <p id="agent-plan-error" class="error-msg" role="alert"></p>
   </form>
-  <div style="margin-top:20px"><h3>Your plans</h3><div id="agent-plan-list"><p class="muted">Loading plans…</p></div></div>
+  <div style="margin-top:20px"><div class="flex-between"><h3>Fortisni activity</h3><button type="button" class="btn btn-ghost" id="fortisni-refresh">Refresh</button></div><div id="fortisni-agent-events" aria-live="polite"><p class="muted">Loading companion activity…</p></div></div>
+  <div style="margin-top:20px"><div class="flex-between"><h3>Automation workflows</h3><button type="button" class="btn btn-ghost" id="automation-refresh">Refresh</button></div>
+    <form id="automation-form" class="card" style="margin-top:10px"><label for="automation-name">Workflow name</label><input id="automation-name" maxlength="100" required placeholder="Daily text review">
+    <label for="automation-tool">First safe action</label><select id="automation-tool"><option value="text.analyze">Analyze text</option><option value="draft.create">Create draft preview</option></select>
+    <label for="automation-args">Action arguments (JSON)</label><textarea id="automation-args" rows="3">{"text":"Paste text to analyze"}</textarea>
+    <label for="automation-trigger">Trigger</label><select id="automation-trigger"><option value="manual">Manual</option><option value="schedule">Schedule</option></select>
+    <label for="automation-interval">Schedule interval in minutes (15–10080)</label><input id="automation-interval" type="number" min="15" max="10080" value="60">
+    <button class="btn btn-primary" type="submit">Create workflow</button><p id="automation-error" class="error-msg" role="alert"></p></form>
+    <div id="automation-list"><p class="muted">Loading workflows…</p></div></div>
+  <div style="margin-top:20px"><h3>Your plans</h3><div id="agent-plan-list"><p class="muted">Loading plans…</p></div></div><div style="margin-top:20px"><div class="flex-between"><h3>Your queued tasks</h3><button type="button" class="btn btn-ghost" id="agent-task-refresh">Refresh</button></div><div id="agent-task-list"><p class="muted">Loading tasks…</p></div></div>
 </section>
   <section class="card" style="margin-top:20px">
     <h2>Personal AI Memory</h2>
@@ -218,6 +229,7 @@
       const card=document.createElement('article');card.className='card';card.style.marginTop='12px';
       const head=document.createElement('div');head.className='flex-between';
       const title=document.createElement('h3');title.textContent=run.plan?.title||'Untitled plan';
+      if(run.botName){const linkedBot=document.createElement('small');linkedBot.className='muted';linkedBot.textContent='Bot context: '+run.botName;head.appendChild(linkedBot);}
       const status=document.createElement('span');status.className='tag';status.textContent=String(run.status||'unknown').replace(/-/g,' ');
       head.append(title,status);card.appendChild(head);
       const summary=document.createElement('p');summary.className='muted';summary.textContent=run.plan?.summary||'';card.appendChild(summary);
@@ -237,8 +249,17 @@
         steps.appendChild(li);
       });
       card.appendChild(steps);
+      if(Array.isArray(run.executionOutputs)&&run.executionOutputs.length){const outputPanel=document.createElement('details');outputPanel.style.marginTop='12px';const outputSummary=document.createElement('summary');outputSummary.textContent='Execution outputs ('+run.executionOutputs.length+')';outputPanel.appendChild(outputSummary);run.executionOutputs.slice().sort((a,b)=>a.step-b.step).forEach(item=>{const section=document.createElement('section');section.style.marginTop='10px';const label=document.createElement('strong');label.textContent='Step '+item.step;const output=document.createElement('pre');output.style.whiteSpace='pre-wrap';output.style.wordBreak='break-word';output.textContent=String(item.text||'');section.append(label,output);outputPanel.appendChild(section);});card.appendChild(outputPanel);}
+      const logPanel=document.createElement('details');logPanel.style.marginTop='12px';
+      const logSummary=document.createElement('summary');logSummary.textContent='Execution timeline ('+(Array.isArray(run.executionLogs)?run.executionLogs.length:0)+' events)';logPanel.appendChild(logSummary);
+      const logControls=document.createElement('div');logControls.style.display='flex';logControls.style.justifyContent='flex-end';logControls.style.margin='8px 0';
+      const logRefresh=document.createElement('button');logRefresh.type='button';logRefresh.className='btn btn-ghost';logRefresh.textContent='Load / refresh timeline';logControls.appendChild(logRefresh);logPanel.appendChild(logControls);
+      const logList=document.createElement('ol');logList.className='muted';logPanel.appendChild(logList);
+      logRefresh.addEventListener('click',async()=>{logRefresh.disabled=true;logRefresh.textContent='Loading…';logList.replaceChildren();try{const data=await api('/agents/'+encodeURIComponent(run.id)+'/logs?limit=100');if(!data.logs.length){const empty=document.createElement('li');empty.textContent='No execution events recorded yet.';logList.appendChild(empty);}data.logs.forEach(entry=>{const li=document.createElement('li');const time=document.createElement('small');time.textContent=entry.at?new Date(entry.at).toLocaleString()+' · ':'';const label=document.createElement('strong');label.textContent=(entry.level||'info').toUpperCase()+' · '+entry.event+' · ';const message=document.createElement('span');message.textContent=entry.message||'';li.append(time,label,message);logList.appendChild(li);});if(data.hasMore){const more=document.createElement('li');more.textContent='Older events are available through the logs API.';logList.appendChild(more);}}catch(error){const li=document.createElement('li');li.textContent=error.message||'Execution timeline unavailable.';logList.appendChild(li);}finally{logRefresh.disabled=false;logRefresh.textContent='Load / refresh timeline';}});
+      logPanel.addEventListener('toggle',()=>{if(logPanel.open&&!logRefresh.disabled)logRefresh.click();});
+      card.appendChild(logPanel);
       const actions=document.createElement('div');actions.className='flex-between';
-      const note=document.createElement('small');note.className='muted';note.textContent=run.status==='approved'?'Approved. Only explicitly approved local tools can run.':run.status==='cancelled'?'Cancelled':'Awaiting your review.';
+      const note=document.createElement('small');note.className='muted';note.textContent=run.status==='approved'?'Approved. Ready to queue model-only execution; this worker does not run external tools.':run.status==='executing'?'Execution in progress.':run.status==='completed'?'Execution completed.':run.status==='cancelled'?'Cancelled':'Awaiting your review.';
       actions.appendChild(note);
       if(run.status==='planned'||run.status==='approved'){
         const controls=document.createElement('div');controls.style.display='flex';controls.style.gap='8px';
@@ -253,6 +274,9 @@
           });
           card.appendChild(approvalChoices);
           const approve=document.createElement('button');approve.type='button';approve.className='btn btn-primary';approve.textContent='Approve plan';approve.dataset.agentAction='approve';approve.dataset.runId=run.id;controls.appendChild(approve);
+        }
+        if(run.status==='approved'){
+          const execute=document.createElement('button');execute.type='button';execute.className='btn btn-primary';execute.textContent='Execute plan';execute.dataset.agentAction='execute';execute.dataset.runId=run.id;controls.appendChild(execute);
         }
         const cancel=document.createElement('button');cancel.type='button';cancel.className='btn btn-ghost';cancel.textContent='Cancel';cancel.dataset.agentAction='cancel';cancel.dataset.runId=run.id;controls.appendChild(cancel);
         actions.appendChild(controls);
@@ -286,6 +310,14 @@
       agentList.appendChild(card);
     });
   }
+  function renderAgentTasks(tasks){
+    const host=document.getElementById('agent-task-list');host.replaceChildren();
+    if(!tasks.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='No queued tasks yet.';host.appendChild(empty);return;}
+    tasks.forEach(task=>{const card=document.createElement('article');card.className='card';card.style.marginTop='10px';const row=document.createElement('div');row.className='flex-between';const name=document.createElement('strong');name.textContent=task.taskType+' · '+task.status;row.appendChild(name);const created=document.createElement('small');created.className='muted';created.textContent=task.createdAt?new Date(task.createdAt).toLocaleString():'';row.appendChild(created);card.appendChild(row);const detail=document.createElement('p');detail.className='muted';detail.textContent='Attempt '+(task.attempt||0)+'/'+(task.maxAttempts||3)+(task.lastError?' · '+task.lastError:'');card.appendChild(detail);if(['queued','running'].includes(task.status)){const cancel=document.createElement('button');cancel.type='button';cancel.className='btn btn-ghost';cancel.textContent='Cancel task';cancel.dataset.agentTaskCancel=task.id;card.appendChild(cancel);}host.appendChild(card);});
+  }
+  async function loadAgentTasks(){try{const {tasks=[]}=await api('/agents/tasks?limit=30');renderAgentTasks(tasks);}catch(error){document.getElementById('agent-task-list').textContent='Task list unavailable.';}}
+  document.getElementById('agent-task-refresh').addEventListener('click',loadAgentTasks);
+  document.getElementById('agent-task-list').addEventListener('click',async event=>{const button=event.target.closest('[data-agent-task-cancel]');if(!button)return;button.disabled=true;try{await api('/agents/tasks/'+encodeURIComponent(button.dataset.agentTaskCancel)+'/cancel',{method:'POST'});await loadAgentTasks();await loadAgentPlans();}catch(error){window.alert(error.message);button.disabled=false;}});
   async function loadAgentToolCatalog(){
     const status=document.getElementById('agent-tool-catalog-status');
     const list=document.getElementById('agent-tool-catalog-list');
@@ -303,14 +335,20 @@
       status.textContent=executionEnabled?'Execution tools are enabled. Review permissions before use.':(message||'Catalog preview only. Tools cannot run yet.');
     }catch(error){status.textContent='Tool catalog is temporarily unavailable.';list.replaceChildren();}
   }
+  async function loadAutomationWorkflows(){const host=document.getElementById('automation-list');try{const {workflows=[]}=await api('/automation');host.replaceChildren();if(!workflows.length){host.textContent='No workflows created yet.';return;}workflows.forEach(workflow=>{const card=document.createElement('article');card.className='card';card.style.marginTop='8px';const title=document.createElement('strong');title.textContent=workflow.name+' · '+(workflow.enabled?'Enabled':'Paused');const detail=document.createElement('p');detail.className='muted';detail.textContent=workflow.steps.length+' safe action(s) · '+workflow.trigger.type+(workflow.trigger.intervalMinutes?' every '+workflow.trigger.intervalMinutes+' minutes':'');const run=document.createElement('button');run.className='btn btn-primary';run.type='button';run.textContent='Run now';run.disabled=!workflow.enabled;run.addEventListener('click',async()=>{run.disabled=true;try{await api('/automation/'+encodeURIComponent(workflow.id)+'/run',{method:'POST',body:{}});run.textContent='Queued';}catch(error){run.textContent=error.message;}finally{run.disabled=false;}});const toggle=document.createElement('button');toggle.className='btn btn-ghost';toggle.type='button';toggle.textContent=workflow.enabled?'Pause':'Enable';toggle.addEventListener('click',async()=>{toggle.disabled=true;try{await api('/automation/'+encodeURIComponent(workflow.id),{method:'PATCH',body:{enabled:!workflow.enabled}});await loadAutomationWorkflows();}catch(error){window.alert(error.message);}finally{toggle.disabled=false;}});card.append(title,detail,run,toggle);host.appendChild(card);});}catch(_){host.textContent='Automation service unavailable.';}}
+  document.getElementById('automation-form').addEventListener('submit',async event=>{event.preventDefault();const error=document.getElementById('automation-error');error.textContent='';try{let args=JSON.parse(document.getElementById('automation-args').value||'{}');const trigger=document.getElementById('automation-trigger').value;const body={name:document.getElementById('automation-name').value,steps:[{type:document.getElementById('automation-tool').value,arguments:args}],trigger:trigger==='schedule'?{type:'schedule',intervalMinutes:Number(document.getElementById('automation-interval').value)}:{type:'manual'}};const result=await api('/automation',{method:'POST',body});await loadAutomationWorkflows();if(result.workflow.trigger?.secret)window.alert('Save this one-time webhook secret securely: '+result.workflow.trigger.secret);event.target.reset();}catch(e){error.textContent=e.message||'Workflow could not be created.';}});
+  document.getElementById('automation-refresh').addEventListener('click',loadAutomationWorkflows);
+  async function loadFortisniEvents(){const root=document.getElementById('fortisni-agent-events');try{const {events=[]}=await api('/agents/fortisni/events?limit=20');root.replaceChildren();if(!events.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='Fortisni will react as your agent tasks progress.';root.appendChild(empty);return;}events.forEach(item=>{const row=document.createElement('div');row.className='card';row.style.marginBottom='8px';const head=document.createElement('div');head.className='flex-between';const state=document.createElement('strong');state.textContent=(item.reaction?.emotion||'neutral')+' · '+(item.reaction?.state||'idle');const time=document.createElement('small');time.className='muted';time.textContent=item.createdAt?new Date(item.createdAt).toLocaleString():'';head.append(state,time);const message=document.createElement('p');message.textContent=item.message||'Agent activity';message.style.margin='6px 0 0';row.append(head,message);root.appendChild(row);});}catch(_){root.textContent='Fortisni activity is temporarily unavailable.';}}
   async function loadAgentPlans(){
     try{const {runs=[]}=await api('/agents/mine');renderAgentPlans(runs);}
     catch(error){agentList.textContent='Agent Lab plans are temporarily unavailable.';}
   }
+  async function loadAgentBotContext(){const select=document.getElementById('agent-bot-context');try{const {bots=[]}=await api('/bots/mine');select.replaceChildren();const empty=document.createElement('option');empty.value='';empty.textContent='General Agent Lab (no bot context)';select.appendChild(empty);bots.forEach(bot=>{const option=document.createElement('option');option.value=bot.id;option.textContent=bot.name;select.appendChild(option);});}catch(_){select.disabled=true;select.title='Bot list unavailable';}}
+  loadAgentBotContext();
   agentForm.addEventListener('submit',async event=>{
     event.preventDefault();agentError.textContent='';agentError.classList.remove('show');
     agentSubmit.disabled=true;agentSubmit.textContent='Creating…';
-    try{await api('/agents/plan',{method:'POST',body:{goal:document.getElementById('agent-goal').value}});document.getElementById('agent-goal').value='';await loadAgentPlans();}
+    try{const botId=document.getElementById('agent-bot-context').value;await api('/agents/plan',{method:'POST',body:{goal:document.getElementById('agent-goal').value,...(botId?{botId}:{}),includePersonalMemory:document.getElementById('agent-personal-memory').checked}});document.getElementById('agent-goal').value='';await loadAgentPlans();}
     catch(error){agentError.textContent=error.message;agentError.classList.add('show');}
     finally{agentSubmit.disabled=false;agentSubmit.textContent='Create plan';}
   });
@@ -333,7 +371,7 @@
         const body={toolIds:selected,writePermission:selected.includes('draft.create'),externalPermission:false};
         await api('/agents/'+encodeURIComponent(runId)+'/approve',{method:'POST',body});
         await loadAgentPlans();
-      }else if(button.dataset.agentAction==='run-tool'){
+      }else if(button.dataset.agentAction==='execute'){const result=await api('/agents/'+encodeURIComponent(runId)+'/execute',{method:'POST'});await loadAgentTasks();await loadAgentPlans();}else if(button.dataset.agentAction==='run-tool'){
         const select=agentList.querySelector('[data-agent-run-tool="'+runId+'"]');
         const argsField=agentList.querySelector('[data-agent-tool-arguments="'+runId+'"]');
         const output=agentList.querySelector('[data-agent-tool-result="'+runId+'"]');
@@ -348,7 +386,12 @@
       }
     }catch(error){window.alert(error.message);button.disabled=false;}
   });
+  document.getElementById('fortisni-refresh').addEventListener('click',loadFortisniEvents);
+  loadFortisniEvents();
+  loadAutomationWorkflows();
   loadAgentPlans();
+  loadAgentTasks();
+  setInterval(()=>{loadAgentTasks();loadAgentPlans();loadFortisniEvents();},10000);
   loadAgentToolCatalog();
 
   loadBots();

@@ -85,3 +85,21 @@ test('timestamps and worker identifiers are validated',()=>{
  q.enqueue(task('a'),0);
  assert.throws(()=>q.claim(''),/workerId/);
 });
+
+
+test('queue lease expiry boundary rejects worker actions exactly at expiration',()=>{
+ const q=queue({leaseMs:1000});q.enqueue(task('boundary'),0);const claimed=q.claim('worker',1);
+ assert.equal(claimed.leaseExpiresAt,1001);
+ assert.equal(q.heartbeat('boundary','worker',1001),null);
+ assert.equal(q.complete('boundary','worker',{ok:true},1001),null);
+ assert.equal(q.fail('boundary','worker','late',1001),null);
+ assert.equal(q.get('boundary','user-1').status,'running');
+});
+
+test('queue running cancellation clears lease and prevents terminal mutation',()=>{
+ const q=queue();q.enqueue(task('cancel-running'),1);const claimed=q.claim('worker',2);
+ const cancelled=q.cancel('cancel-running','user-1',3);assert.equal(cancelled.status,'cancelled');assert.equal(cancelled.leaseOwner,null);assert.equal(cancelled.leaseExpiresAt,null);
+ assert.equal(q.complete(claimed.id,'worker',{late:true},4),null);
+ assert.equal(q.fail(claimed.id,'worker','late',4),null);
+ assert.equal(q.get(claimed.id,'user-1').status,'cancelled');
+});
