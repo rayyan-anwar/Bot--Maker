@@ -70,7 +70,7 @@ async function create(userId,input) {
   return record;
 }
 async function run(userId,id,triggerData={},requestId) {
-  if(requestId!==undefined&&(typeof requestId!=='string'||!requestId.trim()||requestId.length>160))throw new TypeError('Invalid automation request ID.');
+  if(requestId!==undefined&&(typeof requestId!=='string'||!requestId.trim()||requestId.length>100))throw new TypeError('Invalid automation request ID.');
   const workflow=await store.findByIdAsync('aiEngineerRuns',id);
   if(!workflow||workflow.kind!=='automation-workflow'||workflow.userId!==userId) return null;
   if(!workflow.enabled)throw new Error('Workflow is disabled.');
