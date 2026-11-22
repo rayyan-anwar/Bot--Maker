@@ -196,7 +196,7 @@ async function claimDueAutomationWorkflows(now=new Date(),limit=50,leaseMs=60000
  if(!isPostgres())return serializeScheduleClaim(async()=>{
   const rows=all('aiEngineerRuns').filter(row=>row.kind==='automation-workflow'&&row.enabled===true&&row.trigger?.type==='schedule'&&Number.isFinite(Date.parse(row.nextRunAt))&&Date.parse(row.nextRunAt)<=current.getTime()&&(!row.scheduleClaimUntil||Date.parse(row.scheduleClaimUntil)<=current.getTime())).sort((a,b)=>Date.parse(a.nextRunAt)-Date.parse(b.nextRunAt)).slice(0,limit);
   const claimed=[];
-  for(const row of rows){const fresh=findById('aiEngineerRuns',row.id);if(!fresh||fresh.scheduleClaimUntil&&Date.parse(fresh.scheduleClaimUntil)>current.getTime())continue;claimed.push(updateById('aiEngineerRuns',row.id,{scheduleClaimSlot:fresh.nextRunAt,scheduleClaimUntil:until,updatedAt:timestamp}));}
+  for(const row of rows){const fresh=findById('aiEngineerRuns',row.id);if(!fresh||fresh.scheduleClaimUntil&&Date.parse(fresh.scheduleClaimUntil)>current.getTime())continue;claimed.push(updateById('aiEngineerRuns',row.id,{scheduleClaimSlot:fresh.nextRunAt,scheduleClaimUntil:until,scheduleClaimToken:require('node:crypto').randomUUID(),updatedAt:timestamp}));}
   return claimed;
  });
  await initialize();
@@ -210,16 +210,16 @@ async function claimDueAutomationWorkflows(now=new Date(),limit=50,leaseMs=60000
   FOR UPDATE SKIP LOCKED LIMIT $2
  )
  UPDATE botforge_records AS target
- SET data=target.data || jsonb_build_object('scheduleClaimSlot',target.data->>'nextRunAt','scheduleClaimUntil',$3::text,'updatedAt',$1::text),updated_at=now()
+ SET data=target.data || jsonb_build_object('scheduleClaimSlot',target.data->>'nextRunAt','scheduleClaimUntil',$3::text,'scheduleClaimToken',gen_random_uuid()::text,'updatedAt',$1::text),updated_at=now()
  FROM candidates WHERE target.collection='aiEngineerRuns' AND target.id=candidates.id
  RETURNING target.data`,[timestamp,limit,until]);
  return result.rows.map(row=>typeof row.data==='string'?JSON.parse(row.data):row.data);
 }
-async function finishAutomationScheduleClaim(workflowId,slot,advance=true){
- if(typeof workflowId!=='string'||typeof slot!=='string'||!Number.isFinite(Date.parse(slot)))throw new TypeError('Invalid schedule claim identity.');
+async function finishAutomationScheduleClaim(workflowId,slot,token,advance=true){
+ if(typeof workflowId!=='string'||typeof slot!=='string'||typeof token!=='string'||!token||!Number.isFinite(Date.parse(slot)))throw new TypeError('Invalid schedule claim identity.');
  const finish=(row)=>{
-  if(!row||row.kind!=='automation-workflow'||row.scheduleClaimSlot!==slot)return null;
-  const patch={scheduleClaimSlot:null,scheduleClaimUntil:null,updatedAt:new Date().toISOString()};
+  if(!row||row.kind!=='automation-workflow'||row.scheduleClaimSlot!==slot||row.scheduleClaimToken!==token)return null;
+  const patch={scheduleClaimSlot:null,scheduleClaimUntil:null,scheduleClaimToken:null,updatedAt:new Date().toISOString()};
   if(advance&&row.trigger?.type==='schedule'&&Number.isInteger(row.trigger.intervalMinutes)&&row.trigger.intervalMinutes>=1)patch.nextRunAt=new Date(Date.parse(slot)+row.trigger.intervalMinutes*60000).toISOString();
   return updateById('aiEngineerRuns',workflowId,patch);
  };
