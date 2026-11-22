@@ -120,3 +120,12 @@ test('manual automation trigger request IDs deduplicate retried requests',async(
  try{const first=await service.run('owner',workflow.id,{},'client-request-123');const retry=await service.run('owner',workflow.id,{},'client-request-123');assert.equal(first.id,retry.id);assert.equal(keys[0],keys[1]);assert.equal(keys[0],'automation:request-dedupe:request:client-request-123');await assert.rejects(service.run('owner',workflow.id,{},'x'.repeat(101)),/Invalid automation request ID/);}
  finally{store.findByIdAsync=originalFind;store.updateByIdAsync=originalUpdate;require('../server/agent-task-service').enqueueTask=originalEnqueue;}
 });
+
+test('automation validator rejects malformed provided arguments instead of silently dropping them',()=>{
+ for(const argumentsValue of ['text',42,true,[],null])assert.throws(()=>service.validateDefinition({name:'Malformed args',steps:[{type:'text.analyze,arguments:argumentsValue}]}),/arguments must be a JSON object/);
+});
+test('automation validator rejects malformed names, steps and trigger containers',()=>{
+ assert.throws(()=>service.validateDefinition({name:42,steps:[{type:'text.analyze'}]}),/Workflow name/);
+ assert.throws(()=>service.validateDefinition({name:'Bad step',steps:[['text.analyze']]}),/Unsupported workflow step/);
+ for(const trigger of [null,[], 'schedule'])assert.throws(()=>service.validateDefinition({name:'Bad trigger',steps:[{type:'text.analyze'}],trigger}),/Trigger must be an object/);
+});
