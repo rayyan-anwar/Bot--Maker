@@ -225,12 +225,12 @@ async function finishAutomationScheduleClaim(workflowId,slot,token,advance=true)
  };
  if(!isPostgres())return serializeScheduleClaim(async()=>finish(findById('aiEngineerRuns',workflowId)));
  await initialize();
- const current=await pool.query("SELECT data FROM botforge_records WHERE collection='aiEngineerRuns' AND id=$1 AND data->>'kind'='automation-workflow' AND data->>'scheduleClaimSlot'=$2",[workflowId,slot]);
+ const current=await pool.query("SELECT data FROM botforge_records WHERE collection='aiEngineerRuns' AND id=$1 AND data->>'kind'='automation-workflow' AND data->>'scheduleClaimSlot'=$2 AND data->>'scheduleClaimToken'=$3",[workflowId,slot,token]);
  if(!current.rowCount)return null;
  const row=typeof current.rows[0].data==='string'?JSON.parse(current.rows[0].data):current.rows[0].data;
- const patch={scheduleClaimSlot:null,scheduleClaimUntil:null,updatedAt:new Date().toISOString()};
+ const patch={scheduleClaimSlot:null,scheduleClaimUntil:null,scheduleClaimToken:null,updatedAt:new Date().toISOString()};
  if(advance&&row.trigger?.type==='schedule'&&Number.isInteger(row.trigger.intervalMinutes)&&row.trigger.intervalMinutes>=1)patch.nextRunAt=new Date(Date.parse(slot)+row.trigger.intervalMinutes*60000).toISOString();
- const updated=await pool.query("UPDATE botforge_records SET data=data || $3::jsonb,updated_at=now() WHERE collection='aiEngineerRuns' AND id=$1 AND data->>'kind'='automation-workflow' AND data->>'scheduleClaimSlot'=$2 RETURNING data",[workflowId,slot,JSON.stringify(patch)]);
+ const updated=await pool.query("UPDATE botforge_records SET data=data || $4::jsonb,updated_at=now() WHERE collection='aiEngineerRuns' AND id=$1 AND data->>'kind'='automation-workflow' AND data->>'scheduleClaimSlot'=$2 AND data->>'scheduleClaimToken'=$3 RETURNING data",[workflowId,slot,token,JSON.stringify(patch)]);
  return updated.rowCount?updated.rows[0].data:null;
 }
 async function completeWebhookEvent(provider,eventId){
