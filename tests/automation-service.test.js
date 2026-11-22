@@ -74,3 +74,9 @@ test('automation validator does not retain caller-owned argument objects',()=>{
  args.nested.value=99;args.text='mutated';
  assert.equal(result.steps[0].arguments.text,'original');assert.equal(result.steps[0].arguments.nested.value,1);
 });
+
+test('automation validator rejects circular and non-JSON step arguments with clear errors',()=>{
+ const circular={};circular.self=circular;
+ assert.throws(()=>service.validateDefinition({name:'Circular',steps:[{type:'text.analyze',arguments:circular}]}),/valid JSON data/);
+ assert.throws(()=>service.validateDefinition({name:'BigInt',steps:[{type:'text.analyze',arguments:{value:1n}}]}),/valid JSON data/);
+});
