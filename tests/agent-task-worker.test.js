@@ -120,3 +120,32 @@ test('atomic plan terminal transition cannot overwrite a concurrent cancellation
  assert.equal(result.state,'conflict');
  assert.equal(records.get(runId).status,'cancelled');
  }finally{teardown();}});
+
+
+test('scheduler completes fenced schedule claims and advances only the claimed slot',async()=>{
+ const automation=require('../server/automation-service');
+ const savedClaim=store.claimDueAutomationWorkflows,savedFinish=store.finishAutomationScheduleClaim,savedRun=automation.run;
+ const workflow={id:'schedule-worker-1',userId:owner,nextRunAt:'2026-11-22T10:00:00.000Z',scheduleClaimSlot:'2026-11-22T10:00:00.000Z',scheduleClaimToken:'claim-token-1'};
+ const calls=[];
+ store.claimDueAutomationWorkflows=async()=>[workflow];
+ store.finishAutomationScheduleClaim=async(...args)=>{calls.push(args);return {id:workflow.id};};
+ automation.run=async(userId,id,data)=>{assert.equal(userId,owner);assert.equal(id,workflow.id);assert.deepEqual(data,{scheduled:true,scheduleSlot:workflow.scheduleClaimSlot});return{id:'task-1'};};
+ try{
+  await worker.enqueueDueSchedules();
+  assert.deepEqual(calls,[[workflow.id,workflow.scheduleClaimSlot,'claim-token-1',true]]);
+ }finally{store.claimDueAutomationWorkflows=savedClaim;store.finishAutomationScheduleClaim=savedFinish;automation.run=savedRun;}
+});
+
+test('scheduler releases a failed claim without advancing its schedule slot',async()=>{
+ const automation=require('../server/automation-service');
+ const savedClaim=store.claimDueAutomationWorkflows,savedFinish=store.finishAutomationScheduleClaim,savedRun=automation.run;
+ const workflow={id:'schedule-worker-fail',userId:owner,scheduleClaimSlot:'2026-11-22T10:00:00.000Z',scheduleClaimToken:'claim-token-fail'};
+ const calls=[];
+ store.claimDueAutomationWorkflows=async()=>[workflow];
+ store.finishAutomationScheduleClaim=async(...args)=>{calls.push(args);return null;};
+ automation.run=async()=>{throw new Error('temporary queue failure');};
+ try{
+  await worker.enqueueDueSchedules();
+  assert.deepEqual(calls,[[workflow.id,workflow.scheduleClaimSlot,'claim-token-fail',false]]);
+ }finally{store.claimDueAutomationWorkflows=savedClaim;store.finishAutomationScheduleClaim=savedFinish;automation.run=savedRun;}
+});
