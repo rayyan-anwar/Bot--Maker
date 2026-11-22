@@ -147,3 +147,28 @@ test('expired lease recovery fails tasks that exhausted attempts instead of requ
   assert.equal(recovered.length,1);assert.equal(recovered[0].status,'failed');assert.ok(recovered[0].completedAt);
  }finally{teardown();}
 });
+
+
+test('expired workers cannot heartbeat or complete tasks after lease loss',async()=>{ setup();try{
+  const q=await service.enqueueTask({userId:'u-late',taskType:'agent.plan',payload:{}});
+  const claimed=await service.claimTask('worker-late',new Date(Date.parse(q.task.createdAt)+5),1000);
+  const expired=new Date(Date.parse(claimed.leaseExpiresAt)+1);
+  assert.equal(await service.heartbeatTask(claimed.id,'worker-late',expired,1000),null);
+  assert.equal(await service.completeTask(claimed.id,'worker-late',{late:true},expired),null);
+  const current=await store.findByIdAsync('aiEngineerRuns',claimed.id);
+  assert.equal(current.status,'running');assert.equal(current.result,undefined);
+ }finally{teardown();}
+});
+
+test('terminal task records remain immutable to worker updates',async()=>{
+ setup();try{
+  const q=await service.enqueueTask({userId:'u-terminal',taskType:'agent.plan',payload:{}});
+  const claimed=await service.claimTask('worker-terminal',new Date(Date.parse(q.task.createdAt)+5));
+  const completed=await service.completeTask(claimed.id,'worker-terminal',{ok:true},new Date(Date.parse(claimed.leaseExpiresAt)-1));
+  assert.equal(completed.status,'completed');
+  assert.equal(await service.failTask(claimed.id,'worker-terminal','late failure',new Date(Date.parse(claimed.leaseExpiresAt)-1),0),null);
+  assert.equal(await service.heartbeatTask(claimed.id,'worker-terminal',new Date(Date.parse(claimed.leaseExpiresAt)-1)),null);
+  const final=await store.findByIdAsync('aiEngineerRuns',claimed.id);
+  assert.equal(final.status,'completed');assert.deepEqual(final.result,{ok:true});
+ }finally{teardown();}
+});
