@@ -120,3 +120,22 @@ test('manual automation trigger request IDs deduplicate retried requests',async(
  try{const first=await service.run('owner',workflow.id,{},'client-request-123');const retry=await service.run('owner',workflow.id,{},'client-request-123');assert.equal(first.id,retry.id);assert.equal(keys[0],keys[1]);assert.equal(keys[0],'automation:request-dedupe:request:client-request-123');await assert.rejects(service.run('owner',workflow.id,{},'x'.repeat(101)),/Invalid automation request ID/);}
  finally{store.findByIdAsync=originalFind;store.updateByIdAsync=originalUpdate;require('../server/agent-task-service').enqueueTask=originalEnqueue;}
 });
+
+test('automation JSON validation rejects sparse arrays, accessors, symbols and unsafe object keys',()=>{
+ const sparse=[];sparse.length=2;sparse[1]='valid';
+ assert.throws(()=>service.validateDefinition({name:'Sparse',steps:[{type:'text.analyze',arguments:{items:sparse}}]}),/valid JSON data/);
+ const getter={};Object.defineProperty(getter,'secret',{enumerable:true,get(){throw new Error('getter executed');}});
+ assert.throws(()=>service.validateDefinition({name:'Getter',steps:[{type:'text.analyze',arguments:getter}]}),/valid JSON data/);
+ const symbolArg={text:'ok'};symbolArg[Symbol('hidden')]='bad';
+ assert.throws(()=>service.validateDefinition({name:'Symbol',steps:[{type:'text.analyze',arguments:symbolArg}]}),/valid JSON data/);
+ const unsafe=JSON.parse('{"constructor":{"prototype":{"polluted":true}}}');
+ assert.throws(()=>service.validateDefinition({name:'Unsafe key',steps:[{type:'text.analyze',arguments:unsafe}]}),/valid JSON data/);
+});
+test('schedule intervals must be numeric and trigger data must be bounded JSON',async()=>{
+ assert.throws(()=>service.validateDefinition({name:'String interval',steps:[{type:'text.analyze'}],trigger:{type:'schedule',intervalMinutes:'60'}}),/15 to 10080/);
+ const original=store.findByIdAsync;store.findByIdAsync=async()=>({id:'s',kind:'automation-workflow',userId:'owner',enabled:true,trigger:{type:'schedule',intervalMinutes:60},nextRunAt:'2026-11-22T10:00:00.000Z'});
+ try{
+  await assert.rejects(service.run('owner','s',{scheduled:true,scheduleSlot:'not-a-date'}),/Invalid automation schedule slot/);
+  await assert.rejects(service.run('owner','s',{payload:'x'.repeat(9000)}),/Invalid automation trigger data/);
+ }finally{store.findByIdAsync=original;}
+});
