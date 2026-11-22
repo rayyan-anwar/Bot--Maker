@@ -14,18 +14,18 @@ const originals={};
 const records=new Map();
 let generated=0;
 function setup(){
- for(const name of ['findByIdAsync','updateByIdAsync'])originals[name]=store[name];
+ for(const name of ['findByIdAsync','updateByIdAsync','transitionAgentRunStatus'])originals[name]=store[name];
  for(const name of ['isProviderConfigured','getDefaultModel','generate'])originals['providers_'+name]=providers[name];
  for(const name of ['reserveAiBudget','settleAiBudget','releaseAiBudget'])originals['usage_'+name]=usage[name];
  records.set(runId,{id:runId,userId:owner,kind:'agent-plan',status:'approved',goal:'Write a short overview',provider:'openai',plan:{steps:[{type:'draft',title:'Draft',description:'Write a short overview',status:'pending'}]},progress:{total:1,completed:0,failed:0,running:0,pending:1,percent:0}});
  records.set(taskId,{id:taskId,userId:owner,kind:'agent-task',status:'running',leaseOwner:'test-worker',leaseExpiresAt:new Date(Date.now()+60000).toISOString(),payload:{planId:runId}});
  store.findByIdAsync=async(_collection,id)=>records.get(id)||null;
- store.updateByIdAsync=async(_collection,id,patch)=>{const row=records.get(id);if(!row)return null;const next={...row,...patch};records.set(id,next);return next;};
+ store.updateByIdAsync=async(_collection,id,patch)=>{const row=records.get(id);if(!row)return null;const next={...row,...patch};records.set(id,next);return next;};\n store.transitionAgentRunStatus=async(id,userId,from,to,extra={})=>{const row=records.get(id);if(!row||row.userId!==userId||row.kind!=='agent-plan')return{state:'not_found',run:null};if(!from.includes(row.status))return{state:'conflict',run:row};const next={...row,...extra,status:to,updatedAt:new Date().toISOString()};records.set(id,next);return{state:'updated',run:next};};
  providers.isProviderConfigured=()=>true;providers.getDefaultModel=()=> 'test-model';providers.generate=async()=>{generated++;return{text:'Completed draft output',usage:{}};};
  usage.reserveAiBudget=async()=>({reservationId:'reserve'});usage.settleAiBudget=async()=>true;usage.releaseAiBudget=async()=>true;
  generated=0;
 }
-function teardown(){for(const name of ['findByIdAsync','updateByIdAsync'])store[name]=originals[name];for(const name of ['isProviderConfigured','getDefaultModel','generate'])providers[name]=originals['providers_'+name];for(const name of ['reserveAiBudget','settleAiBudget','releaseAiBudget'])usage[name]=originals['usage_'+name];records.clear();}
+function teardown(){for(const name of ['findByIdAsync','updateByIdAsync','transitionAgentRunStatus'])store[name]=originals[name];for(const name of ['isProviderConfigured','getDefaultModel','generate'])providers[name]=originals['providers_'+name];for(const name of ['reserveAiBudget','settleAiBudget','releaseAiBudget'])usage[name]=originals['usage_'+name];records.clear();}
 test('approved plan worker completes step and persists output',async()=>{setup();try{const result=await worker.executeApprovedPlan(records.get(taskId),{workerId:'test-worker'});assert.equal(result.stepsCompleted,1);assert.equal(generated,1);const run=records.get(runId);assert.equal(run.status,'completed');assert.equal(run.plan.steps[0].status,'completed');assert.equal(run.executionOutputs[0].text,'Completed draft output');assert.deepEqual(run.executionLogs.map(log=>log.event),['step.started','step.completed']);}finally{teardown();}});
 test('approved plan worker rejects task owner mismatch',async()=>{setup();try{const task={...records.get(taskId),userId:'intruder'};await assert.rejects(worker.executeApprovedPlan(task,{workerId:'test-worker'}),/not found for task owner/);assert.equal(generated,0);}finally{teardown();}});
 test('worker retries resume completed steps without repeating successful work',async()=>{setup();try{
@@ -109,4 +109,12 @@ test('worker does not finalize a plan after its lease expires between final step
  await assert.rejects(worker.executeApprovedPlan(records.get(taskId),{workerId:'test-worker'}),/lease lost before plan completion/);
  assert.equal(records.get(runId).status,'executing');
  assert.equal(records.get(runId).plan.steps[0].status,'completed');
+ }finally{teardown();}});
+
+test('atomic plan terminal transition cannot overwrite a concurrent cancellation',async()=>{setup();try{
+ const run=records.get(runId);
+ records.set(runId,{...run,status:'cancelled'});
+ const result=await store.transitionAgentRunStatus(runId,owner,['executing'],'completed',{completedAt:new Date().toISOString()});
+ assert.equal(result.state,'conflict');
+ assert.equal(records.get(runId).status,'cancelled');
  }finally{teardown();}});
