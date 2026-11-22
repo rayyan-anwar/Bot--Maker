@@ -20,7 +20,8 @@ function setup(){
  records.set(runId,{id:runId,userId:owner,kind:'agent-plan',status:'approved',goal:'Write a short overview',provider:'openai',plan:{steps:[{type:'draft',title:'Draft',description:'Write a short overview',status:'pending'}]},progress:{total:1,completed:0,failed:0,running:0,pending:1,percent:0}});
  records.set(taskId,{id:taskId,userId:owner,kind:'agent-task',status:'running',leaseOwner:'test-worker',leaseExpiresAt:new Date(Date.now()+60000).toISOString(),payload:{planId:runId}});
  store.findByIdAsync=async(_collection,id)=>records.get(id)||null;
- store.updateByIdAsync=async(_collection,id,patch)=>{const row=records.get(id);if(!row)return null;const next={...row,...patch};records.set(id,next);return next;};\n store.transitionAgentRunStatus=async(id,userId,from,to,extra={})=>{const row=records.get(id);if(!row||row.userId!==userId||row.kind!=='agent-plan')return{state:'not_found',run:null};if(!from.includes(row.status))return{state:'conflict',run:row};const next={...row,...extra,status:to,updatedAt:new Date().toISOString()};records.set(id,next);return{state:'updated',run:next};};
+ store.updateByIdAsync=async(_collection,id,patch)=>{const row=records.get(id);if(!row)return null;const next={...row,...patch};records.set(id,next);return next;};
+ store.transitionAgentRunStatus=async(id,userId,from,to,extra={})=>{const row=records.get(id);if(!row||row.userId!==userId||row.kind!=='agent-plan')return{state:'not_found',run:null};if(!from.includes(row.status))return{state:'conflict',run:row};const next={...row,...extra,status:to,updatedAt:new Date().toISOString()};records.set(id,next);return{state:'updated',run:next};};
  providers.isProviderConfigured=()=>true;providers.getDefaultModel=()=> 'test-model';providers.generate=async()=>{generated++;return{text:'Completed draft output',usage:{}};};
  usage.reserveAiBudget=async()=>({reservationId:'reserve'});usage.settleAiBudget=async()=>true;usage.releaseAiBudget=async()=>true;
  generated=0;
