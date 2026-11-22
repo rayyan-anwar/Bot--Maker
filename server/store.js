@@ -275,7 +275,7 @@ async function insertDocumentWithinCapacity(record,{maxDocuments=50,maxCharacter
 
 async function transitionAgentRunStatus(id,userId,fromStatuses,toStatus,extra={}){
  if(!isUuid(id)||typeof userId!=='string'||!userId||!Array.isArray(fromStatuses)||!fromStatuses.length||typeof toStatus!=='string')return {state:'invalid',run:null};
- const allowed=new Set(['planned','approved','cancelled']);
+ const allowed=new Set(['planned','approved','executing','completed','failed','cancelled']);
  if(!allowed.has(toStatus)||fromStatuses.some(status=>!allowed.has(status)))return {state:'invalid',run:null};
  const now=new Date().toISOString();
  if(!isPostgres()){
