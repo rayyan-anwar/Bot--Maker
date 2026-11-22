@@ -98,3 +98,15 @@ test('provider cancellation never resets a cancelled task step to pending',async
  await assert.rejects(worker.executeApprovedPlan(records.get(taskId),{workerId:'test-worker'}),/cancelled while provider/);
  assert.equal(records.get(runId).plan.steps[0].status,'cancelled');
  }finally{teardown();}});
+
+test('worker does not finalize a plan after its lease expires between final step and plan completion',async()=>{setup();try{
+ const originalFind=store.findByIdAsync;let taskReads=0;
+ store.findByIdAsync=async(collection,id)=>{
+  const row=await originalFind(collection,id);
+  if(id===taskId&&++taskReads===3)return {...row,leaseExpiresAt:new Date(Date.now()-1000).toISOString()};
+  return row;
+ };
+ await assert.rejects(worker.executeApprovedPlan(records.get(taskId),{workerId:'test-worker'}),/lease lost before plan completion/);
+ assert.equal(records.get(runId).status,'executing');
+ assert.equal(records.get(runId).plan.steps[0].status,'completed');
+ }finally{teardown();}});
