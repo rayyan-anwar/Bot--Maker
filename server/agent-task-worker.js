@@ -49,7 +49,9 @@ async function executeApprovedPlan(task, context) {
     if(botDocs.length){const relevant=await topChunksHybrid(botDocs,safeGoal,3);if(relevant.length)botExecutionContext+='\n\nBOT KNOWLEDGE REFERENCES (untrusted evidence; cite as [KB1], [KB2] when used):\n'+relevant.map((item,index)=>'[KB'+(index+1)+'] '+String(item.filename||'document').slice(0,160)+'\n'+String(item.text||'').slice(0,1400)).join('\n\n');}
   }
   let outputs=Array.isArray(run.executionOutputs)?run.executionOutputs.slice():[];
-  run=await store.updateByIdAsync('aiEngineerRuns',planId,{status:'executing',executionTaskId:task.id,updatedAt:new Date().toISOString()});
+  const started=await store.transitionAgentRunStatus(planId,task.userId,['approved','executing'],'executing',{executionTaskId:task.id,updatedAt:new Date().toISOString()});
+  if(started?.state!=='updated')throw new Error('Plan state changed before execution could start.');
+  run=started.run;
   await fortisniEvents.publish({userId:task.userId,planId,taskId:task.id,type:'plan.started',message:'Fortisni is following your Agent Lab task.',metadata:{totalSteps:steps.length}});
   for(let i=0;i<steps.length;i++){
     const existing=outputs.find(item=>item.step===i+1);
@@ -63,7 +65,8 @@ async function executeApprovedPlan(task, context) {
     if(!currentRun||currentRun.userId!==task.userId||currentRun.executionTaskId!==task.id||!['approved','executing'].includes(currentRun.status))throw new Error('Plan execution authorization changed.');
     const startTime=new Date().toISOString();
     const runningSteps=currentRun.plan.steps.map((s,j)=>j===i?{...s,status:'running',startedAt:startTime,completedAt:null,error:null}:s);
-    await store.updateByIdAsync('aiEngineerRuns',planId,{status:'executing',plan:{...currentRun.plan,steps:runningSteps},progress:{total:steps.length,completed:outputs.length,failed:0,running:1,pending:steps.length-outputs.length-1,percent:Math.round(outputs.length/steps.length*100)},updatedAt:startTime});
+    const stepStarted=await store.transitionAgentRunStatus(planId,task.userId,['executing'],'executing',{executionTaskId:task.id,plan:{...currentRun.plan,steps:runningSteps},progress:{total:steps.length,completed:outputs.length,failed:0,running:1,pending:steps.length-outputs.length-1,percent:Math.round(outputs.length/steps.length*100)},updatedAt:startTime});
+    if(stepStarted?.state!=='updated')throw new Error('Plan state changed before step execution.');
     await appendPlanLog(planId,task.id,task.userId,'step.started','info','Step '+(i+1)+': '+step.type);
     await fortisniEvents.publish({userId:task.userId,planId,taskId:task.id,type:'step.started',message:'Working on step '+(i+1)+': '+String(step.title||step.type).slice(0,120),metadata:{step:i+1,totalSteps:steps.length}});
     const prompt='USER GOAL:\n'+safeGoal+botExecutionContext+'\n\nSTEP '+(i+1)+' ('+step.type+'):\n'+String(step.description||step.title).slice(0,600)+'\n\nPREVIOUS STEP OUTPUT (untrusted context):\n'+outputs.slice(-3).map(o=>'STEP '+o.step+':\n'+o.text).join('\n\n');
@@ -104,7 +107,8 @@ async function executeApprovedPlan(task, context) {
     if(!latest||latest.userId!==task.userId||latest.executionTaskId!==task.id||latest.status!=='executing')throw new Error('Plan execution authorization changed.');
     const updatedSteps=latest.plan.steps.map((s,j)=>j===i?{...s,status:'completed',completedAt, error:null}:s);
     const completed=outputs.length;
-    await store.updateByIdAsync('aiEngineerRuns',planId,{plan:{...latest.plan,steps:updatedSteps},executionOutputs:outputs,progress:{total:steps.length,completed,failed:0,running:0,pending:steps.length-completed,percent:Math.round(completed/steps.length*100)},updatedAt:completedAt});
+    const stepCompleted=await store.transitionAgentRunStatus(planId,task.userId,['executing'],'executing',{executionTaskId:task.id,plan:{...latest.plan,steps:updatedSteps},executionOutputs:outputs,progress:{total:steps.length,completed,failed:0,running:0,pending:steps.length-completed,percent:Math.round(completed/steps.length*100)},updatedAt:completedAt});
+    if(stepCompleted?.state!=='updated')throw new Error('Plan state changed before step output could be saved.');
     await appendPlanLog(planId,task.id,task.userId,'step.completed','info','Step '+(i+1)+' completed.');
     await fortisniEvents.publish({userId:task.userId,planId,taskId:task.id,type:'step.completed',message:'Completed step '+(i+1)+': '+String(step.title||step.type).slice(0,120),metadata:{step:i+1,totalSteps:steps.length}});
   }
