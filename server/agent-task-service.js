@@ -11,8 +11,36 @@ const MAX_RESULT_BYTES = 32 * 1024;
 const DEFAULT_LEASE_MS = 30_000;
 const MAX_ATTEMPTS = 3;
 
+function isSafeJsonValue(value, depth = 0, seen = new Set()) {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value !== 'object' || depth > 20 || seen.has(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  if (Array.isArray(value) ? prototype !== Array.prototype : (prototype !== Object.prototype && prototype !== null)) return false;
+  if (Object.getOwnPropertySymbols(value).length) return false;
+  seen.add(value);
+  let valid = true;
+  if (Array.isArray(value)) {
+    for (const key of Reflect.ownKeys(value)) {
+      if (key === 'length') continue;
+      if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= value.length) { valid = false; break; }
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !descriptor.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || !isSafeJsonValue(descriptor.value, depth + 1, seen)) { valid = false; break; }
+    }
+    if (valid) for (let index = 0; index < value.length; index++) if (!Object.prototype.hasOwnProperty.call(value, index)) { valid = false; break; }
+  } else {
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key !== 'string' || ['__proto__','prototype','constructor'].includes(key)) { valid = false; break; }
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !descriptor.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || !isSafeJsonValue(descriptor.value, depth + 1, seen)) { valid = false; break; }
+    }
+  }
+  seen.delete(value);
+  return valid;
+}
 function boundedJson(value, maxBytes, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError(label + ' must be an object.');
+  if (!isSafeJsonValue(value)) throw new TypeError(label + ' must contain only safe JSON data.');
   let serialized;
   try { serialized = JSON.stringify(value); } catch (_) { throw new TypeError(label + ' must be JSON serializable.'); }
   if (serialized === undefined || Buffer.byteLength(serialized, 'utf8') > maxBytes) throw new RangeError(label + ' exceeds the size limit.');
