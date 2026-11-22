@@ -34,20 +34,50 @@ function isJsonValue(value, depth = 0, seen = new Set()) {
 }
 
 
+function readOwnDataProperty(object, key, fallback) {
+  const descriptor = Object.getOwnPropertyDescriptor(object, key);
+  if (!descriptor) return fallback;
+  if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+    throw new TypeError('Workflow definitions must not contain accessor properties.');
+  }
+  return descriptor.value;
+}
+
+function assertPlainRecord(value, message) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError(message);
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) throw new TypeError(message);
+  if (Object.getOwnPropertySymbols(value).length) throw new TypeError(message);
+  for (const key of Object.keys(value)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new TypeError('Workflow definitions must not contain accessor properties.');
+    }
+  }
+}
+
 function validateDefinition(input) {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new TypeError('Workflow definition is required.');
-  if (typeof input.name !== 'string') throw new TypeError('Workflow name must be 1 to 100 characters.');
-  const name = input.name.trim();
+  assertPlainRecord(input, 'Workflow definition is required.');
+  const rawName = readOwnDataProperty(input, 'name');
+  if (typeof rawName !== 'string') throw new TypeError('Workflow name must be 1 to 100 characters.');
+  const name = rawName.trim();
   if (!name || name.length > 100) throw new TypeError('Workflow name must be 1 to 100 characters.');
-  if (!Array.isArray(input.steps) || input.steps.length < 1 || input.steps.length > MAX_STEPS) throw new TypeError('Workflows require 1 to 8 steps.');
-  const steps = input.steps.map((step, index) => {
-    if (!step || typeof step !== 'object' || Array.isArray(step) || !TYPES.has(step.type)) throw new TypeError('Unsupported workflow step at position ' + (index + 1) + '.');
+  const rawSteps = readOwnDataProperty(input, 'steps');
+  if (!Array.isArray(rawSteps) || rawSteps.length < 1 || rawSteps.length > MAX_STEPS) throw new TypeError('Workflows require 1 to 8 steps.');
+  const steps = [];
+  for (let index = 0; index < rawSteps.length; index++) {
+    if (!Object.prototype.hasOwnProperty.call(rawSteps, index)) throw new TypeError('Workflow steps must not contain empty entries.');
+    const step = rawSteps[index];
+    assertPlainRecord(step, 'Unsupported workflow step at position ' + (index + 1) + '.');
+    const type = readOwnDataProperty(step, 'type');
+    if (!TYPES.has(type)) throw new TypeError('Unsupported workflow step at position ' + (index + 1) + '.');
     let args = {};
-    if (Object.prototype.hasOwnProperty.call(step, 'arguments')) {
-      if (!step.arguments || typeof step.arguments !== 'object' || Array.isArray(step.arguments)) throw new TypeError('Workflow step arguments must be a JSON object.');
+    const rawArgs = readOwnDataProperty(step, 'arguments');
+    if (rawArgs !== undefined) {
+      if (!rawArgs || typeof rawArgs !== 'object' || Array.isArray(rawArgs)) throw new TypeError('Workflow step arguments must be a JSON object.');
       try {
-        if (!isJsonValue(step.arguments)) throw new TypeError('Workflow step arguments must be valid JSON data.');
-        const serialized = JSON.stringify(step.arguments);
+        if (!isJsonValue(rawArgs)) throw new TypeError('Workflow step arguments must be valid JSON data.');
+        const serialized = JSON.stringify(rawArgs);
         if (serialized === undefined) throw new TypeError('Workflow step arguments must be JSON serializable.');
         if (Buffer.byteLength(serialized) > 4000) throw new RangeError('Workflow step arguments are too large.');
         args = JSON.parse(serialized);
@@ -56,17 +86,18 @@ function validateDefinition(input) {
         throw new TypeError('Workflow step arguments must be valid JSON data.');
       }
     }
-    return { id: uuidv4(), type: step.type, arguments: args };
-  });
-  const trigger = Object.prototype.hasOwnProperty.call(input, 'trigger') ? input.trigger : { type: 'manual' };
-  if (!trigger || typeof trigger !== 'object' || Array.isArray(trigger)) throw new TypeError('Trigger must be an object.');
-  if (!['manual','webhook','schedule'].includes(trigger.type)) throw new TypeError('Trigger must be manual, webhook or schedule.');
-  if (trigger.type === 'schedule') {
-    const intervalMinutes = trigger.intervalMinutes;
+    steps.push({ id: uuidv4(), type, arguments: args });
+  }
+  const trigger = readOwnDataProperty(input, 'trigger', { type: 'manual' });
+  assertPlainRecord(trigger, 'Trigger must be an object.');
+  const triggerType = readOwnDataProperty(trigger, 'type');
+  if (!['manual','webhook','schedule'].includes(triggerType)) throw new TypeError('Trigger must be manual, webhook or schedule.');
+  if (triggerType === 'schedule') {
+    const intervalMinutes = readOwnDataProperty(trigger, 'intervalMinutes');
     if (typeof intervalMinutes !== 'number' || !Number.isInteger(intervalMinutes) || intervalMinutes < 15 || intervalMinutes > 10080) throw new TypeError('Schedule interval must be 15 to 10080 minutes.');
     return { name, steps, trigger: { type: 'schedule', intervalMinutes } };
   }
-  if (trigger.type === 'webhook') return { name, steps, trigger: { type: 'webhook', secret: uuidv4() } };
+  if (triggerType === 'webhook') return { name, steps, trigger: { type: 'webhook', secret: uuidv4() } };
   return { name, steps, trigger: { type: 'manual' } };
 }
 
