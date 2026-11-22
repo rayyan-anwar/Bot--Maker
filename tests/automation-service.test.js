@@ -117,6 +117,6 @@ test('manual automation trigger request IDs deduplicate retried requests',async(
  store.findByIdAsync=async(_collection,id)=>id===workflow.id?{...workflow}:null;
  store.updateByIdAsync=async(_collection,id,patch)=>{Object.assign(workflow,patch);return workflow;};
  require('../server/agent-task-service').enqueueTask=async args=>{keys.push(args.idempotencyKey);return{created:keys.length===1,task:{id:'same-task'}};};
- try{const first=await service.run('owner',workflow.id,{},'client-request-123');const retry=await service.run('owner',workflow.id,{},'client-request-123');assert.equal(first.id,retry.id);assert.equal(keys[0],keys[1]);assert.equal(keys[0],'automation:request-dedupe:request:client-request-123');assert.throws(()=>service.run('owner',workflow.id,{},'x'.repeat(161)),/Invalid automation request ID/);}
+ try{const first=await service.run('owner',workflow.id,{},'client-request-123');const retry=await service.run('owner',workflow.id,{},'client-request-123');assert.equal(first.id,retry.id);assert.equal(keys[0],keys[1]);assert.equal(keys[0],'automation:request-dedupe:request:client-request-123');assert.throws(()=>service.run('owner',workflow.id,{},'x'.repeat(101)),/Invalid automation request ID/);}
  finally{store.findByIdAsync=originalFind;store.updateByIdAsync=originalUpdate;require('../server/agent-task-service').enqueueTask=originalEnqueue;}
 });
