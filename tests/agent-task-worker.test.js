@@ -120,3 +120,16 @@ test('atomic plan terminal transition cannot overwrite a concurrent cancellation
  assert.equal(result.state,'conflict');
  assert.equal(records.get(runId).status,'cancelled');
  }finally{teardown();}});
+
+test('retry failure cannot reset step state after a concurrent plan cancellation',async()=>{setup();try{
+ const originalTransition=store.transitionAgentRunStatus;
+ providers.generate=async()=>{generated++;const current=records.get(runId);records.set(runId,{...current,status:'cancelled',plan:{...current.plan,steps:current.plan.steps.map(step=>({...step,status:'cancelled'}))}});throw new Error('provider failed during cancellation');};
+ store.transitionAgentRunStatus=async(id,userId,from,to,extra={})=>{
+  const current=records.get(id);
+  if(current?.status==='cancelled')return{state:'conflict',run:current};
+  return originalTransition(id,userId,from,to,extra);
+ };
+ await assert.rejects(worker.executeApprovedPlan(records.get(taskId),{workerId:'test-worker'}),/Plan state changed before retry progress could be reset/);
+ assert.equal(records.get(runId).status,'cancelled');
+ assert.equal(records.get(runId).plan.steps[0].status,'cancelled');
+ }finally{teardown();}});
