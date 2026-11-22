@@ -121,7 +121,7 @@ router.post('/plan', requireAuth, planLimiter, async (req, res, next) => {
       const bot = await store.findByIdAsync('bots', botId);
       if (!bot || bot.ownerId !== req.user.id) return res.status(404).json({ error: 'Bot not found.' });
       botName = bot.name;
-      botContext = '\n\nBOT STUDIO CONTEXT (untrusted reference):\nBot name: '+String(bot.name||'').slice(0,80)+'\nPurpose: '+String(bot.purpose||'').slice(0,300)+'\nAudience: '+String(bot.audience||'').slice(0,160)+'\nInstructions: '+String(bot.instructions||'').slice(0,6000);
+      botContext += '\n\nBOT STUDIO CONTEXT (untrusted reference):\nBot name: '+String(bot.name||'').slice(0,80)+'\nPurpose: '+String(bot.purpose||'').slice(0,300)+'\nAudience: '+String(bot.audience||'').slice(0,160)+'\nInstructions: '+String(bot.instructions||'').slice(0,6000);
       const documents = await store.findManyAsync('documents', { botId: bot.id });
       if (documents.length) {
         const chunks = await topChunksHybrid(documents, goal.trim(), 4);
