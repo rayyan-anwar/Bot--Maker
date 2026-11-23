@@ -203,7 +203,7 @@ test('automation emits Fortisni step started and completed events',async()=>{
 
 test('automation execution continues when Fortisni event persistence fails',async()=>{
  const automation=require('../server/automation-service');
- const savedGet=automation.getOwned,savedFind=store.findByIdAsync,savedPublish=fortisniEvents.publish;
+ const savedGet=automation.getOwned,savedFind=store.findByIdAsync,savedUpdate=store.updateByIdAsync,savedPublish=fortisniEvents.publish;
  const task={id:'automation-fortisni-failure',userId:owner,leaseOwner:'worker-1',payload:{workflowId:'workflow-event-failure'}};
  const taskRow={id:task.id,status:'running',leaseOwner:task.leaseOwner,leaseExpiresAt:new Date(Date.now()+60000).toISOString()};
  const workflow={id:'workflow-event-failure',name:'Event failure workflow',enabled:true,updatedAt:'v1',steps:[{type:'text.analyze',arguments:{text:'hello'}}]};
