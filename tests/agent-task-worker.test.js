@@ -231,6 +231,6 @@ test('approved Agent Lab execution continues when Fortisni event persistence fai
  try{
   const result=await worker.executeApprovedPlan({id:task,userId:owner,payload:{planId:plan}},{workerId:'worker-test',isLeaseLost:()=>false});
   assert.equal(calls,1);
-  assert.equal(result.completed,1);
+  assert.equal(result.stepsCompleted,1);
  }finally{store.findByIdAsync=savedFind;store.updateByIdAsync=savedUpdate;store.transitionAgentRunStatus=savedTransition;providers.generate=savedGenerate;providers.isProviderConfigured=savedConfigured;providers.getDefaultModel=savedDefault;usage.reserveAiBudget=savedReserve;usage.settleAiBudget=savedSettle;usage.releaseAiBudget=savedRelease;fortisniEvents.publish=savedPublish;}
 });
