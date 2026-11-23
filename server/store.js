@@ -105,7 +105,7 @@ async function saveAgentTaskCheckpoints(taskId,workerId,now,checkpoints){
  }
  if(!isUuid(taskId))return null;
  await initialize();
- const result=await query("UPDATE botforge_records SET data=data || $4::jsonb,updated_at=now() WHERE collection='aiEngineerRuns' AND id=$1 AND data->>'kind'='agent-task' AND data->>'status'='running' AND data->>'leaseOwner'=$2 AND (data->>'leaseExpiresAt')::timestamptz>$3 RETURNING data",[taskId,workerId,timestamp,JSON.stringify({executionCheckpoints:checkpoints,updatedAt:timestamp})]);
+ const result=await module.exports.query("UPDATE botforge_records SET data=data || $4::jsonb,updated_at=now() WHERE collection='aiEngineerRuns' AND id=$1 AND data->>'kind'='agent-task' AND data->>'status'='running' AND data->>'leaseOwner'=$2 AND (data->>'leaseExpiresAt')::timestamptz>$3 RETURNING data",[taskId,workerId,timestamp,JSON.stringify({executionCheckpoints:checkpoints,updatedAt:timestamp})]);
  return result.rowCount?result.rows[0].data:null;
 }
 async function deleteByIdAsync(c,id){assertCollection(c);if(!isUuid(id))return false;if(!isPostgres())return deleteById(c,id);await initialize();const r=await pool.query('DELETE FROM botforge_records WHERE collection=$1 AND id=$2',[c,id]);return r.rowCount>0;}
