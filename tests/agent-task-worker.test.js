@@ -56,6 +56,28 @@ test('terminal task failure synchronizes executing plan to failed',async()=>{
 });
 
 
+
+test('recovered exhausted Agent Lab task marks its executing plan failed',async()=>{
+ const savedFind=store.findByIdAsync,savedUpdate=store.updateByIdAsync,savedTransition=store.transitionAgentRunStatus;
+ const task={id:'recovered-agent-task',userId:owner,taskType:'agent.plan.execute',status:'failed',payload:{planId:'recovered-agent-plan'}};
+ const plan={id:'recovered-agent-plan',kind:'agent-plan',userId:owner,executionTaskId:task.id,status:'executing',plan:{steps:[
+  {title:'Completed',status:'completed',completedAt:'2026-11-23T00:00:00.000Z'},
+  {title:'Interrupted',status:'running'},
+  {title:'Not started',status:'pending'}
+ ]},executionOutputs:[{step:1,text:'done'}]};
+ let transitionArgs=null;
+ store.findByIdAsync=async(_collection,id)=>id===plan.id?plan:null;
+ store.updateByIdAsync=async(_collection,id,patch)=>({...plan,...patch});
+ store.transitionAgentRunStatus=async(...args)=>{transitionArgs=args;return {state:'updated',run:{...plan,status:'failed'}};};
+ try{
+  assert.equal(await worker.reconcileRecoveredAgentPlan(task),true);
+  assert.equal(transitionArgs[3],'failed');
+  assert.deepEqual(transitionArgs[4].plan.steps.map(step=>step.status),['completed','failed','failed']);
+  assert.equal(transitionArgs[4].progress.completed,1);
+  assert.equal(transitionArgs[4].progress.failed,2);
+ }finally{store.findByIdAsync=savedFind;store.updateByIdAsync=savedUpdate;store.transitionAgentRunStatus=savedTransition;}
+});
+
 test('stopWorker times out instead of waiting indefinitely for an active handler',async()=>{
  const service=require('../server/agent-task-service');
  const originals={claim:service.claimTask,complete:service.completeTask,recover:service.recoverExpiredTasks};
