@@ -7,6 +7,7 @@ const taskService = require('./agent-task-service');
 const { topChunksHybrid } = require('./retrieval');
 const fortisniEvents = require('./fortisni-events');
 const { executeSafeTool } = require('./agent-tool-registry');
+const { searchBotKnowledge } = require('./knowledge-search');
 const automationService = require('./automation-service');
 
 const POLL_MS = Math.max(250, Math.min(30000, Number(process.env.AGENT_WORKER_POLL_MS) || 1500));
@@ -159,7 +160,9 @@ async function executeAutomationWorkflow(task, context = {}) {
     if(completed)continue;
     const step=workflow.steps[index];
     await publishFortisniEventSafely({userId:task.userId,planId:workflow.id,taskId:task.id,type:'step.started',message:'Automation '+workflow.name+': step '+(index+1)+' started.',metadata:{step:index+1,totalSteps:workflow.steps.length}});
-    const output=executeSafeTool(step.type,step.arguments||{});
+    const output=step.type==='knowledge.search'
+       ? await searchBotKnowledge({userId:task.userId,...(step.arguments||{})})
+       : executeSafeTool(step.type,step.arguments||{});
     const checkpoint={step:index+1,type:step.type,result:output,completedAt:new Date().toISOString()};
     results.push(checkpoint);
     // Persist each completed step before moving on. A retried task resumes from
