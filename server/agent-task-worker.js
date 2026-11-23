@@ -169,7 +169,10 @@ async function executeAutomationWorkflow(task, context = {}) {
     if(!saved)throw new Error('Workflow worker lease lost before checkpoint persistence.');
     await publishFortisniEventSafely({userId:task.userId,planId:workflow.id,taskId:task.id,type:'step.completed',message:'Automation '+workflow.name+': step '+(index+1)+' completed.',metadata:{step:index+1,totalSteps:workflow.steps.length}});
   }
-  return {workflowId:workflow.id,workflowName:workflow.name,results,completedAt:new Date().toISOString()};
+  // Checkpoints retain the full per-step outputs on the task record. Keep the
+  // terminal task result compact so a valid multi-step workflow cannot exceed
+  // the task service's 32 KB result limit after all work has completed.
+  return {workflowId:workflow.id,workflowName:workflow.name,completedSteps:results.length,completedAt:new Date().toISOString()};
 }
 async function enqueueDueSchedules(){
   const claims=await store.claimDueAutomationWorkflows(new Date(),50,LEASE_MS);
