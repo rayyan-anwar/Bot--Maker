@@ -14,6 +14,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -31,7 +32,8 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
-      - run: npm test
+      - name: Run test suite with bounded duration and readable per-test output
+        run: timeout --signal=TERM --kill-after=30s 8m node --test --test-concurrency=1 --test-reporter=spec
       - run: node scripts/check-syntax.js
       - run: npm run security:scan
       - run: bash -n scripts/backup-postgres.sh scripts/restore-postgres.sh
