@@ -256,28 +256,24 @@ test('automation worker aborts before execution when lease is already lost',asyn
 
 
 
-test('automation checkpoint writes are fenced by current worker lease',async()=>{
- const savedIsPostgres=store.isPostgres,savedQuery=store.query;
- const taskId='550e8400-e29b-41d4-a716-446655440000';
+test('automation checkpoint writes require the current unexpired worker lease',async()=>{
+ const taskId='automation-checkpoint-fence-'+Date.now();
+ const task={id:taskId,kind:'agent-task',status:'running',leaseOwner:'worker-current',leaseExpiresAt:new Date(Date.now()+60000).toISOString(),userId:owner};
+ store.insert('aiEngineerRuns',task);
  try{
-  store.isPostgres=()=>true;
-  let captured=null;
-  store.query=async(sql,values)=>{captured={sql,values};return {rowCount:1,rows:[{data:{id:taskId,executionCheckpoints:values[3]&&JSON.parse(values[3]).executionCheckpoints}}]};};
-  const checkpoints=[{step:1,result:{ok:true}}],now=new Date('2026-11-23T00:00:00.000Z');
-  const saved=await store.saveAgentTaskCheckpoints(taskId,'worker-atomic',now,checkpoints);
+  const checkpoints=[{step:1,result:{ok:true}}];
+  const saved=await store.saveAgentTaskCheckpoints(taskId,'worker-current',new Date(),checkpoints);
   assert.deepEqual(saved.executionCheckpoints,checkpoints);
-  assert.match(captured.sql,/data->>'leaseOwner'=\$2/);
-  assert.match(captured.sql,/leaseExpiresAt\)::timestamptz>\$3/);
-  assert.equal(captured.values[0],taskId);
-  assert.equal(captured.values[1],'worker-atomic');
-  store.query=async()=>({rowCount:0,rows:[]});
-  assert.equal(await store.saveAgentTaskCheckpoints(taskId,'stale-worker',now,checkpoints),null);
- }finally{store.isPostgres=savedIsPostgres;store.query=savedQuery;}
+  assert.equal(await store.saveAgentTaskCheckpoints(taskId,'worker-stale',new Date(),[{step:2}]),null);
+  const expired={...task,leaseExpiresAt:new Date(Date.now()-1000).toISOString()};
+  store.updateById('aiEngineerRuns',taskId,expired);
+  assert.equal(await store.saveAgentTaskCheckpoints(taskId,'worker-current',new Date(),[{step:3}]),null);
+ }finally{store.deleteById('aiEngineerRuns',taskId);}
 });
 
 test('automation retries resume from durable step checkpoints without repeating completed steps',async()=>{
  const automation=require('../server/automation-service');
- const savedGet=automation.getOwned,savedFind=store.findByIdAsync,savedUpdate=store.updateByIdAsync;
+ const savedGet=automation.getOwned,savedFind=store.findByIdAsync,savedUpdate=store.updateByIdAsync,savedCheckpoint=store.saveAgentTaskCheckpoints;
  const task={id:'automation-checkpoint-task',userId:owner,leaseOwner:'worker-checkpoint',payload:{workflowId:'workflow-checkpoint'}};
  const workflow={id:'workflow-checkpoint',name:'Checkpoint workflow',enabled:true,updatedAt:'v1',steps:[
   {type:'text.analyze',arguments:{text:'first result'}},
@@ -288,6 +284,7 @@ test('automation retries resume from durable step checkpoints without repeating 
  automation.getOwned=async()=>workflow;
  store.findByIdAsync=async(_collection,id)=>id===task.id?taskRow:null;
  store.updateByIdAsync=async(_collection,id,patch)=>{Object.assign(taskRow,patch);return taskRow;};
+ store.saveAgentTaskCheckpoints=async(id,workerId,now,checkpoints)=>{if(id!==task.id||workerId!==task.leaseOwner||taskRow.status!=='running'||Date.parse(taskRow.leaseExpiresAt)<=now.getTime())return null;taskRow.executionCheckpoints=checkpoints;return taskRow;};
  try{
   const result=await worker.executeAutomationWorkflow(task);
   assert.equal(result.results.length,2);
