@@ -215,3 +215,22 @@ test('automation execution continues when Fortisni event persistence fails',asyn
   assert.equal(result.results.length,1);
  }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;fortisniEvents.publish=savedPublish;}
 });
+
+test('approved Agent Lab execution continues when Fortisni event persistence fails',async()=>{
+ const savedFind=store.findByIdAsync,savedUpdate=store.updateByIdAsync,savedTransition=store.transitionAgentRunStatus,savedGenerate=providers.generate,savedConfigured=providers.isProviderConfigured,savedDefault=providers.getDefaultModel,savedReserve=usage.reserveAiBudget,savedSettle=usage.settleAiBudget,savedRelease=usage.releaseAiBudget,savedPublish=fortisniEvents.publish;
+ const plan='agent-event-persistence-plan',task='agent-event-persistence-task';
+ const steps=[{type:'analyze',title:'Analyze',description:'Analyze the input',status:'pending'}];
+ const rows=new Map([[plan,{id:plan,userId:owner,kind:'agent-plan',status:'approved',goal:'Analyze input',provider:'openai',plan:{steps},progress:{total:1,completed:0,failed:0,running:0,pending:1,percent:0}}],[task,{id:task,userId:owner,kind:'agent-task',status:'running',leaseOwner:'worker-test',leaseExpiresAt:new Date(Date.now()+60000).toISOString(),payload:{planId:plan}}]]);
+ let calls=0;
+ store.findByIdAsync=async(_collection,id)=>rows.get(id)||null;
+ store.updateByIdAsync=async(_collection,id,patch)=>{const row=rows.get(id);if(!row)return null;const next={...row,...patch};rows.set(id,next);return next;};
+ store.transitionAgentRunStatus=async(id,userId,from,to,extra={})=>{const row=rows.get(id);if(!row||row.userId!==userId)return{state:'not_found'};if(!from.includes(row.status))return{state:'conflict',run:row};const next={...row,...extra,status:to};rows.set(id,next);return{state:'updated',run:next};};
+ providers.isProviderConfigured=()=>true;providers.getDefaultModel=()=> 'test-model';providers.generate=async()=>{calls++;return{text:'Step output',usage:{}};};
+ usage.reserveAiBudget=async()=>({reservationId:'test'});usage.settleAiBudget=async()=>true;usage.releaseAiBudget=async()=>true;
+ fortisniEvents.publish=async()=>{throw new Error('events unavailable');};
+ try{
+  const result=await worker.executeApprovedPlan({id:task,userId:owner,payload:{planId:plan}},{workerId:'worker-test',isLeaseLost:()=>false});
+  assert.equal(calls,1);
+  assert.equal(result.completed,1);
+ }finally{store.findByIdAsync=savedFind;store.updateByIdAsync=savedUpdate;store.transitionAgentRunStatus=savedTransition;providers.generate=savedGenerate;providers.isProviderConfigured=savedConfigured;providers.getDefaultModel=savedDefault;usage.reserveAiBudget=savedReserve;usage.settleAiBudget=savedSettle;usage.releaseAiBudget=savedRelease;fortisniEvents.publish=savedPublish;}
+});
