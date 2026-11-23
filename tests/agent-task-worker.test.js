@@ -316,3 +316,12 @@ test('automation retries resume from durable step checkpoints without repeating 
   assert.equal(taskRow.executionCheckpoints[1].step,2);
  }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;store.updateByIdAsync=savedUpdate;store.saveAgentTaskCheckpoints=savedCheckpoint;}
 });
+
+
+test('knowledge search always uses the authenticated task owner, not workflow-supplied identity',async()=>{
+ let received;
+ await worker.executeKnowledgeSearchForTask({userId:owner},{botId:'owned-bot',query:'private data',userId:'attacker-controlled-user'},async args=>{received=args;return {results:[]};});
+ assert.equal(received.userId,owner);
+ assert.equal(received.botId,'owned-bot');
+ assert.equal(received.query,'private data');
+});
