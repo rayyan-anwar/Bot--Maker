@@ -173,10 +173,10 @@ test('webhook authentication rejects empty configured secrets and compares fixed
 
 test('automation task payload is pinned to the workflow revision at enqueue time',async()=>{
  const originalFind=store.findByIdAsync,originalUpdate=store.updateByIdAsync,originalEnqueue=require('../server/agent-task-service').enqueueTask;
- const workflow={id:'revision-pin',kind:'automation-workflow',userId:'owner',enabled:true,updatedAt:'revision-v1',trigger:{type:'manual'},steps:[{id:'step-1',type:'text.analyze',arguments:{text:'hello'}}]};let queued;
+ const workflow={id:'revision-pin',kind:'automation-workflow',userId:'owner',enabled:true,updatedAt:'revision-v1',trigger:{type:'manual'},steps:[{id:'step-1',type:'text.analyze',arguments:{text:'hello'}}]};let queued,metadataPatch;
  store.findByIdAsync=async(_collection,id)=>id===workflow.id?{...workflow}:null;
- store.updateByIdAsync=async(_collection,id,patch)=>{Object.assign(workflow,patch);return workflow;};
+ store.updateByIdAsync=async(_collection,id,patch)=>{metadataPatch=patch;Object.assign(workflow,patch);return workflow;};
  require('../server/agent-task-service').enqueueTask=async args=>{queued=args;return{created:true,task:{id:'task-revision'}};};
- try{await service.run('owner',workflow.id,{},'revision-request');assert.equal(queued.payload.workflowUpdatedAt,'revision-v1');assert.equal(queued.payload.workflowId,workflow.id);}
+ try{await service.run('owner',workflow.id,{},'revision-request');assert.equal(queued.payload.workflowUpdatedAt,'revision-v1');assert.equal(queued.payload.workflowId,workflow.id);assert.equal(Object.hasOwn(metadataPatch,'updatedAt'),false);assert.equal(workflow.updatedAt,'revision-v1');}
  finally{store.findByIdAsync=originalFind;store.updateByIdAsync=originalUpdate;require('../server/agent-task-service').enqueueTask=originalEnqueue;}
 });
