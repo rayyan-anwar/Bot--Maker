@@ -47,7 +47,7 @@ class AgentTaskQueue {
   claim(workerId, now = Date.now()) {
     const timestamp = safeNow(now);
     if (typeof workerId !== 'string' || !workerId.trim() || workerId.length > 128) throw new TypeError('workerId is required and must be bounded.');
-    const task = [...this.tasks.values()].filter(item => item.status === 'queued' && item.availableAt <= timestamp).sort((a,b)=>a.createdAt-b.createdAt||a.id.localeCompare(b.id))[0];
+    const task = [...this.tasks.values()].filter(item => item.status === 'queued' && item.availableAt <= timestamp).sort((a,b)=>a.createdAt-b.createdAt)[0];
     if (!task) return null;
     task.status = 'running'; task.attempt += 1; task.leaseOwner = workerId; task.leaseExpiresAt = timestamp + this.leaseMs; task.updatedAt = timestamp;
     return this.snapshot(task);
@@ -63,7 +63,9 @@ class AgentTaskQueue {
   complete(taskId, workerId, result, now = Date.now()) {
     const timestamp = safeNow(now), task = this.tasks.get(taskId);
     if (!this.ownsLiveLease(task, workerId, timestamp)) return null;
-    const serialized = JSON.stringify(result);
+    let serialized;
+    try { serialized = JSON.stringify(result); }
+    catch (_) { throw new RangeError('Task result must be JSON serializable and at most 32 KB.'); }
     if (serialized === undefined || Buffer.byteLength(serialized, 'utf8') > 32 * 1024) throw new RangeError('Task result must be JSON serializable and at most 32 KB.');
     task.status = 'completed'; task.result = JSON.parse(serialized); task.updatedAt = timestamp; task.leaseOwner = null; task.leaseExpiresAt = null;
     return this.snapshot(task);
