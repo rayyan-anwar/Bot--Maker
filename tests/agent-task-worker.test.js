@@ -6,6 +6,7 @@ const store=require('../server/store');
 const providers=require('../server/providers');
 const usage=require('../server/usage');
 const worker=require('../server/agent-task-worker');
+const fortisniEvents=require('../server/fortisni-events');
 
 const runId='123e4567-e89b-42d3-a456-426614174001';
 const taskId='123e4567-e89b-42d3-a456-426614174002';
@@ -179,4 +180,22 @@ test('automation worker stops if workflow definition changes between steps',asyn
   await assert.rejects(worker.executeAutomationWorkflow(task),/definition changed during execution/);
   assert.equal(lookup,2);
  }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;if(savedExecute)worker.executeSafeTool=savedExecute;}
+});
+
+test('automation emits Fortisni step started and completed events',async()=>{
+ const automation=require('../server/automation-service');
+ const savedGet=automation.getOwned,savedFind=store.findByIdAsync,savedPublish=fortisniEvents.publish;
+ const task={id:'automation-fortisni-events',userId:owner,leaseOwner:'worker-1',payload:{workflowId:'workflow-events'}};
+ const taskRow={id:task.id,status:'running',leaseOwner:task.leaseOwner,leaseExpiresAt:new Date(Date.now()+60000).toISOString()};
+ const workflow={id:'workflow-events',name:'Event workflow',enabled:true,updatedAt:'v1',steps:[{type:'text.analyze',arguments:{text:'hello'}}]};
+ const events=[];
+ automation.getOwned=async()=>workflow;
+ store.findByIdAsync=async(_collection,id)=>id===task.id?taskRow:null;
+ fortisniEvents.publish=async(event)=>{events.push(event);return event;};
+ try{
+  const result=await worker.executeAutomationWorkflow(task);
+  assert.equal(result.workflowId,workflow.id);
+  assert.deepEqual(events.map(event=>event.type),['step.started','step.completed']);
+  assert.deepEqual(events.map(event=>event.metadata.step),[1,1]);
+ }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;fortisniEvents.publish=savedPublish;}
 });
