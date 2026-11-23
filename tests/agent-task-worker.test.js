@@ -249,3 +249,27 @@ test('automation worker aborts before execution when lease is already lost',asyn
   assert.equal(lookups,0);
  }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;}
 });
+
+
+test('automation retries resume from durable step checkpoints without repeating completed steps',async()=>{
+ const automation=require('../server/automation-service');
+ const savedGet=automation.getOwned,savedFind=store.findByIdAsync,savedUpdate=store.updateByIdAsync;
+ const task={id:'automation-checkpoint-task',userId:owner,leaseOwner:'worker-checkpoint',payload:{workflowId:'workflow-checkpoint'}};
+ const workflow={id:'workflow-checkpoint',name:'Checkpoint workflow',enabled:true,updatedAt:'v1',steps:[
+  {type:'text.analyze',arguments:{text:'first result'}},
+  {type:'text.analyze',arguments:{text:'second result'}}
+ ]};
+ const prior={step:1,type:'text.analyze',result:{text:'first result'},completedAt:new Date().toISOString()};
+ const taskRow={id:task.id,status:'running',leaseOwner:task.leaseOwner,leaseExpiresAt:new Date(Date.now()+60000).toISOString(),executionCheckpoints:[prior]};
+ automation.getOwned=async()=>workflow;
+ store.findByIdAsync=async(_collection,id)=>id===task.id?taskRow:null;
+ store.updateByIdAsync=async(_collection,id,patch)=>{Object.assign(taskRow,patch);return taskRow;};
+ try{
+  const result=await worker.executeAutomationWorkflow(task);
+  assert.equal(result.results.length,2);
+  assert.deepEqual(result.results[0],prior);
+  assert.equal(taskRow.executionCheckpoints.length,2);
+  assert.equal(taskRow.executionCheckpoints[0].result.text,'first result');
+  assert.equal(taskRow.executionCheckpoints[1].step,2);
+ }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;store.updateByIdAsync=savedUpdate;}
+});
