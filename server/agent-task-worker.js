@@ -137,7 +137,7 @@ async function executeApprovedPlan(task, context) {
   return {planId,stepsCompleted:outputs.length,outputs:outputs.sort((a,b)=>a.step-b.step).map(item=>({step:item.step,text:item.text.slice(0,1800)}))};
 }
 registerTaskHandler('agent.plan.execute',executeApprovedPlan);
-async function publishFortisniEventSafely(event) { try { return await publishFortisniEventSafely(event); } catch (error) { console.error('Fortisni event persistence failed:', safeError(error)); return null; } }
+async function publishFortisniEventSafely(event) { try { return await fortisniEvents.publish(event); } catch (error) { console.error('Fortisni event persistence failed:', safeError(error)); return null; } }
 
 async function executeAutomationWorkflow(task) {
   const workflow=await automationService.getOwned(task.userId,task.payload?.workflowId);
