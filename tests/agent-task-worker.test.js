@@ -129,7 +129,7 @@ test('retry failure cannot reset step state after a concurrent plan cancellation
   if(current?.status==='cancelled')return{state:'conflict',run:current};
   return originalTransition(id,userId,from,to,extra);
  };
- await assert.rejects(worker.executeApprovedPlan(records.get(taskId),{workerId:'test-worker'}),/Plan state changed before retry progress could be reset/);
+ await assert.rejects(worker.executeApprovedPlan(records.get(taskId),{workerId:'test-worker'}),/provider failed during cancellation/);
  assert.equal(records.get(runId).status,'cancelled');
  assert.equal(records.get(runId).plan.steps[0].status,'cancelled');
  }finally{teardown();}});
