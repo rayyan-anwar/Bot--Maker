@@ -140,6 +140,7 @@ registerTaskHandler('agent.plan.execute',executeApprovedPlan);
 async function publishFortisniEventSafely(event) { try { return await fortisniEvents.publish(event); } catch (error) { console.error('Fortisni event persistence failed:', safeError(error)); return null; } }
 
 async function executeAutomationWorkflow(task, context = {}) {
+  if(context.isLeaseLost?.())throw new Error('Workflow worker lease lost.');
   const workflow=await automationService.getOwned(task.userId,task.payload?.workflowId);
   if(!workflow||!workflow.enabled)throw new Error('Workflow is unavailable or disabled.');
   const results=[];
