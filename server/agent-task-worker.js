@@ -143,6 +143,10 @@ async function executeAutomationWorkflow(task, context = {}) {
   if(context.isLeaseLost?.())throw new Error('Workflow worker lease lost.');
   const workflow=await automationService.getOwned(task.userId,task.payload?.workflowId);
   if(!workflow||!workflow.enabled)throw new Error('Workflow is unavailable or disabled.');
+  // Bind every newly enqueued execution to the exact workflow revision that
+  // was approved by the caller. A retry must never apply old checkpoints to
+  // a newer, edited workflow definition.
+  if(task.payload?.workflowUpdatedAt!==undefined&&task.payload.workflowUpdatedAt!==(workflow.updatedAt||null))throw new Error('Workflow definition changed after this execution was enqueued.');
   const taskRecord=await store.findByIdAsync('aiEngineerRuns',task.id);
   if(!taskRecord||taskRecord.status==='cancelled')throw new Error('Workflow execution cancelled.');
   if(taskRecord.status!=='running'||taskRecord.leaseOwner!==task.leaseOwner||Date.parse(taskRecord.leaseExpiresAt)<=Date.now())throw new Error('Workflow worker lease lost.');
