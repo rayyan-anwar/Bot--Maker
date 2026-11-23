@@ -316,3 +316,31 @@ test('automation retries resume from durable step checkpoints without repeating 
   assert.equal(taskRow.executionCheckpoints[1].step,2);
  }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;store.updateByIdAsync=savedUpdate;store.saveAgentTaskCheckpoints=savedCheckpoint;}
 });
+
+
+test('automation completion result stays bounded while full step outputs remain in checkpoints',async()=>{
+ const automation=require('../server/automation-service');
+ const savedGet=automation.getOwned,savedFind=store.findByIdAsync,savedCheckpoint=store.saveAgentTaskCheckpoints,savedPublish=fortisniEvents.publish;
+ const task={id:'automation-large-result-task',userId:owner,leaseOwner:'worker-large-result',payload:{workflowId:'workflow-large-result'}};
+ const taskRow={id:task.id,status:'running',leaseOwner:task.leaseOwner,leaseExpiresAt:new Date(Date.now()+60000).toISOString()};
+ const largeContent='x'.repeat(12000);
+ const workflow={id:'workflow-large-result',name:'Large output workflow',enabled:true,updatedAt:'v1',steps:Array.from({length:8},(_,index)=>({type:'draft.create',arguments:{title:'Draft '+(index+1),content:largeContent}}))};
+ automation.getOwned=async()=>workflow;
+ store.findByIdAsync=async(_collection,id)=>id===task.id?taskRow:null;
+ store.saveAgentTaskCheckpoints=async(id,workerId,now,checkpoints)=>{
+  if(id!==task.id||workerId!==task.leaseOwner||taskRow.status!=='running'||Date.parse(taskRow.leaseExpiresAt)<=now.getTime())return null;
+  taskRow.executionCheckpoints=checkpoints;
+  return taskRow;
+ };
+ fortisniEvents.publish=async()=>null;
+ try{
+  const result=await worker.executeAutomationWorkflow(task);
+  assert.equal(result.completedSteps,8);
+  assert.equal(Object.hasOwn(result,'results'),false);
+  assert.ok(Buffer.byteLength(JSON.stringify(result),'utf8')<1024);
+  assert.equal(taskRow.executionCheckpoints.length,8);
+  assert.equal(taskRow.executionCheckpoints[7].result.content.length,12000);
+ }finally{
+  automation.getOwned=savedGet;store.findByIdAsync=savedFind;store.saveAgentTaskCheckpoints=savedCheckpoint;fortisniEvents.publish=savedPublish;
+ }
+});
