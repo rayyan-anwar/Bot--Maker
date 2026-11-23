@@ -95,6 +95,19 @@ async function insertAgentTaskWithinCapacity(record,maxActive=100){
  }catch(error){try{await client.query('ROLLBACK');}catch(_){}throw error;}finally{client.release();}
 }
 async function updateByIdAsync(c,id,patch){assertCollection(c);if(!isUuid(id))return null;if(!isPostgres())return updateById(c,id,patch);await initialize();const r=await pool.query("UPDATE botforge_records SET data=data || $3::jsonb,updated_at=now() WHERE collection=$1 AND id=$2 RETURNING data",[c,id,JSON.stringify(patch)]);return r.rowCount?r.rows[0].data:null;}
+async function saveAgentTaskCheckpoints(taskId,workerId,now,checkpoints){
+ if(typeof taskId!=='string'||!taskId||typeof workerId!=='string'||!workerId||!(now instanceof Date)||!Number.isFinite(now.getTime())||!Array.isArray(checkpoints))throw new TypeError('Invalid agent task checkpoint update.');
+ const timestamp=now.toISOString();
+ if(!isPostgres()){
+  const current=findById('aiEngineerRuns',taskId);
+  if(!current||current.kind!=='agent-task'||current.status!=='running'||current.leaseOwner!==workerId||Date.parse(current.leaseExpiresAt)<=now.getTime())return null;
+  return updateById('aiEngineerRuns',taskId,{executionCheckpoints:checkpoints,updatedAt:timestamp});
+ }
+ if(!isUuid(taskId))return null;
+ await initialize();
+ const result=await pool.query("UPDATE botforge_records SET data=data || $4::jsonb,updated_at=now() WHERE collection='aiEngineerRuns' AND id=$1 AND data->>'kind'='agent-task' AND data->>'status'='running' AND data->>'leaseOwner'=$2 AND (data->>'leaseExpiresAt')::timestamptz>$3 RETURNING data",[taskId,workerId,timestamp,JSON.stringify({executionCheckpoints:checkpoints,updatedAt:timestamp})]);
+ return result.rowCount?result.rows[0].data:null;
+}
 async function deleteByIdAsync(c,id){assertCollection(c);if(!isUuid(id))return false;if(!isPostgres())return deleteById(c,id);await initialize();const r=await pool.query('DELETE FROM botforge_records WHERE collection=$1 AND id=$2',[c,id]);return r.rowCount>0;}
 async function findUserByPasswordResetTokenHash(tokenHash){
  if(typeof tokenHash!=='string'||!tokenHash)return null;
@@ -358,4 +371,4 @@ async function consumeSocialOAuthState(stateHash,userId,platform,now=new Date())
 async function query(sql,values=[]){if(!isPostgres())throw new Error('Shared PostgreSQL storage is not configured.');await initialize();return pool.query(sql,values);}
 async function health(){if(!isPostgres())return {ok:true,database:'json-development'};try{await initialize();await pool.query('SELECT 1');return {ok:true,database:'postgres'};}catch(_){return {ok:false,database:'postgres'};}}
 async function close(){if(pool){await pool.end();pool=null;}initialized=false;}
-module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,insertAgentTaskIdempotent,insertAgentTaskWithinCapacity,updateByIdAsync,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,claimDueAutomationWorkflows,finishAutomationScheduleClaim,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,transitionAgentRunStatus,consumeSocialOAuthState,insertDocumentWithinCapacity,query,health,load,persist};
+module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,insertAgentTaskIdempotent,insertAgentTaskWithinCapacity,updateByIdAsync,saveAgentTaskCheckpoints,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,claimDueAutomationWorkflows,finishAutomationScheduleClaim,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,transitionAgentRunStatus,consumeSocialOAuthState,insertDocumentWithinCapacity,query,health,load,persist};
