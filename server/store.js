@@ -183,6 +183,56 @@ async function claimWebhookEvent(provider,eventId){
  if(existing.rows[0]?.processed_at)return false;
  const error=new Error('Webhook event is already being processed.');error.status=409;throw error;
 }
+let scheduleClaimLock = Promise.resolve();
+function serializeScheduleClaim(fn) {
+ const run=scheduleClaimLock.then(fn,fn);
+ scheduleClaimLock=run.then(()=>undefined,()=>undefined);
+ return run;
+}
+async function claimDueAutomationWorkflows(now=new Date(),limit=50,leaseMs=60000){
+ const current=now instanceof Date?now:new Date(now);
+ if(!Number.isFinite(current.getTime())||!Number.isInteger(limit)||limit<1||limit>200||!Number.isInteger(leaseMs)||leaseMs<5000||leaseMs>900000)throw new TypeError('Invalid schedule claim parameters.');
+ const timestamp=current.toISOString(),until=new Date(current.getTime()+leaseMs).toISOString();
+ if(!isPostgres())return serializeScheduleClaim(async()=>{
+  const rows=all('aiEngineerRuns').filter(row=>row.kind==='automation-workflow'&&row.enabled===true&&row.trigger?.type==='schedule'&&Number.isFinite(Date.parse(row.nextRunAt))&&Date.parse(row.nextRunAt)<=current.getTime()&&(!row.scheduleClaimUntil||Date.parse(row.scheduleClaimUntil)<=current.getTime())).sort((a,b)=>Date.parse(a.nextRunAt)-Date.parse(b.nextRunAt)).slice(0,limit);
+  const claimed=[];
+  for(const row of rows){const fresh=findById('aiEngineerRuns',row.id);if(!fresh||fresh.scheduleClaimUntil&&Date.parse(fresh.scheduleClaimUntil)>current.getTime())continue;claimed.push(updateById('aiEngineerRuns',row.id,{scheduleClaimSlot:fresh.nextRunAt,scheduleClaimUntil:until,scheduleClaimToken:require('node:crypto').randomUUID(),updatedAt:timestamp}));}
+  return claimed;
+ });
+ await initialize();
+ const result=await pool.query(`WITH candidates AS (
+  SELECT id FROM botforge_records
+  WHERE collection='aiEngineerRuns' AND data->>'kind'='automation-workflow'
+   AND data->>'enabled'='true' AND data->'trigger'->>'type'='schedule'
+   AND (data->>'nextRunAt')::timestamptz <= $1::timestamptz
+   AND (data->>'scheduleClaimUntil' IS NULL OR (data->>'scheduleClaimUntil')::timestamptz <= $1::timestamptz)
+  ORDER BY (data->>'nextRunAt')::timestamptz,id
+  LIMIT $2 FOR UPDATE SKIP LOCKED
+ )
+ UPDATE botforge_records AS target
+ SET data=target.data || jsonb_build_object('scheduleClaimSlot',target.data->>'nextRunAt','scheduleClaimUntil',$3::text,'scheduleClaimToken',gen_random_uuid()::text,'updatedAt',$1::text),updated_at=now()
+ FROM candidates WHERE target.collection='aiEngineerRuns' AND target.id=candidates.id
+ RETURNING target.data`,[timestamp,limit,until]);
+ return result.rows.map(row=>typeof row.data==='string'?JSON.parse(row.data):row.data);
+}
+async function finishAutomationScheduleClaim(workflowId,slot,token,advance=true){
+ if(typeof workflowId!=='string'||typeof slot!=='string'||typeof token!=='string'||!token||!Number.isFinite(Date.parse(slot)))throw new TypeError('Invalid schedule claim identity.');
+ const finish=(row)=>{
+  if(!row||row.kind!=='automation-workflow'||row.scheduleClaimSlot!==slot||row.scheduleClaimToken!==token)return null;
+  const patch={scheduleClaimSlot:null,scheduleClaimUntil:null,scheduleClaimToken:null,updatedAt:new Date().toISOString()};
+  if(advance&&row.trigger?.type==='schedule'&&Number.isInteger(row.trigger.intervalMinutes)&&row.trigger.intervalMinutes>=1)patch.nextRunAt=new Date(Date.parse(slot)+row.trigger.intervalMinutes*60000).toISOString();
+  return updateById('aiEngineerRuns',workflowId,patch);
+ };
+ if(!isPostgres())return serializeScheduleClaim(async()=>finish(findById('aiEngineerRuns',workflowId)));
+ await initialize();
+ const current=await pool.query("SELECT data FROM botforge_records WHERE collection='aiEngineerRuns' AND id=$1 AND data->>'kind'='automation-workflow' AND data->>'scheduleClaimSlot'=$2 AND data->>'scheduleClaimToken'=$3",[workflowId,slot,token]);
+ if(!current.rowCount)return null;
+ const row=typeof current.rows[0].data==='string'?JSON.parse(current.rows[0].data):current.rows[0].data;
+ const patch={scheduleClaimSlot:null,scheduleClaimUntil:null,scheduleClaimToken:null,updatedAt:new Date().toISOString()};
+ if(advance&&row.trigger?.type==='schedule'&&Number.isInteger(row.trigger.intervalMinutes)&&row.trigger.intervalMinutes>=1)patch.nextRunAt=new Date(Date.parse(slot)+row.trigger.intervalMinutes*60000).toISOString();
+ const updated=await pool.query("UPDATE botforge_records SET data=data || $4::jsonb,updated_at=now() WHERE collection='aiEngineerRuns' AND id=$1 AND data->>'kind'='automation-workflow' AND data->>'scheduleClaimSlot'=$2 AND data->>'scheduleClaimToken'=$3 RETURNING data",[workflowId,slot,token,JSON.stringify(patch)]);
+ return updated.rowCount?updated.rows[0].data:null;
+}
 async function completeWebhookEvent(provider,eventId){
  if(!['stripe','razorpay'].includes(provider)||typeof eventId!=='string'||!eventId)return;
  if(!isPostgres()){const event=all('webhookEvents').find(x=>x.provider===provider&&x.eventId===eventId);if(!event)throw new Error('Webhook event claim was lost.');event.processedAt=new Date().toISOString();event.processingUntil=null;persist();return;}
@@ -308,4 +358,4 @@ async function consumeSocialOAuthState(stateHash,userId,platform,now=new Date())
 async function query(sql,values=[]){if(!isPostgres())throw new Error('Shared PostgreSQL storage is not configured.');await initialize();return pool.query(sql,values);}
 async function health(){if(!isPostgres())return {ok:true,database:'json-development'};try{await initialize();await pool.query('SELECT 1');return {ok:true,database:'postgres'};}catch(_){return {ok:false,database:'postgres'};}}
 async function close(){if(pool){await pool.end();pool=null;}initialized=false;}
-module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,insertAgentTaskIdempotent,insertAgentTaskWithinCapacity,updateByIdAsync,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,transitionAgentRunStatus,consumeSocialOAuthState,insertDocumentWithinCapacity,query,health,load,persist};
+module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,insertAgentTaskIdempotent,insertAgentTaskWithinCapacity,updateByIdAsync,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,claimDueAutomationWorkflows,finishAutomationScheduleClaim,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,transitionAgentRunStatus,consumeSocialOAuthState,insertDocumentWithinCapacity,query,health,load,persist};

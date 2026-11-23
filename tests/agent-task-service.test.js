@@ -172,3 +172,29 @@ test('terminal task records remain immutable to worker updates',async()=>{
   assert.equal(final.status,'completed');assert.deepEqual(final.result,{ok:true});
  }finally{teardown();}
 });
+
+
+test('task payload validation rejects accessors without invoking them',async()=>{
+ setup();try{
+  let invoked=false;
+  const payload={goal:'safe'};
+  Object.defineProperty(payload,'secret',{enumerable:true,get(){invoked=true;return 'unsafe';}});
+  await assert.rejects(service.enqueueTask({userId:'u-safe',taskType:'agent.plan',payload}),/safe JSON data/);
+  assert.equal(invoked,false);
+  const nested={};
+  Object.defineProperty(nested,'value',{enumerable:true,get(){invoked=true;return 1;}});
+  await assert.rejects(service.enqueueTask({userId:'u-safe',taskType:'agent.plan',payload:{nested}}),/safe JSON data/);
+  assert.equal(invoked,false);
+ }finally{teardown();}
+});
+
+test('task payload validation rejects sparse arrays, hidden fields and unsafe keys',async()=>{
+ setup();try{
+  const sparse=[];sparse.length=2;sparse[1]='x';
+  await assert.rejects(service.enqueueTask({userId:'u-safe',taskType:'agent.plan',payload:{items:sparse}}),/safe JSON data/);
+  const hidden={visible:true};Object.defineProperty(hidden,'secret',{value:'hidden'});
+  await assert.rejects(service.enqueueTask({userId:'u-safe',taskType:'agent.plan',payload:{nested:hidden}}),/safe JSON data/);
+  const unsafe=JSON.parse('{"__proto__":{"polluted":true}}');
+  await assert.rejects(service.enqueueTask({userId:'u-safe',taskType:'agent.plan',payload:unsafe}),/safe JSON data/);
+ }finally{teardown();}
+});

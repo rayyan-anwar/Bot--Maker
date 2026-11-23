@@ -6,6 +6,7 @@ const store=require('../server/store');
 const providers=require('../server/providers');
 const usage=require('../server/usage');
 const worker=require('../server/agent-task-worker');
+const fortisniEvents=require('../server/fortisni-events');
 
 const runId='123e4567-e89b-42d3-a456-426614174001';
 const taskId='123e4567-e89b-42d3-a456-426614174002';
@@ -120,3 +121,131 @@ test('atomic plan terminal transition cannot overwrite a concurrent cancellation
  assert.equal(result.state,'conflict');
  assert.equal(records.get(runId).status,'cancelled');
  }finally{teardown();}});
+
+
+test('scheduler completes fenced schedule claims and advances only the claimed slot',async()=>{
+ const automation=require('../server/automation-service');
+ const savedClaim=store.claimDueAutomationWorkflows,savedFinish=store.finishAutomationScheduleClaim,savedRun=automation.run;
+ const workflow={id:'schedule-worker-1',userId:owner,nextRunAt:'2026-11-22T10:00:00.000Z',scheduleClaimSlot:'2026-11-22T10:00:00.000Z',scheduleClaimToken:'claim-token-1'};
+ const calls=[];
+ store.claimDueAutomationWorkflows=async()=>[workflow];
+ store.finishAutomationScheduleClaim=async(...args)=>{calls.push(args);return {id:workflow.id};};
+ automation.run=async(userId,id,data)=>{assert.equal(userId,owner);assert.equal(id,workflow.id);assert.deepEqual(data,{scheduled:true,scheduleSlot:workflow.scheduleClaimSlot});return{id:'task-1'};};
+ try{
+  await worker.enqueueDueSchedules();
+  assert.deepEqual(calls,[[workflow.id,workflow.scheduleClaimSlot,'claim-token-1',true]]);
+ }finally{store.claimDueAutomationWorkflows=savedClaim;store.finishAutomationScheduleClaim=savedFinish;automation.run=savedRun;}
+});
+
+test('scheduler releases a failed claim without advancing its schedule slot',async()=>{
+ const automation=require('../server/automation-service');
+ const savedClaim=store.claimDueAutomationWorkflows,savedFinish=store.finishAutomationScheduleClaim,savedRun=automation.run;
+ const workflow={id:'schedule-worker-fail',userId:owner,scheduleClaimSlot:'2026-11-22T10:00:00.000Z',scheduleClaimToken:'claim-token-fail'};
+ const calls=[];
+ store.claimDueAutomationWorkflows=async()=>[workflow];
+ store.finishAutomationScheduleClaim=async(...args)=>{calls.push(args);return null;};
+ automation.run=async()=>{throw new Error('temporary queue failure');};
+ try{
+  await worker.enqueueDueSchedules();
+  assert.deepEqual(calls,[[workflow.id,workflow.scheduleClaimSlot,'claim-token-fail',false]]);
+ }finally{store.claimDueAutomationWorkflows=savedClaim;store.finishAutomationScheduleClaim=savedFinish;automation.run=savedRun;}
+});
+
+
+test('automation worker stops before the next step when workflow is disabled',async()=>{
+ const automation=require('../server/automation-service');
+ const savedGet=automation.getOwned,savedFind=store.findByIdAsync;
+ const task={id:'automation-task-disabled',userId:owner,leaseOwner:'worker-1',payload:{workflowId:'workflow-disabled'}};
+ const taskRow={id:task.id,status:'running',leaseOwner:task.leaseOwner,leaseExpiresAt:new Date(Date.now()+60000).toISOString()};
+ let lookups=0;
+ automation.getOwned=async()=>{lookups++;return lookups===1?{id:'workflow-disabled',name:'Two steps',enabled:true,steps:[{type:'text.analyze',arguments:{text:'first'}},{type:'text.analyze',arguments:{text:'second'}}]}:{id:'workflow-disabled',name:'Two steps',enabled:false,steps:[]};};
+ store.findByIdAsync=async(_collection,id)=>id===task.id?taskRow:null;
+ try{
+  await assert.rejects(worker.handlers.get('automation.workflow.execute')(task),/disabled during execution/);
+  assert.equal(lookups,2);
+ }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;}
+});
+
+
+test('automation worker stops if workflow definition changes between steps',async()=>{
+ const automation=require('../server/automation-service');
+ const savedGet=automation.getOwned,savedFind=store.findByIdAsync,savedExecute=worker.executeSafeTool;
+ const task={id:'automation-task-edit',userId:owner,leaseOwner:'worker-1',payload:{workflowId:'workflow-edit'}};
+ const taskRow={id:task.id,status:'running',leaseOwner:task.leaseOwner,leaseExpiresAt:new Date(Date.now()+60000).toISOString()};
+ const originalSteps=[{type:'text.analyze',arguments:{text:'first'}},{type:'text.analyze',arguments:{text:'second'}}];
+ let lookup=0,executions=0;
+ automation.getOwned=async()=>{lookup++;return lookup===1?{id:'workflow-edit',name:'Original',enabled:true,updatedAt:'v1',steps:originalSteps}:{id:'workflow-edit',name:'Edited',enabled:true,updatedAt:'v2',steps:[...originalSteps,{type:'draft.create',arguments:{text:'changed'}}]};};
+ store.findByIdAsync=async(_collection,id)=>id===task.id?taskRow:null;
+ try{
+  await assert.rejects(worker.executeAutomationWorkflow(task),/definition changed during execution/);
+  assert.equal(lookup,2);
+ }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;if(savedExecute)worker.executeSafeTool=savedExecute;}
+});
+
+test('automation emits Fortisni step started and completed events',async()=>{
+ const automation=require('../server/automation-service');
+ const savedGet=automation.getOwned,savedFind=store.findByIdAsync,savedPublish=fortisniEvents.publish;
+ const task={id:'automation-fortisni-events',userId:owner,leaseOwner:'worker-1',payload:{workflowId:'workflow-events'}};
+ const taskRow={id:task.id,status:'running',leaseOwner:task.leaseOwner,leaseExpiresAt:new Date(Date.now()+60000).toISOString()};
+ const workflow={id:'workflow-events',name:'Event workflow',enabled:true,updatedAt:'v1',steps:[{type:'text.analyze',arguments:{text:'hello'}}]};
+ const events=[];
+ automation.getOwned=async()=>workflow;
+ store.findByIdAsync=async(_collection,id)=>id===task.id?taskRow:null;
+ fortisniEvents.publish=async(event)=>{events.push(event);return event;};
+ try{
+  const result=await worker.executeAutomationWorkflow(task);
+  assert.equal(result.workflowId,workflow.id);
+  assert.deepEqual(events.map(event=>event.type),['step.started','step.completed']);
+  assert.deepEqual(events.map(event=>event.metadata.step),[1,1]);
+ }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;fortisniEvents.publish=savedPublish;}
+});
+
+test('automation execution continues when Fortisni event persistence fails',async()=>{
+ const automation=require('../server/automation-service');
+ const savedGet=automation.getOwned,savedFind=store.findByIdAsync,savedPublish=fortisniEvents.publish;
+ const task={id:'automation-fortisni-failure',userId:owner,leaseOwner:'worker-1',payload:{workflowId:'workflow-event-failure'}};
+ const taskRow={id:task.id,status:'running',leaseOwner:task.leaseOwner,leaseExpiresAt:new Date(Date.now()+60000).toISOString()};
+ const workflow={id:'workflow-event-failure',name:'Event failure workflow',enabled:true,updatedAt:'v1',steps:[{type:'text.analyze',arguments:{text:'hello'}}]};
+ automation.getOwned=async()=>workflow;
+ store.findByIdAsync=async(_collection,id)=>id===task.id?taskRow:null;
+ fortisniEvents.publish=async()=>{throw new Error('event store unavailable');};
+ try{
+  const result=await worker.executeAutomationWorkflow(task);
+  assert.equal(result.workflowId,workflow.id);
+  assert.equal(result.results.length,1);
+ }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;fortisniEvents.publish=savedPublish;}
+});
+
+test('approved Agent Lab execution continues when Fortisni event persistence fails',async()=>{
+ const savedFind=store.findByIdAsync,savedUpdate=store.updateByIdAsync,savedTransition=store.transitionAgentRunStatus,savedGenerate=providers.generate,savedConfigured=providers.isProviderConfigured,savedDefault=providers.getDefaultModel,savedReserve=usage.reserveAiBudget,savedSettle=usage.settleAiBudget,savedRelease=usage.releaseAiBudget,savedPublish=fortisniEvents.publish;
+ const plan='agent-event-persistence-plan',task='agent-event-persistence-task';
+ const steps=[{type:'analyze',title:'Analyze',description:'Analyze the input',status:'pending'}];
+ const rows=new Map([[plan,{id:plan,userId:owner,kind:'agent-plan',status:'approved',goal:'Analyze input',provider:'openai',plan:{steps},progress:{total:1,completed:0,failed:0,running:0,pending:1,percent:0}}],[task,{id:task,userId:owner,kind:'agent-task',status:'running',leaseOwner:'worker-test',leaseExpiresAt:new Date(Date.now()+60000).toISOString(),payload:{planId:plan}}]]);
+ let calls=0;
+ store.findByIdAsync=async(_collection,id)=>rows.get(id)||null;
+ store.updateByIdAsync=async(_collection,id,patch)=>{const row=rows.get(id);if(!row)return null;const next={...row,...patch};rows.set(id,next);return next;};
+ store.transitionAgentRunStatus=async(id,userId,from,to,extra={})=>{const row=rows.get(id);if(!row||row.userId!==userId)return{state:'not_found'};if(!from.includes(row.status))return{state:'conflict',run:row};const next={...row,...extra,status:to};rows.set(id,next);return{state:'updated',run:next};};
+ providers.isProviderConfigured=()=>true;providers.getDefaultModel=()=> 'test-model';providers.generate=async()=>{calls++;return{text:'Step output',usage:{}};};
+ usage.reserveAiBudget=async()=>({reservationId:'test'});usage.settleAiBudget=async()=>true;usage.releaseAiBudget=async()=>true;
+ fortisniEvents.publish=async()=>{throw new Error('events unavailable');};
+ try{
+  const result=await worker.executeApprovedPlan({id:task,userId:owner,payload:{planId:plan}},{workerId:'worker-test',isLeaseLost:()=>false});
+  assert.equal(calls,1);
+  assert.equal(result.stepsCompleted,1);
+ }finally{store.findByIdAsync=savedFind;store.updateByIdAsync=savedUpdate;store.transitionAgentRunStatus=savedTransition;providers.generate=savedGenerate;providers.isProviderConfigured=savedConfigured;providers.getDefaultModel=savedDefault;usage.reserveAiBudget=savedReserve;usage.settleAiBudget=savedSettle;usage.releaseAiBudget=savedRelease;fortisniEvents.publish=savedPublish;}
+});
+
+
+test('automation worker aborts before execution when lease is already lost',async()=>{
+ const automation=require('../server/automation-service');
+ const savedGet=automation.getOwned,savedFind=store.findByIdAsync;
+ const task={id:'automation-lease-lost',userId:owner,leaseOwner:'worker-1',payload:{workflowId:'workflow-lease-lost'}};
+ const taskRow={id:task.id,status:'running',leaseOwner:task.leaseOwner,leaseExpiresAt:new Date(Date.now()+60000).toISOString()};
+ let lookups=0;
+ automation.getOwned=async()=>{lookups++;return{id:'workflow-lease-lost',name:'Lease test',enabled:true,steps:[{type:'text.analyze',arguments:{text:'must not run'}}]};};
+ store.findByIdAsync=async(_collection,id)=>id===task.id?taskRow:null;
+ try{
+  await assert.rejects(worker.executeAutomationWorkflow(task,{workerId:'worker-1',isLeaseLost:()=>true}),/lease lost/);
+  assert.equal(lookups,0);
+ }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;}
+});

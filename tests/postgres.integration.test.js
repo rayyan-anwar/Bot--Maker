@@ -123,6 +123,23 @@ test('PostgreSQL integration: shared rate limits, atomic login lockout and quota
     assert.equal(recovered[0].leaseOwner,null);
    }finally{await store.deleteByIdAsync('aiEngineerRuns',taskId);}
   });
+  await t.test('concurrent PostgreSQL schedulers claim a due workflow once and fence stale owners',async()=>{
+   const workflowId=crypto.randomUUID(),slot=new Date(Date.now()-60000).toISOString();
+   const workflow={id:workflowId,userId,kind:'automation-workflow',name:'Atomic scheduler test',steps:[{id:'step-1',type:'text.analyze',arguments:{}}],trigger:{type:'schedule',intervalMinutes:15},enabled:true,nextRunAt:slot,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+   try{
+    await store.insertAsync('aiEngineerRuns',workflow);
+    const claims=await Promise.all(Array.from({length:8},()=>store.claimDueAutomationWorkflows(new Date(),10,60000)));
+    const winners=claims.flat();
+    assert.equal(winners.length,1);
+    assert.equal(winners[0].scheduleClaimSlot,slot);
+    assert.ok(winners[0].scheduleClaimToken);
+    assert.equal(await store.finishAutomationScheduleClaim(workflowId,slot,'stale-claim-token',true),null);
+    const finished=await store.finishAutomationScheduleClaim(workflowId,slot,winners[0].scheduleClaimToken,true);
+    assert.ok(finished);
+    assert.equal(Date.parse(finished.nextRunAt),Date.parse(slot)+15*60000);
+    assert.equal(finished.scheduleClaimToken,null);
+   }finally{await store.deleteByIdAsync('aiEngineerRuns',workflowId);}
+  });
   await t.test('concurrent quota reservations never exceed the daily limit',async()=>{
    const day=new Date().toISOString().slice(0,10);
    const results=await Promise.all(Array.from({length:8},async()=>{
