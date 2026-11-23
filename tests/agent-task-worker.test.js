@@ -184,20 +184,21 @@ test('automation worker stops if workflow definition changes between steps',asyn
 
 test('automation emits Fortisni step started and completed events',async()=>{
  const automation=require('../server/automation-service');
- const savedGet=automation.getOwned,savedFind=store.findByIdAsync,savedPublish=fortisniEvents.publish;
+ const savedGet=automation.getOwned,savedFind=store.findByIdAsync,savedUpdate=store.updateByIdAsync,savedPublish=fortisniEvents.publish;
  const task={id:'automation-fortisni-events',userId:owner,leaseOwner:'worker-1',payload:{workflowId:'workflow-events'}};
  const taskRow={id:task.id,status:'running',leaseOwner:task.leaseOwner,leaseExpiresAt:new Date(Date.now()+60000).toISOString()};
  const workflow={id:'workflow-events',name:'Event workflow',enabled:true,updatedAt:'v1',steps:[{type:'text.analyze',arguments:{text:'hello'}}]};
  const events=[];
  automation.getOwned=async()=>workflow;
  store.findByIdAsync=async(_collection,id)=>id===task.id?taskRow:null;
+ store.updateByIdAsync=async(_collection,id,patch)=>{if(id!==task.id)return null;Object.assign(taskRow,patch);return taskRow;};
  fortisniEvents.publish=async(event)=>{events.push(event);return event;};
  try{
   const result=await worker.executeAutomationWorkflow(task);
   assert.equal(result.workflowId,workflow.id);
   assert.deepEqual(events.map(event=>event.type),['step.started','step.completed']);
   assert.deepEqual(events.map(event=>event.metadata.step),[1,1]);
- }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;fortisniEvents.publish=savedPublish;}
+ }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;store.updateByIdAsync=savedUpdate;fortisniEvents.publish=savedPublish;}
 });
 
 test('automation execution continues when Fortisni event persistence fails',async()=>{
@@ -208,12 +209,13 @@ test('automation execution continues when Fortisni event persistence fails',asyn
  const workflow={id:'workflow-event-failure',name:'Event failure workflow',enabled:true,updatedAt:'v1',steps:[{type:'text.analyze',arguments:{text:'hello'}}]};
  automation.getOwned=async()=>workflow;
  store.findByIdAsync=async(_collection,id)=>id===task.id?taskRow:null;
+ store.updateByIdAsync=async(_collection,id,patch)=>{if(id!==task.id)return null;Object.assign(taskRow,patch);return taskRow;};
  fortisniEvents.publish=async()=>{throw new Error('event store unavailable');};
  try{
   const result=await worker.executeAutomationWorkflow(task);
   assert.equal(result.workflowId,workflow.id);
   assert.equal(result.results.length,1);
- }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;fortisniEvents.publish=savedPublish;}
+ }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;store.updateByIdAsync=savedUpdate;fortisniEvents.publish=savedPublish;}
 });
 
 test('approved Agent Lab execution continues when Fortisni event persistence fails',async()=>{
