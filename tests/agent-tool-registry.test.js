@@ -61,3 +61,21 @@ test('knowledge search is approved read-only and non-external',()=>{
  assert.equal(result.valid,true);assert.equal(result.executable,true);
  assert.equal(result.tool.access,'read');assert.equal(result.tool.external,false);
 });
+
+
+test('tool arguments reject getters without executing them',()=>{
+ let invoked=false;const args={};
+ Object.defineProperty(args,'text',{enumerable:true,get(){invoked=true;return 'unsafe';}});
+ const result=validateToolRequest({toolId:'text.analyze',arguments:args},{runStatus:'approved',approvedToolIds:['text.analyze']});
+ assert.equal(result.valid,false);assert.ok(result.errors.some(error=>error.includes('plain JSON data')));assert.equal(invoked,false);
+});
+
+test('tool arguments reject cycles, sparse arrays and prototype-pollution keys',()=>{
+ const circular={};circular.self=circular;
+ const context={runStatus:'approved',approvedToolIds:['text.analyze']};
+ for(const args of [circular,{items:new Array(2)},JSON.parse('{"__proto__":{"polluted":true}}')]){
+  const result=validateToolRequest({toolId:'text.analyze',arguments:args},context);
+  assert.equal(result.valid,false);assert.ok(result.errors.some(error=>error.includes('plain JSON data')));
+ }
+ assert.equal({}.polluted,undefined);
+});
