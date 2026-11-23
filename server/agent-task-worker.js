@@ -164,10 +164,9 @@ async function executeAutomationWorkflow(task, context = {}) {
     results.push(checkpoint);
     // Persist each completed step before moving on. A retried task resumes from
     // these checkpoints instead of repeating already completed tool work.
-    const latestTask=await store.findByIdAsync('aiEngineerRuns',task.id);
-    if(!latestTask||latestTask.status!=='running'||latestTask.leaseOwner!==task.leaseOwner||Date.parse(latestTask.leaseExpiresAt)<=Date.now()||context.isLeaseLost?.())throw new Error('Workflow worker lease lost before checkpoint persistence.');
-    const saved=await store.updateByIdAsync('aiEngineerRuns',task.id,{executionCheckpoints:results,updatedAt:new Date().toISOString()});
-    if(!saved)throw new Error('Workflow checkpoint could not be persisted.');
+    if(context.isLeaseLost?.())throw new Error('Workflow worker lease lost before checkpoint persistence.');
+    const saved=await store.saveAgentTaskCheckpoints(task.id,task.leaseOwner,new Date(),results);
+    if(!saved)throw new Error('Workflow worker lease lost before checkpoint persistence.');
     await publishFortisniEventSafely({userId:task.userId,planId:workflow.id,taskId:task.id,type:'step.completed',message:'Automation '+workflow.name+': step '+(index+1)+' completed.',metadata:{step:index+1,totalSteps:workflow.steps.length}});
   }
   return {workflowId:workflow.id,workflowName:workflow.name,results,completedAt:new Date().toISOString()};
