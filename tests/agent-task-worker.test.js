@@ -253,6 +253,26 @@ test('automation worker aborts before execution when lease is already lost',asyn
 });
 
 
+
+test('automation checkpoint writes are fenced by current worker lease',async()=>{
+ const savedIsPostgres=store.isPostgres,savedQuery=store.query;
+ const taskId='550e8400-e29b-41d4-a716-446655440000';
+ try{
+  store.isPostgres=()=>true;
+  let captured=null;
+  store.query=async(sql,values)=>{captured={sql,values};return {rowCount:1,rows:[{data:{id:taskId,executionCheckpoints:values[3]&&JSON.parse(values[3]).executionCheckpoints}}]};};
+  const checkpoints=[{step:1,result:{ok:true}}],now=new Date('2026-11-23T00:00:00.000Z');
+  const saved=await store.saveAgentTaskCheckpoints(taskId,'worker-atomic',now,checkpoints);
+  assert.deepEqual(saved.executionCheckpoints,checkpoints);
+  assert.match(captured.sql,/data->>'leaseOwner'=\$2/);
+  assert.match(captured.sql,/leaseExpiresAt\)::timestamptz>\$3/);
+  assert.equal(captured.values[0],taskId);
+  assert.equal(captured.values[1],'worker-atomic');
+  store.query=async()=>({rowCount:0,rows:[]});
+  assert.equal(await store.saveAgentTaskCheckpoints(taskId,'stale-worker',now,checkpoints),null);
+ }finally{store.isPostgres=savedIsPostgres;store.query=savedQuery;}
+});
+
 test('automation retries resume from durable step checkpoints without repeating completed steps',async()=>{
  const automation=require('../server/automation-service');
  const savedGet=automation.getOwned,savedFind=store.findByIdAsync,savedUpdate=store.updateByIdAsync;
