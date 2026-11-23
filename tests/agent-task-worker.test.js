@@ -164,3 +164,19 @@ test('automation worker stops before the next step when workflow is disabled',as
   assert.equal(lookups,2);
  }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;}
 });
+
+
+test('automation worker stops if workflow definition changes between steps',async()=>{
+ const automation=require('../server/automation-service');
+ const savedGet=automation.getOwned,savedFind=store.findByIdAsync,savedExecute=worker.executeSafeTool;
+ const task={id:'automation-task-edit',userId:owner,leaseOwner:'worker-1',payload:{workflowId:'workflow-edit'}};
+ const taskRow={id:task.id,status:'running',leaseOwner:task.leaseOwner,leaseExpiresAt:new Date(Date.now()+60000).toISOString()};
+ const originalSteps=[{type:'text.analyze',arguments:{text:'first'}},{type:'text.analyze',arguments:{text:'second'}}];
+ let lookup=0,executions=0;
+ automation.getOwned=async()=>{lookup++;return lookup===1?{id:'workflow-edit',name:'Original',enabled:true,updatedAt:'v1',steps:originalSteps}:{id:'workflow-edit',name:'Edited',enabled:true,updatedAt:'v2',steps:[...originalSteps,{type:'draft.create',arguments:{text:'changed'}}]};};
+ store.findByIdAsync=async(_collection,id)=>id===task.id?taskRow:null;
+ try{
+  await assert.rejects(worker.executeAutomationWorkflow(task),/definition changed during execution/);
+  assert.equal(lookup,2);
+ }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;if(savedExecute)worker.executeSafeTool=savedExecute;}
+});
