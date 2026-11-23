@@ -16,7 +16,7 @@ test('shutdown force-closes an HTTP connection that does not finish within the g
  const server=await start(0,'127.0.0.1');
  const socket=net.connect(server.address().port,'127.0.0.1');
  await new Promise((resolve,reject)=>{socket.once('connect',resolve);socket.once('error',reject);});
- socket.write('GET /healthz HTTP/1.1\\r\\nHost: localhost\\r\\n');
+ socket.write('GET /healthz HTTP/1.1\r\nHost: localhost\r\n');
  const began=Date.now();
  await shutdown();
  assert.ok(Date.now()-began<1500,'shutdown should respect its bounded HTTP grace period');
