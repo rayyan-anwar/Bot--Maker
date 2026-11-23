@@ -228,13 +228,31 @@ async function processOneTask() {
   }finally{clearInterval(heartbeat);}
   return true;
 }
+async function reconcileRecoveredAgentPlan(task){
+ if(!task||task.status!=='failed'||task.taskType!=='agent.plan.execute'||typeof task.payload?.planId!=='string')return false;
+ const plan=await store.findByIdAsync('aiEngineerRuns',task.payload.planId).catch(()=>null);
+ if(!plan||plan.kind!=='agent-plan'||plan.userId!==task.userId||plan.executionTaskId!==task.id||plan.status!=='executing')return false;
+ const now=new Date().toISOString();
+ const steps=Array.isArray(plan.plan?.steps)?plan.plan.steps.map(step=>step.status==='completed'?step:{...step,status:'failed',completedAt:now,error:'Worker lease expired after maximum retry attempts.'}):[];
+ const completed=Array.isArray(plan.executionOutputs)?plan.executionOutputs.length:0;
+ const transition=await store.transitionAgentRunStatus(plan.id,task.userId,['executing'],'failed',{
+  plan:{...plan.plan,steps},
+  progress:{total:steps.length,completed,failed:steps.filter(step=>step.status==='failed').length,running:0,pending:0,percent:steps.length?Math.round(completed/steps.length*100):0},
+  lastError:'Worker lease expired after maximum retry attempts.',
+  failedAt:now
+ }).catch(()=>null);
+ if(transition?.state!=='updated')return false;
+ await appendPlanLog(plan.id,task.id,task.userId,'plan.failed','error','Worker lease expired after maximum retry attempts.').catch(()=>{});
+ await publishFortisniEventSafely({userId:task.userId,planId:plan.id,taskId:task.id,type:'plan.failed',message:'Your Agent Lab plan failed because the worker lease expired after maximum retries.',metadata:{reason:'worker_lease_exhausted'}}).catch(()=>{});
+ return true;
+}
 async function tick(){
   if(stopped||active)return;
   active=true;
-  try{await enqueueDueSchedules();await taskService.recoverExpiredTasks();await processOneTask();}
+  try{await enqueueDueSchedules();const recovered=await taskService.recoverExpiredTasks();for(const task of recovered)await reconcileRecoveredAgentPlan(task);await processOneTask();}
   catch(error){console.error('Agent task worker tick failed:',safeError(error));}
   finally{active=false;if(!stopped)timer=setTimeout(tick,POLL_MS);}
 }
 function startWorker(){if(timer||active)return;stopped=false;timer=setTimeout(tick,0);}
 async function stopWorker(timeoutMs=10000){stopped=true;if(timer){clearTimeout(timer);timer=null;}const timeout=Math.max(100,Math.min(30000,Number(timeoutMs)||10000));const deadline=Date.now()+timeout;while(active&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,50));return !active;}
-module.exports={registerTaskHandler,startWorker,stopWorker,processOneTask,executeApprovedPlan,executeAutomationWorkflow,enqueueDueSchedules,handlers};
+module.exports={registerTaskHandler,startWorker,stopWorker,processOneTask,executeApprovedPlan,executeAutomationWorkflow,enqueueDueSchedules,reconcileRecoveredAgentPlan,handlers};
