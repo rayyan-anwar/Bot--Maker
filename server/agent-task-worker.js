@@ -137,7 +137,7 @@ async function executeApprovedPlan(task, context) {
   return {planId,stepsCompleted:outputs.length,outputs:outputs.sort((a,b)=>a.step-b.step).map(item=>({step:item.step,text:item.text.slice(0,1800)}))};
 }
 registerTaskHandler('agent.plan.execute',executeApprovedPlan);
-async function publishFortisniEventSafely(event) { try { return await fortisniEvents.publish(event); } catch (error) { console.error('Fortisni event persistence failed:', safeError(error)); return null; } }
+async function publishFortisniEventSafely(event) { try { return await publishFortisniEventSafely(event); } catch (error) { console.error('Fortisni event persistence failed:', safeError(error)); return null; } }
 
 async function executeAutomationWorkflow(task) {
   const workflow=await automationService.getOwned(task.userId,task.payload?.workflowId);
@@ -208,7 +208,7 @@ async function processOneTask() {
         const transition=await store.transitionAgentRunStatus(plan.id,task.userId,['executing'],'failed',{plan:{...plan.plan,steps},progress:{total:steps.length,completed:plan.executionOutputs?.length||0,failed:steps.filter(step=>step.status==='failed').length,running:0,pending:steps.filter(step=>step.status==='pending').length,percent:steps.length?Math.round((plan.executionOutputs?.length||0)/steps.length*100):0},lastError:safeError(error),failedAt:now}).catch(()=>null);
         if(transition?.state==='updated'){
           await appendPlanLog(plan.id,task.id,task.userId,'plan.failed','error',safeError(error)).catch(()=>{});
-          await fortisniEvents.publish({userId:task.userId,planId:plan.id,taskId:task.id,type:'plan.failed',message:'Your Agent Lab plan failed after retries.',metadata:{error:safeError(error)}}).catch(()=>{});
+          await publishFortisniEventSafely({userId:task.userId,planId:plan.id,taskId:task.id,type:'plan.failed',message:'Your Agent Lab plan failed after retries.',metadata:{error:safeError(error)}}).catch(()=>{});
         }
       }
     }
