@@ -10,6 +10,28 @@ const TOOL_CATALOG = Object.freeze([
   Object.freeze({ id: 'draft.create', title: 'Create a draft', description: 'Create a draft artifact for the user to review.', category: 'writing', access: 'write', external: false, enabled: true })
 ]);
 
+function isSafeJsonData(value, depth = 0, seen = new Set()) {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value !== 'object' || depth > 20 || seen.has(value)) return false;
+  if (!Array.isArray(value) && Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) return false;
+  if (Object.getOwnPropertySymbols(value).length) return false;
+  seen.add(value);
+  let valid = true;
+  for (const key of Reflect.ownKeys(value)) {
+    if (Array.isArray(value) && key === 'length') continue;
+    if (typeof key !== 'string' || key === '__proto__' || key === 'prototype' || key === 'constructor') { valid = false; break; }
+    if (Array.isArray(value) && (!/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= value.length)) { valid = false; break; }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !descriptor.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || !isSafeJsonData(descriptor.value, depth + 1, seen)) { valid = false; break; }
+  }
+  if (valid && Array.isArray(value)) {
+    for (let index = 0; index < value.length; index++) if (!Object.prototype.hasOwnProperty.call(value, index)) { valid = false; break; }
+  }
+  seen.delete(value);
+  return valid;
+}
+
 function getToolCatalog() {
   return TOOL_CATALOG.map(tool => ({ ...tool, requiresApproval: true, executionAvailable: tool.enabled }));
 }
