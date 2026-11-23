@@ -199,3 +199,19 @@ test('automation emits Fortisni step started and completed events',async()=>{
   assert.deepEqual(events.map(event=>event.metadata.step),[1,1]);
  }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;fortisniEvents.publish=savedPublish;}
 });
+
+test('automation execution continues when Fortisni event persistence fails',async()=>{
+ const automation=require('../server/automation-service');
+ const savedGet=automation.getOwned,savedFind=store.findByIdAsync,savedPublish=fortisniEvents.publish;
+ const task={id:'automation-fortisni-failure',userId:owner,leaseOwner:'worker-1',payload:{workflowId:'workflow-event-failure'}};
+ const taskRow={id:task.id,status:'running',leaseOwner:task.leaseOwner,leaseExpiresAt:new Date(Date.now()+60000).toISOString()};
+ const workflow={id:'workflow-event-failure',name:'Event failure workflow',enabled:true,updatedAt:'v1',steps:[{type:'text.analyze',arguments:{text:'hello'}}]};
+ automation.getOwned=async()=>workflow;
+ store.findByIdAsync=async(_collection,id)=>id===task.id?taskRow:null;
+ fortisniEvents.publish=async()=>{throw new Error('event store unavailable');};
+ try{
+  const result=await worker.executeAutomationWorkflow(task);
+  assert.equal(result.workflowId,workflow.id);
+  assert.equal(result.results.length,1);
+ }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;fortisniEvents.publish=savedPublish;}
+});
