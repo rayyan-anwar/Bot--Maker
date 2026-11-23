@@ -143,7 +143,10 @@ async function executeAutomationWorkflow(task, context = {}) {
   if(context.isLeaseLost?.())throw new Error('Workflow worker lease lost.');
   const workflow=await automationService.getOwned(task.userId,task.payload?.workflowId);
   if(!workflow||!workflow.enabled)throw new Error('Workflow is unavailable or disabled.');
-  const results=[];
+  const taskRecord=await store.findByIdAsync('aiEngineerRuns',task.id);
+  if(!taskRecord||taskRecord.status==='cancelled')throw new Error('Workflow execution cancelled.');
+  if(taskRecord.status!=='running'||taskRecord.leaseOwner!==task.leaseOwner||Date.parse(taskRecord.leaseExpiresAt)<=Date.now())throw new Error('Workflow worker lease lost.');
+  const results=Array.isArray(taskRecord.executionCheckpoints)?taskRecord.executionCheckpoints.slice():[];
   for(let index=0;index<workflow.steps.length;index++){
     if(context.isLeaseLost?.())throw new Error('Workflow worker lease lost.');
     const current=await store.findByIdAsync('aiEngineerRuns',task.id);
@@ -152,10 +155,19 @@ async function executeAutomationWorkflow(task, context = {}) {
     const latestWorkflow=await automationService.getOwned(task.userId,workflow.id);
     if(!latestWorkflow||!latestWorkflow.enabled)throw new Error('Workflow was disabled during execution.');
     if(!Array.isArray(latestWorkflow.steps)||latestWorkflow.steps.length!==workflow.steps.length||latestWorkflow.updatedAt!==workflow.updatedAt||latestWorkflow.name!==workflow.name||JSON.stringify(latestWorkflow.steps)!==JSON.stringify(workflow.steps))throw new Error('Workflow definition changed during execution.');
+    const completed=results.find(item=>item.step===index+1);
+    if(completed)continue;
     const step=workflow.steps[index];
     await publishFortisniEventSafely({userId:task.userId,planId:workflow.id,taskId:task.id,type:'step.started',message:'Automation '+workflow.name+': step '+(index+1)+' started.',metadata:{step:index+1,totalSteps:workflow.steps.length}});
     const output=executeSafeTool(step.type,step.arguments||{});
-    results.push({step:index+1,type:step.type,result:output,completedAt:new Date().toISOString()});
+    const checkpoint={step:index+1,type:step.type,result:output,completedAt:new Date().toISOString()};
+    results.push(checkpoint);
+    // Persist each completed step before moving on. A retried task resumes from
+    // these checkpoints instead of repeating already completed tool work.
+    const latestTask=await store.findByIdAsync('aiEngineerRuns',task.id);
+    if(!latestTask||latestTask.status!=='running'||latestTask.leaseOwner!==task.leaseOwner||Date.parse(latestTask.leaseExpiresAt)<=Date.now()||context.isLeaseLost?.())throw new Error('Workflow worker lease lost before checkpoint persistence.');
+    const saved=await store.updateByIdAsync('aiEngineerRuns',task.id,{executionCheckpoints:results,updatedAt:new Date().toISOString()});
+    if(!saved)throw new Error('Workflow checkpoint could not be persisted.');
     await publishFortisniEventSafely({userId:task.userId,planId:workflow.id,taskId:task.id,type:'step.completed',message:'Automation '+workflow.name+': step '+(index+1)+' completed.',metadata:{step:index+1,totalSteps:workflow.steps.length}});
   }
   return {workflowId:workflow.id,workflowName:workflow.name,results,completedAt:new Date().toISOString()};
