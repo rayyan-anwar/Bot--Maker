@@ -25,7 +25,7 @@ async function requestIp(trustProxy, forwardedFor) {
 
 test('TRUST_PROXY=0 ignores a client-supplied X-Forwarded-For address', async () => {
   const ip = await requestIp('0', '198.51.100.77');
-  assert.match(ip, /127\\.0\\.0\\.1|::1|::ffff:127\\.0\\.0\\.1/);
+  assert.match(ip, /127\.0\.0\.1|::1|::ffff:127\.0\.0\.1/);
   assert.notEqual(ip, '198.51.100.77');
 });
 
@@ -44,6 +44,6 @@ test('proxy trust rejects ambiguous hop counts and blanket trust values', () => 
 test('main application wires the validated proxy trust policy before rate limiters', () => {
   const fs = require('node:fs');
   const source = fs.readFileSync(require.resolve('../server/index'), 'utf8');
-  assert.match(source, /configureProxyTrust\\(app,process\\.env\\.TRUST_PROXY\\)/);
+  assert.match(source, /configureProxyTrust\(app,process\.env\.TRUST_PROXY\)/);
   assert.ok(source.indexOf('configureProxyTrust') < source.indexOf('const apiLimiter'));
 });
