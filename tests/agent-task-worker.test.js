@@ -234,3 +234,18 @@ test('approved Agent Lab execution continues when Fortisni event persistence fai
   assert.equal(result.stepsCompleted,1);
  }finally{store.findByIdAsync=savedFind;store.updateByIdAsync=savedUpdate;store.transitionAgentRunStatus=savedTransition;providers.generate=savedGenerate;providers.isProviderConfigured=savedConfigured;providers.getDefaultModel=savedDefault;usage.reserveAiBudget=savedReserve;usage.settleAiBudget=savedSettle;usage.releaseAiBudget=savedRelease;fortisniEvents.publish=savedPublish;}
 });
+
+
+test('automation worker aborts before execution when lease is already lost',async()=>{
+ const automation=require('../server/automation-service');
+ const savedGet=automation.getOwned,savedFind=store.findByIdAsync;
+ const task={id:'automation-lease-lost',userId:owner,leaseOwner:'worker-1',payload:{workflowId:'workflow-lease-lost'}};
+ const taskRow={id:task.id,status:'running',leaseOwner:task.leaseOwner,leaseExpiresAt:new Date(Date.now()+60000).toISOString()};
+ let lookups=0;
+ automation.getOwned=async()=>{lookups++;return{id:'workflow-lease-lost',name:'Lease test',enabled:true,steps:[{type:'text.analyze',arguments:{text:'must not run'}}]};};
+ store.findByIdAsync=async(_collection,id)=>id===task.id?taskRow:null;
+ try{
+  await assert.rejects(worker.executeAutomationWorkflow(task,{workerId:'worker-1',isLeaseLost:()=>true}),/lease lost/);
+  assert.equal(lookups,0);
+ }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;}
+});
