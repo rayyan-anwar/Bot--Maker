@@ -10,6 +10,10 @@ const { executeSafeTool } = require('./agent-tool-registry');
 const { searchBotKnowledge } = require('./knowledge-search');
 const automationService = require('./automation-service');
 
+async function executeKnowledgeSearchForTask(task, args, search = searchBotKnowledge) {
+  return search({ ...(args || {}), userId: task.userId });
+}
+
 const POLL_MS = Math.max(250, Math.min(30000, Number(process.env.AGENT_WORKER_POLL_MS) || 1500));
 const LEASE_MS = Math.max(10000, Math.min(900000, Number(process.env.AGENT_WORKER_LEASE_MS) || 60000));
 const WORKER_ID = process.env.AGENT_WORKER_ID || ('botforge-worker-' + process.pid);
@@ -161,7 +165,7 @@ async function executeAutomationWorkflow(task, context = {}) {
     const step=workflow.steps[index];
     await publishFortisniEventSafely({userId:task.userId,planId:workflow.id,taskId:task.id,type:'step.started',message:'Automation '+workflow.name+': step '+(index+1)+' started.',metadata:{step:index+1,totalSteps:workflow.steps.length}});
     const output=step.type==='knowledge.search'
-       ? await searchBotKnowledge({...(step.arguments||{}),userId:task.userId})
+       ? await executeKnowledgeSearchForTask(task,step.arguments||{})
        : executeSafeTool(step.type,step.arguments||{});
     const checkpoint={step:index+1,type:step.type,result:output,completedAt:new Date().toISOString()};
     results.push(checkpoint);
@@ -258,4 +262,4 @@ async function tick(){
 }
 function startWorker(){if(timer||active)return;stopped=false;timer=setTimeout(tick,0);}
 async function stopWorker(timeoutMs=10000){stopped=true;if(timer){clearTimeout(timer);timer=null;}const timeout=Math.max(100,Math.min(30000,Number(timeoutMs)||10000));const deadline=Date.now()+timeout;while(active&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,50));return !active;}
-module.exports={registerTaskHandler,startWorker,stopWorker,processOneTask,executeApprovedPlan,executeAutomationWorkflow,enqueueDueSchedules,reconcileRecoveredAgentPlan,handlers};
+module.exports={registerTaskHandler,startWorker,stopWorker,processOneTask,executeApprovedPlan,executeAutomationWorkflow,executeKnowledgeSearchForTask,enqueueDueSchedules,reconcileRecoveredAgentPlan,handlers};
