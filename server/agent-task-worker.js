@@ -139,11 +139,12 @@ async function executeApprovedPlan(task, context) {
 registerTaskHandler('agent.plan.execute',executeApprovedPlan);
 async function publishFortisniEventSafely(event) { try { return await fortisniEvents.publish(event); } catch (error) { console.error('Fortisni event persistence failed:', safeError(error)); return null; } }
 
-async function executeAutomationWorkflow(task) {
+async function executeAutomationWorkflow(task, context = {}) {
   const workflow=await automationService.getOwned(task.userId,task.payload?.workflowId);
   if(!workflow||!workflow.enabled)throw new Error('Workflow is unavailable or disabled.');
   const results=[];
   for(let index=0;index<workflow.steps.length;index++){
+    if(context.isLeaseLost?.())throw new Error('Workflow worker lease lost.');
     const current=await store.findByIdAsync('aiEngineerRuns',task.id);
     if(!current||current.status==='cancelled')throw new Error('Workflow execution cancelled.');
     if(current.status!=='running'||current.leaseOwner!==task.leaseOwner||Date.parse(current.leaseExpiresAt)<=Date.now())throw new Error('Workflow worker lease lost.');
