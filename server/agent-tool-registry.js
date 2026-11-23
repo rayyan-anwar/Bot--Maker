@@ -49,7 +49,7 @@ function validateToolRequest(request, context = {}) {
   const args = request.arguments === undefined ? {} : request.arguments;
   if (!args || typeof args !== 'object' || Array.isArray(args)) errors.push('arguments must be an object');
   else {
-    try { if (Buffer.byteLength(JSON.stringify(args), 'utf8') > MAX_ARGUMENT_BYTES) errors.push('arguments exceed the 4 KB limit'); }
+    try { if (!isSafeJsonData(args)) errors.push('arguments must be valid plain JSON data'); else if (Buffer.byteLength(JSON.stringify(args), 'utf8') > MAX_ARGUMENT_BYTES) errors.push('arguments exceed the 4 KB limit'); }
     catch (_) { errors.push('arguments must be valid JSON data'); }
   }
   return { valid: errors.length === 0, errors, tool: { id: tool.id, access: tool.access, external: tool.external }, executable: errors.length === 0 && tool.enabled };
