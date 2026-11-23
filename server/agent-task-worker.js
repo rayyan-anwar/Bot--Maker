@@ -161,7 +161,7 @@ async function executeAutomationWorkflow(task, context = {}) {
     const step=workflow.steps[index];
     await publishFortisniEventSafely({userId:task.userId,planId:workflow.id,taskId:task.id,type:'step.started',message:'Automation '+workflow.name+': step '+(index+1)+' started.',metadata:{step:index+1,totalSteps:workflow.steps.length}});
     const output=step.type==='knowledge.search'
-       ? await searchBotKnowledge({userId:task.userId,...(step.arguments||{})})
+       ? await searchBotKnowledge({...(step.arguments||{}),userId:task.userId})
        : executeSafeTool(step.type,step.arguments||{});
     const checkpoint={step:index+1,type:step.type,result:output,completedAt:new Date().toISOString()};
     results.push(checkpoint);
