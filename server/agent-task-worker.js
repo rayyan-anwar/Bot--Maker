@@ -137,6 +137,8 @@ async function executeApprovedPlan(task, context) {
   return {planId,stepsCompleted:outputs.length,outputs:outputs.sort((a,b)=>a.step-b.step).map(item=>({step:item.step,text:item.text.slice(0,1800)}))};
 }
 registerTaskHandler('agent.plan.execute',executeApprovedPlan);
+async function publishFortisniEventSafely(event) { try { return await fortisniEvents.publish(event); } catch (error) { console.error('Fortisni automation event failed:', safeError(error)); return null; } }
+
 async function executeAutomationWorkflow(task) {
   const workflow=await automationService.getOwned(task.userId,task.payload?.workflowId);
   if(!workflow||!workflow.enabled)throw new Error('Workflow is unavailable or disabled.');
@@ -149,10 +151,10 @@ async function executeAutomationWorkflow(task) {
     if(!latestWorkflow||!latestWorkflow.enabled)throw new Error('Workflow was disabled during execution.');
     if(!Array.isArray(latestWorkflow.steps)||latestWorkflow.steps.length!==workflow.steps.length||latestWorkflow.updatedAt!==workflow.updatedAt||latestWorkflow.name!==workflow.name||JSON.stringify(latestWorkflow.steps)!==JSON.stringify(workflow.steps))throw new Error('Workflow definition changed during execution.');
     const step=workflow.steps[index];
-    await fortisniEvents.publish({userId:task.userId,planId:workflow.id,taskId:task.id,type:'step.started',message:'Automation '+workflow.name+': step '+(index+1)+' started.',metadata:{step:index+1,totalSteps:workflow.steps.length}});
+    await publishFortisniEventSafely({userId:task.userId,planId:workflow.id,taskId:task.id,type:'step.started',message:'Automation '+workflow.name+': step '+(index+1)+' started.',metadata:{step:index+1,totalSteps:workflow.steps.length}});
     const output=executeSafeTool(step.type,step.arguments||{});
     results.push({step:index+1,type:step.type,result:output,completedAt:new Date().toISOString()});
-    await fortisniEvents.publish({userId:task.userId,planId:workflow.id,taskId:task.id,type:'step.completed',message:'Automation '+workflow.name+': step '+(index+1)+' completed.',metadata:{step:index+1,totalSteps:workflow.steps.length}});
+    await publishFortisniEventSafely({userId:task.userId,planId:workflow.id,taskId:task.id,type:'step.completed',message:'Automation '+workflow.name+': step '+(index+1)+' completed.',metadata:{step:index+1,totalSteps:workflow.steps.length}});
   }
   return {workflowId:workflow.id,workflowName:workflow.name,results,completedAt:new Date().toISOString()};
 }
