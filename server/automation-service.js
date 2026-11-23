@@ -127,7 +127,7 @@ async function run(userId,id,triggerData={},requestId) {
   const created=await taskService.enqueueTask({userId,taskType:'automation.workflow.execute',payload:{workflowId:id,workflowUpdatedAt:workflow.updatedAt||null,triggerData},idempotencyKey});
   const latest=await store.findByIdAsync('aiEngineerRuns',id);
   if(latest&&latest.kind==='automation-workflow'&&latest.userId===userId){
-    const patch={lastRunAt:new Date().toISOString(),lastTaskId:created.task.id,updatedAt:new Date().toISOString()};
+    const patch={lastRunAt:new Date().toISOString(),lastTaskId:created.task.id};
     await store.updateByIdAsync('aiEngineerRuns',id,patch);
   }
   return created.task;
