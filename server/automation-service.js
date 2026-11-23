@@ -124,7 +124,7 @@ async function run(userId,id,triggerData={},requestId) {
   const scheduleSlot=triggerData.scheduled===true&&workflow.trigger?.type==='schedule'?(triggerData.scheduleSlot||workflow.nextRunAt):null;
   if(scheduleSlot!==null&&(typeof scheduleSlot!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(scheduleSlot)||!Number.isFinite(Date.parse(scheduleSlot))||new Date(scheduleSlot).toISOString()!==scheduleSlot))throw new TypeError('Invalid automation schedule slot.');
   const idempotencyKey=scheduleSlot?'automation:'+id+':schedule:'+scheduleSlot:requestId?'automation:'+id+':request:'+requestId:'automation:'+id+':'+Date.now()+':'+uuidv4();
-  const created=await taskService.enqueueTask({userId,taskType:'automation.workflow.execute',payload:{workflowId:id,triggerData},idempotencyKey});
+  const created=await taskService.enqueueTask({userId,taskType:'automation.workflow.execute',payload:{workflowId:id,workflowUpdatedAt:workflow.updatedAt||null,triggerData},idempotencyKey});
   const latest=await store.findByIdAsync('aiEngineerRuns',id);
   if(latest&&latest.kind==='automation-workflow'&&latest.userId===userId){
     const patch={lastRunAt:new Date().toISOString(),lastTaskId:created.task.id,updatedAt:new Date().toISOString()};
