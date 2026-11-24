@@ -8,18 +8,28 @@ const RULES=[
  {emotion:'curiosity',state:'attentive',intensity:0.52,patterns:[/\b(why|how|what is|explain|tell me|curious|wonder)\b/i,/(क्यों|कैसे|क्या है|समझाओ|बताओ|kyun|kyu|kaise|kya|kab|kahan|kaun|samjhao|batao)/i]},
  {emotion:'neutral',state:'idle',intensity:0.25,patterns:[]}
 ];
+function maskNegatedEmotionPhrases(value){
+ let text=String(value==null?'':value);
+ const englishTargets='(?:happy|glad|sad|depressed|lonely|upset|heartbroken|unhappy|angry|furious|annoyed|frustrated|worried|anxious|nervous|scared|afraid|excited|grateful|love you|miss you|dear|buddy|best friend|hate)';
+ text=text.replace(new RegExp('\\\\b(?:not|never|no longer|dont|don\\'t|do not|doesnt|doesn\\'t|isnt|isn\\'t|arent|aren\\'t|cant|can\\'t)(?:\\\\s+\\\\w+){0,3}\\\\s+'+englishTargets+'\\\\b','gi'),' ');
+ text=text.replace(/\\b(?:khush|khushi|dukhi|udaas|gussa|naraz|pareshan|akela|akeli|darr?|ghabra\\w*)\\s+(?:nahi|nahin)\\b/gi,' ');
+ text=text.replace(/\\b(?:nahi|nahin)\\s+(?:khush|khushi|dukhi|udaas|gussa|naraz|pareshan|akela|akeli|darr?|ghabra\\w*)\\b/gi,' ');
+ text=text.replace(/(?:खुश|खुशी|दुखी|उदास|गुस्सा|नाराज़|डर|परेशान|अकेला|अकेली)\\s*(?:नहीं|नही|मत)(?:\\s+\\S+){0,2}/g,' ');
+ text=text.replace(/(?:नहीं|नही|मत)\\s*(?:खुश|खुशी|दुखी|उदास|गुस्सा|नाराज़|डर|परेशान|अकेला|अकेली)(?:\\s+\\S+){0,2}/g,' ');
+ return text;
+}
 const STATES=new Set(['idle','celebrating','comforting','calming','reassuring','attentive','warm','thinking','speaking']);
 function analyzeText(text,context={}){
- const value=String(text||'').trim().slice(0,10000);
+ const originalValue=String(text||'').trim().slice(0,10000);const value=maskNegatedEmotionPhrases(originalValue).trim();
  const match=RULES.find(rule=>rule.emotion!=='neutral'&&rule.patterns.some(pattern=>pattern.test(value)))||RULES[RULES.length-1];
  const prior=STATES.has(context.state)?context.state:null;
- const question=/[?？]$/.test(value);
+ const question=/[?？]$/.test(originalValue);
  let state=match.state;
  if(!value)state='idle';
  if(context.isTyping===true&&match.emotion==='neutral')state='thinking';
  if(context.isSpeaking===true)state='speaking';
  const emotion=match.emotion;
- const intensity=value?match.intensity:0.15;
+ const intensity=originalValue?match.intensity:0.15;
  return {emotion,state,intensity,expression:emotion==='joy'?'smile':emotion==='sadness'?'soft':emotion==='anger'?'focused':emotion==='fear'?'concerned':emotion==='curiosity'?'wide_eyes':emotion==='affection'?'warm_smile':'neutral',animation:state,question,transition:prior&&prior!==state?'transition':'steady'};
 }
 function getReaction(text,context={}){
