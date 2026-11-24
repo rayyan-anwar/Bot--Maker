@@ -229,6 +229,7 @@
     const formData=new FormData();
     formData.append('image',file);
     formData.append('userInitiated','true');
+    formData.append('botId',botId);
     formData.append('prompt',visionPrompt.value.trim());
     const button=visionForm.querySelector('button[type="submit"]');
     button.disabled=true;
