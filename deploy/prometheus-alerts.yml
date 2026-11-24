@@ -1,0 +1,35 @@
+groups:
+  - name: botforge.service
+    rules:
+      - alert: BotForgeHighServerErrorRate
+        expr: |
+          sum(rate(botforge_http_server_errors_total[5m]))
+          /
+          clamp_min(sum(rate(botforge_http_requests_total[5m])), 0.001) > 0.05
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: BotForge HTTP 5xx rate is above 5%
+          description: More than 5% of completed requests returned HTTP 5xx for at least 10 minutes.
+
+      - alert: BotForgeHighAverageRequestDuration
+        expr: |
+          sum(rate(botforge_http_request_duration_ms_sum[5m]))
+          /
+          clamp_min(sum(rate(botforge_http_requests_total[5m])), 0.001) > 1000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: BotForge average request duration is above one second
+          description: Average completed request duration exceeded 1000 ms for at least 10 minutes.
+
+      - alert: BotForgeHighResidentMemory
+        expr: max(botforge_process_resident_memory_bytes) > 1610612736
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: BotForge process resident memory is above 1.5 GiB
+          description: At least one BotForge process has sustained resident memory above 1.5 GiB.
