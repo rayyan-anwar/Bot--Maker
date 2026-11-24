@@ -1,5 +1,6 @@
 # Local staging rehearsal with a real PostgreSQL service.
 # Copy .env.example to .env and set POSTGRES_PASSWORD, JWT_SECRET and provider keys.
+# The app binds to loopback only; put a trusted reverse proxy in front of it.
 services:
   clamav:
     image: clamav/clamav:stable
@@ -28,22 +29,27 @@ services:
       clamav:
         condition: service_started
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       NODE_ENV: production
       PORT: 3000
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      BOTFORGE_ADMIN_EMAIL: ${BOTFORGE_ADMIN_EMAIL:?Set BOTFORGE_ADMIN_EMAIL in .env}
+      BOTFORGE_ADMIN_NAME: ${BOTFORGE_ADMIN_NAME:-Administrator}
       DATABASE_URL: postgres://botforge:${POSTGRES_PASSWORD}@postgres:5432/botforge
+      PGSSL: disable
+      PGSSL_REJECT_UNAUTHORIZED: ${PGSSL_REJECT_UNAUTHORIZED:-true}
+      PG_POOL_MAX: ${PG_POOL_MAX:-10}
+      TRUST_PROXY: ${TRUST_PROXY:-0}
       CLAMAV_HOST: clamav
       CLAMAV_PORT: 3310
-      CLAMAV_TIMEOUT_MS: 15000
-      PGSSL: disable
+      CLAMAV_TIMEOUT_MS: ${CLAMAV_TIMEOUT_MS:-15000}
+      MALWARE_SCAN_REQUIRED: "true"
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY:-}
       FREE_DAILY_MESSAGES: ${FREE_DAILY_MESSAGES:-30}
       BOTFORGE_EMBEDDINGS_ENABLED: ${BOTFORGE_EMBEDDINGS_ENABLED:-false}
-      BOTFORGE_ADMIN_EMAIL: ${BOTFORGE_ADMIN_EMAIL:-}
       METRICS_TOKEN: ${METRICS_TOKEN:-}
       BOTFORGE_PLANS_JSON: ${BOTFORGE_PLANS_JSON:-}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
@@ -53,6 +59,12 @@ services:
       STRIPE_SUCCESS_URL: ${STRIPE_SUCCESS_URL:-}
       STRIPE_CANCEL_URL: ${STRIPE_CANCEL_URL:-}
       STRIPE_PORTAL_RETURN_URL: ${STRIPE_PORTAL_RETURN_URL:-}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+      RAZORPAY_PLAN_PLUS: ${RAZORPAY_PLAN_PLUS:-}
+      RAZORPAY_PLAN_PRO: ${RAZORPAY_PLAN_PRO:-}
+      RAZORPAY_SUBSCRIPTION_TOTAL_COUNT: ${RAZORPAY_SUBSCRIPTION_TOTAL_COUNT:-120}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 15s
