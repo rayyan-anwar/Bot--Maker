@@ -48,6 +48,24 @@ test('PostgreSQL integration: shared rate limits, atomic login lockout and quota
    assert.equal(await store.deleteBotAndData(botId),true);
    assert.deepEqual(await store.findManyAsync('botVersions',{botId}),[]);
   });
+  await t.test('versioned bot creation and concurrent updates are atomic in PostgreSQL',async()=>{
+   const botId=crypto.randomUUID(),versionId=crypto.randomUUID(),now=new Date().toISOString();
+   const bot={id:botId,ownerId:userId,name:'Atomic bot',instructions:'Initial instructions',provider:'anthropic',isPublic:false,version:1,createdAt:now,updatedAt:now};
+   const initial={id:versionId,botId,ownerId:userId,version:1,snapshot:{name:'Atomic bot'},createdAt:now};
+   try{
+    await store.createBotWithVersion(bot,initial);
+    assert.equal((await store.findByIdAsync('bots',botId)).version,1);
+    await assert.rejects(()=>store.updateBotVersioned({botId,ownerId:userId,expectedVersion:1,patch:{name:'Must roll back',version:2,updatedAt:new Date().toISOString()},versionRecord:{id:versionId,botId,ownerId:userId,version:2,snapshot:{name:'Must roll back'},createdAt:new Date().toISOString()}}));
+    assert.equal((await store.findByIdAsync('bots',botId)).version,1);
+    assert.deepEqual((await store.findManyAsync('botVersions',{botId,ownerId:userId})).map(row=>row.version),[1]);
+    const update=(name)=>store.updateBotVersioned({botId,ownerId:userId,expectedVersion:1,patch:{name,version:2,updatedAt:new Date().toISOString()},versionRecord:{id:crypto.randomUUID(),botId,ownerId:userId,version:2,snapshot:{name},createdAt:new Date().toISOString()}});
+    const outcomes=await Promise.all([update('Concurrent A'),update('Concurrent B')]);
+    assert.equal(outcomes.filter(row=>row.state==='updated').length,1);
+    assert.equal(outcomes.filter(row=>row.state==='conflict').length,1);
+    assert.equal((await store.findByIdAsync('bots',botId)).version,2);
+    assert.deepEqual((await store.findManyAsync('botVersions',{botId,ownerId:userId})).map(row=>row.version).sort((a,b)=>a-b),[1,2]);
+   }finally{await store.deleteBotAndData(botId);}
+  });
   await t.test('password reset tokens are consumed only once under concurrency',async()=>{
    const tokenHash=crypto.createHash('sha256').update('one-time-reset-token').digest('hex');
    await store.updateByIdAsync('users',userId,{passwordResetTokenHash:tokenHash,passwordResetExpiresAt:new Date(Date.now()+60000).toISOString(),sessionVersion:0});
