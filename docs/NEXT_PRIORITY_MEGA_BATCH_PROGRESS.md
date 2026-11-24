@@ -101,3 +101,15 @@ These checks validate repository code and CI only. Live provider credentials, ac
 - Latest verified CI: Node.js 18/20/22, PostgreSQL 16 integration, Docker build/readiness smoke test, and Full Chat Browser E2E all passed. The Node 18 job was rerun after an infrastructure cancellation and passed.
 - External OpenAI credentials, physical camera behavior, and real-device UX remain outside CI verification.
 
+
+
+## Verified checkpoint — 2026-11-24 (Fortisni browser voice)
+
+- PR #102 merged to `main` at merge commit `369e9a97a1ccf7b4eb81d108a15ce30e6e68cd42`.
+- Chat now offers optional browser speech recognition. Recognized final text is inserted into the composer and is never auto-submitted.
+- Spoken assistant replies are opt-in and disabled by default. Speech output is controlled by the browser speech synthesis API.
+- Added permission/error/unsupported-browser feedback, accessible live status, and responsive controls.
+- Added unit tests for unsupported APIs, transcript insertion, permission failures, opt-in speech output and cleanup.
+- Latest BotForge CI passed on Node.js 18/20/22, PostgreSQL 16 integration and Docker build/readiness; Full Chat Browser E2E passed.
+- Browser/OS locale support and physical microphone/speaker behavior still require real-device QA. Browser speech recognition may use the browser vendor's speech service; no audio is sent to the BotForge API.
+
