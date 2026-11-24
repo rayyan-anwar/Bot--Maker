@@ -1,5 +1,7 @@
 name: AI Engineer Admin Browser E2E
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
     paths:
