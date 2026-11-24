@@ -1,11 +1,11 @@
 const express=require('express');const {v4:uuidv4}=require('uuid');const store=require('./store');const {requireAuth}=require('./auth');const {topChunksHybrid}=require('./retrieval');const providers=require('./providers');const usage=require('./usage');const rateLimit=require('express-rate-limit');const {PostgresRateLimitStore}=require('./rate-limit-store');const router=express.Router();
 const MAX_HISTORY_MESSAGES=20,MAX_MESSAGE_CHARS=8000;
 const SENSITIVE_AUTOMATIC_MEMORY_PATTERNS=[
- /\b(?:diabetes|cancer|hiv|aids|asthma|epilepsy|bipolar|schizophrenia|ptsd|adhd|autism|depression|anxiety disorder|hypertension|pregnan(?:t|cy)|insulin|antidepressant|medication|prescription|medical diagnosis|mental health condition)\b/i,
+ /\b(?:diabetes|cancer|hiv|aids|asthma|epilepsy|bipolar|schizophrenia|ptsd|adhd|autism|autistic|depression|anxiety|hypertension|pregnan(?:t|cy)|insulin|antidepressant|medication|prescription|medical diagnosis|mental health condition|chronic pain|disability|heart disease|kidney disease|liver disease)\b/i,
  /\b(?:religion|religious|muslim|islam|hindu|christian|christianity|jewish|judaism|sikh|buddhist|atheist|agnostic)\b/i,
  /\b(?:politic(?:s|al)|voting|vote for|election|political party|campaign support)\b/i,
  /\b(?:sexual orientation|sexuality|gay|lesbian|bisexual|transgender|nonbinary|asexual|queer)\b/i,
- /\b(?:race|racial|ethnicity|ethnic|caste|nationality|citizenship|immigration status|gender identity)\b/i,
+ /\b(?:race|racial|ethnicity|ethnic|caste|nationality|citizen(?:ship)?|immigration status|gender identity|gender|woman|man|female|male)\b/i,
  /\b(?:password|passcode|otp|one[- ]time password|api[- ]?key|secret key|access token|refresh token|private key|seed phrase|recovery phrase|security code|credential)\b/i,
  /\b(?:aadhaar|aadhar|pan card|passport number|social security|ssn|credit card|debit card|cvv|iban|bank account|account number|upi pin)\b/i,
  /\b(?:my name is|call me|email address|phone number|mobile number|home address|residential address|date of birth|born on|i live at)\b/i
