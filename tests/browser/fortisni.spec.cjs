@@ -55,3 +55,13 @@ test('Fortisni ignores accidental affection substrings in unrelated Roman Hindi 
   await page.evaluate(() => window.setFortisniText('This is a dostana movie', 'user'));
   await expect(companion).toHaveAttribute('data-state', 'idle');
 });
+
+test('Fortisni does not confuse negated emotions with positive or negative states', async ({ page }) => {
+  const companion = page.locator('#fortisni-companion');
+  await page.evaluate(() => window.setFortisniText('I am not sad today', 'user'));
+  await expect(companion).toHaveAttribute('data-state', 'idle');
+  await page.evaluate(() => window.setFortisniText('मैं दुखी नहीं हूं', 'user'));
+  await expect(companion).toHaveAttribute('data-state', 'idle');
+  await page.evaluate(() => window.setFortisniText('I am not sad but happy', 'user'));
+  await expect(companion).toHaveAttribute('data-state', 'happy');
+});
