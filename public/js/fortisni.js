@@ -33,7 +33,8 @@
   ];
 
   function matchesPhrase(text, phrase) {
-    if (/[\\u0900-\\u097F]/.test(phrase)) return text.includes(phrase);
+    const firstCodePoint = phrase.codePointAt(0) || 0;
+    if (firstCodePoint >= 0x0900 && firstCodePoint <= 0x097F) return text.includes(phrase);
     const normalizedText = ' ' + text.replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
     const normalizedPhrase = phrase.replace(/[^a-z0-9]+/g, ' ').trim();
     return normalizedText.includes(' ' + normalizedPhrase + ' ');
