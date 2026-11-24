@@ -42,6 +42,18 @@ test('Fortisni vision endpoint requires authentication and explicit user initiat
   const denied=await fetch(base+'/api/vision/analyze',{method:'POST',headers:{cookie},body:deniedForm});
   assert.equal(denied.status,400);
   assert.match((await denied.json()).error,/explicitly/);
+
+  const invalidForm=new FormData();
+  invalidForm.append('userInitiated','true');
+  invalidForm.append('image',new Blob(['not an image'],{type:'image/png}),'spoofed.png');
+  const invalid=await fetch(base+'/api/vision/analyze',{method:'POST',headers:{cookie},body:invalidForm});
+  assert.equal(invalid.status,415);
+
+  const missingProviderForm=new FormData();
+  missingProviderForm.append('userInitiated','true');
+  missingProviderForm.append('image',image(),'sample.png');
+  const missingProvider=await fetch(base+'/api/vision/analyze',{method:'POST',headers:{cookie},body:missingProviderForm});
+  assert.equal(missingProvider.status,503);
  }finally{
   if(shutdown)await shutdown();
   fs.rmSync(dir,{recursive:true,force:true});
