@@ -1,8 +1,8 @@
 # BotForge Master Completion Tracker
 
 **Repository:** `rayyan-anwar/Bot--Maker`  
-**Baseline:** `main` at `56b4749692353b882b611b70138842f8234ac5e3`  
-**Last reconciled:** 2026-11-24 (after PRs #104, #106, #107, #108, #109, #110, #111, #112 and #113)  
+**Baseline:** `main` at `56042cf635e3391c1a1cab0821bd9fb99a172343`  
+**Last reconciled:** 2026-11-24 (after PRs #104, #106, #107, #108, #109, #110, #111, #112, #113 and #114)  
 **Purpose:** One evidence-led view of implementation, automated verification, and release blockers.
 
 ## Status definitions
@@ -19,12 +19,12 @@ Do not calculate a project-wide percentage by counting files, commits, PRs, or c
 
 | Work item | Status | Evidence / exit condition |
 |---|---|---|
-| Required CI on exact release SHA | Partial | CI workflows exist; record all required run URLs and exact tested SHA for each release |
-| Full signup-to-chat browser journey | Partial | Browser E2E exists; require successful run on release SHA |
-| Fortisni browser behavior | Partial | Browser E2E and unit tests exist; physical browser/OS/device matrix remains |
-| Dependency and source security scans | Partial | CI security checks exist; review and disposition every high/critical finding |
-| PostgreSQL migration and concurrency | Partial | Migration and integration tests exist; require staging migration and recovery evidence |
-| Backup and restore | Partial | Scripts and CI syntax checks exist; restore into clean staging DB and record RPO/RTO |
+| Required CI on exact release SHA | Main-commit CI verified; release-tag verification remains | PR #114 enables browser E2E on main pushes; exact main SHA `56042cf635e3391c1a1cab0821bd9fb99a172343` passed BotForge CI, Node 18/20/22, PostgreSQL 16, Docker, Fortisni Chromium and Full Chat Browser E2E |
+| Full signup-to-chat browser journey | Automated-tested on main commit | Full Chat Browser E2E passed on exact main SHA `56042cf635e3391c1a1cab0821bd9fb99a172343`; repeat for each release candidate |
+| Fortisni browser behavior | Automated-tested on main commit; device QA required | Fortisni Chromium E2E passed on exact main SHA `56042cf635e3391c1a1cab0821bd9fb99a172343`; physical browser/OS/device matrix remains |
+| Dependency and source security scans | Automated-tested on main commit; review required | `npm audit`/source security scan passed in main-commit CI; review and disposition every high/critical finding before release |
+| PostgreSQL migration and concurrency | Automated-tested on main commit; staging validation required | PostgreSQL 16 migration, concurrency and integration suite passed on exact main SHA; require staging migration and recovery evidence |
+| Backup and restore | CI rehearsal passed; staging validation required | PostgreSQL backup/restore rehearsal into disposable databases passed on exact main SHA; restore into clean staging DB and record RPO/RTO |
 | Production deployment | External validation required | No production URL or operator evidence recorded in this tracker |
 | Rollback and incident response | External validation required | Runbook and operator rehearsal required |
 
@@ -88,7 +88,8 @@ Do not calculate a project-wide percentage by counting files, commits, PRs, or c
 8. **PR #112 merged:** PostgreSQL integration now verifies atomic bot creation plus version history, rollback when history insertion fails, and concurrent version-checked edits. Node.js 18/20/22, PostgreSQL 16, Docker and security checks passed on the exact PR head SHA.
 9. **PR #113 merged:** Fortisni now masks common negated English, Roman Hindi and Devanagari emotion phrases before classification, preserves contrastive clauses such as “not sad but happy,” and recognizes excitement on the server. Node.js 18/20/22, PostgreSQL 16, Docker, Fortisni Chromium E2E and Full Chat Browser E2E passed on the exact PR head SHA. This remains a rule-based heuristic, not full semantic/sarcasm understanding.
 10. Continue P0/P1 source review and select the next code batch from verified gaps, not feature-count pressure.
-11. Keep infrastructure/device/provider-dependent work explicitly blocked until access and evidence are available.
+11. **PR #114 merged:** Full Chat Browser E2E and Fortisni Browser E2E now run on pushes to `main`. The resulting exact main SHA `56042cf635e3391c1a1cab0821bd9fb99a172343` passed BotForge CI (Node.js 18/20/22, PostgreSQL 16, Docker, security scan and backup/restore rehearsal), Full Chat Browser E2E and Fortisni Chromium E2E.
+12. Keep infrastructure/device/provider-dependent work explicitly blocked until access and evidence are available.
 
 ## Release authority
 
@@ -114,3 +115,5 @@ The [release acceptance checklist](RELEASE_ACCEPTANCE_CHECKLIST.md) is the contr
 - PR #112 exact head SHA `ecb7d23b2abb7da6c9a552f14e04a807cea88ca7` passed Node.js 18/20/22 tests, syntax/security checks, PostgreSQL 16 integration including atomic bot rollback/concurrency and backup/restore rehearsal, and Docker build/readiness.
 
 - PR #113 exact head SHA `1d033d1f4d9400f5cc854f995725edcff75aef17` passed Node.js 18/20/22 tests, syntax/security checks, PostgreSQL 16 integration including backup/restore rehearsal, Docker readiness, Fortisni Chromium E2E and Full Chat Browser E2E.
+
+- Main commit `56042cf635e3391c1a1cab0821bd9fb99a172343` passed BotForge CI run `45373812123`, Full Chat Browser E2E run `45373812187`, and Fortisni Browser E2E run `45373812050`. These are post-merge main-commit results, not a production deployment or release certification.
