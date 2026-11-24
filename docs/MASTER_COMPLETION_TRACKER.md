@@ -1,8 +1,8 @@
 # BotForge Master Completion Tracker
 
 **Repository:** `rayyan-anwar/Bot--Maker`  
-**Baseline:** `e40073d77b2c47fe36a0e64ecbaf78e3171a92f9` at `56042cf635e3391c1a1cab0821bd9fb99a172343`  
-**Last reconciled:** 2026-11-24 (after PR #119; PR #104–#119 reconciled)
+**Baseline:** `223b18945279f7edfe16eaea9ff1284755c7ecd2` at `56042cf635e3391c1a1cab0821bd9fb99a172343`  
+**Last reconciled:** 2026-11-24 (after PR #121; PR #104–#121 reconciled)
 **Purpose:** One evidence-led view of implementation, automated verification, and release blockers.
 
 ## Status definitions
@@ -94,6 +94,9 @@ Do not calculate a project-wide percentage by counting files, commits, PRs, or c
 13. Keep infrastructure/device/provider-dependent work explicitly blocked until access and evidence are available.
 
 
+
+16. **PR #121 merged:** PDF parsing now permits at most two concurrent parser workers per application process and rejects excess work with HTTP 503. Parser slots are released on completion, error, timeout and worker-construction failure; capacity/overload/slot-reuse tests were added. Exact PR head SHA `f78d16071033478cb48001d7c6575518a9f8ce9a` passed Node.js 18/20/22, PostgreSQL 16 integration, Docker build and Full Chat Browser E2E. This is a per-process guard, not OS/container isolation or multi-instance capacity certification.
+
 15. **PR #118 merged:** Streaming chat now aborts the upstream provider request when the SSE client disconnects. Caller cancellation is propagated into the provider fetch; quota reservations are released when cancellation occurs before provider work starts, while post-start AI budget holds remain for reconciliation because partial provider cost may have been incurred. Exact PR head SHA `00579500f45dddd283e7e98e308f1e00d59cb2b8` passed Node.js 18/20/22, PostgreSQL 16 integration, Docker build and Full Chat Browser E2E. Main-branch post-merge checks were queued at checkpoint time.
 
 14. **PR #116 merged:** Chat response-style and safety-mode prompt suffixes now use actual newline separators; extracted prompt construction into a pure helper and added regression coverage for concise, detailed, strict, basic and default modes. Exact PR head SHA `70491f121625681f44823f8352fe52e695a27b92` passed Node.js 18/20/22 verification, PostgreSQL 16 integration, Docker image build and Full Chat Browser E2E. Main-branch post-merge workflows were still running at tracker reconciliation; no live provider or production behavior is implied.
@@ -136,3 +139,5 @@ The [release acceptance checklist](RELEASE_ACCEPTANCE_CHECKLIST.md) is the contr
 - PR #118 exact head SHA `00579500f45dddd283e7e98e308f1e00d59cb2b8` passed all six PR checks: Node.js 18/20/22, PostgreSQL 16 integration, Docker image build and Full Chat Browser E2E. It was squash-merged to `main` as `a4d347dca643a9c7a2d348df0b29e7b63a622136`. Main-branch post-merge checks were queued when this checkpoint was written.
 
 - Main commit `e40073d77b2c47fe36a0e64ecbaf78e3171a92f9` passed all nine post-merge checks after PR #118 and tracker PR #119: Node.js 18/20/22, PostgreSQL 16 integration, Docker image build, Full Chat Browser E2E, Fortisni Chromium E2E, AI Engineer Admin Browser E2E and workflow generation. This validates this main commit in CI only, not a live deployment.
+
+- Main commit `223b18945279f7edfe16eaea9ff1284755c7ecd2` passed all nine post-merge checks after PR #121: Node.js 18/20/22, PostgreSQL 16 integration, Docker image build, Full Chat Browser E2E, Fortisni Chromium E2E, AI Engineer Admin Browser E2E and workflow generation. CI success does not establish staging or production behavior.
