@@ -134,7 +134,7 @@ async function updateByIdAsync(c,id,patch){assertCollection(c);if(!isUuid(id))re
 async function applySubscriptionEvent(userId,provider,subscriptionId,patch,{requireOwnership=false,ended=false}={}){
  const fields={stripe:{current:'stripeSubscriptionId',other:'razorpaySubscriptionId',tombstone:'stripeEndedSubscriptionId'},razorpay:{current:'razorpaySubscriptionId',other:'stripeSubscriptionId',tombstone:'razorpayEndedSubscriptionId'}};
  const selected=fields[provider];
- if(!selected||!isUuid(userId)||typeof subscriptionId!=='string'||!subscriptionId.trim()||subscriptionId!==subscriptionId.trim()||subscriptionId.length>255||/[\\u0000-\\u001f\\u007f]/.test(subscriptionId)||!patch||typeof patch!=='object'||Array.isArray(patch))throw new TypeError('Invalid subscription event update.');
+ if(!selected||!isUuid(userId)||typeof subscriptionId!=='string'||!subscriptionId.trim()||subscriptionId!==subscriptionId.trim()||subscriptionId.length>255||/[\u0000-\u001f\u007f]/.test(subscriptionId)||!patch||typeof patch!=='object'||Array.isArray(patch))throw new TypeError('Invalid subscription event update.');
  const update={...patch,...(ended?{[selected.tombstone]:subscriptionId}:{})};
  const matches=user=>{
   if(!user||user[selected.other])return false;
