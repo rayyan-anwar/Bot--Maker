@@ -16,3 +16,6 @@ Tests cover representative Roman Hindi/Hinglish cases and neutral fallback behav
 
 
 Roman Hindi affection tokens are matched as complete words in both browser and server classifiers, preventing accidental matches inside unrelated words such as `dostana` or `yaadgar`. Regression tests cover both false-positive and intended positive cases.
+
+
+Negation handling is applied before emotion matching in both browser and server classifiers. Common English forms (`not`, `don't`, `do not`, `isn't`, etc.), Roman Hindi forms (`nahi` / `nahin`) and common Devanagari emotion phrases are masked before matching. This is a conservative heuristic, not a full semantic or sarcasm model; mixed clauses still need broader real-world evaluation.
