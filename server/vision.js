@@ -48,7 +48,7 @@ router.post('/analyze',requireAuth,limiter,upload.single('image'),async(req,res,
   providerResult=await providers.generateVision({model:generation.model,prompt,imageBase64:req.file.buffer.toString('base64'),mimeType,maxTokens:512});
   if(budget)await usage.settleAiBudget(budget,providerResult);
   await usage.recordUsage({userId:req.user.id,botId:null,provider:'openai',model:generation.model,inputTokens:providerResult.inputTokens,outputTokens:providerResult.outputTokens,reservationId:quota.reservationId});
-  const contextRecord={id:require('crypto').randomUUID(),kind:'fortisni-vision-context',userId:req.user.id,botId:null,contextKey:req.user.id,summary:providerResult.text.slice(0,3000),createdAt:Date.now(),expiresAt:Date.now()+10*60*1000};
+  const contextRecord={id:require('crypto').randomUUID(),kind:'fortisni-vision-context',userId:req.user.id,botId:null,contextKey:req.user.id,used:false,summary:providerResult.text.slice(0,3000),createdAt:Date.now(),expiresAt:Date.now()+10*60*1000};
   await require('./store').insertAsync('aiEngineerRuns',contextRecord);
   quota=null;budget=null;
   return res.json({assistant:{role:'assistant',content:providerResult.text},provider:'openai',model:generation.model,serverMediaRetained:false,contextAvailableForChat:true});
