@@ -7,6 +7,7 @@ const taskService = require('./agent-task-service');
 const { topChunksHybrid } = require('./retrieval');
 const fortisniEvents = require('./fortisni-events');
 const { executeSafeTool } = require('./agent-tool-registry');
+const { searchBotKnowledge } = require('./knowledge-search');
 const automationService = require('./automation-service');
 
 const POLL_MS = Math.max(250, Math.min(30000, Number(process.env.AGENT_WORKER_POLL_MS) || 1500));
@@ -139,10 +140,15 @@ async function executeApprovedPlan(task, context) {
 registerTaskHandler('agent.plan.execute',executeApprovedPlan);
 async function publishFortisniEventSafely(event) { try { return await fortisniEvents.publish(event); } catch (error) { console.error('Fortisni event persistence failed:', safeError(error)); return null; } }
 
+async function executeKnowledgeSearchForTask(task, args, search = searchBotKnowledge) {
+  return search({ ...(args || {}), userId: task.userId });
+}
+
 async function executeAutomationWorkflow(task, context = {}) {
   if(context.isLeaseLost?.())throw new Error('Workflow worker lease lost.');
   const workflow=await automationService.getOwned(task.userId,task.payload?.workflowId);
   if(!workflow||!workflow.enabled)throw new Error('Workflow is unavailable or disabled.');
+  if(task.payload?.workflowUpdatedAt!==undefined&&task.payload.workflowUpdatedAt!==(workflow.updatedAt||null))throw new Error('Workflow definition changed after this execution was enqueued.');
   const taskRecord=await store.findByIdAsync('aiEngineerRuns',task.id);
   if(!taskRecord||taskRecord.status==='cancelled')throw new Error('Workflow execution cancelled.');
   if(taskRecord.status!=='running'||taskRecord.leaseOwner!==task.leaseOwner||Date.parse(taskRecord.leaseExpiresAt)<=Date.now())throw new Error('Workflow worker lease lost.');
@@ -159,7 +165,9 @@ async function executeAutomationWorkflow(task, context = {}) {
     if(completed)continue;
     const step=workflow.steps[index];
     await publishFortisniEventSafely({userId:task.userId,planId:workflow.id,taskId:task.id,type:'step.started',message:'Automation '+workflow.name+': step '+(index+1)+' started.',metadata:{step:index+1,totalSteps:workflow.steps.length}});
-    const output=executeSafeTool(step.type,step.arguments||{});
+    const output=step.type==='knowledge.search'
+      ? await executeKnowledgeSearchForTask(task,step.arguments||{})
+      : executeSafeTool(step.type,step.arguments||{});
     const checkpoint={step:index+1,type:step.type,result:output,completedAt:new Date().toISOString()};
     results.push(checkpoint);
     // Persist each completed step before moving on. A retried task resumes from
@@ -169,7 +177,7 @@ async function executeAutomationWorkflow(task, context = {}) {
     if(!saved)throw new Error('Workflow worker lease lost before checkpoint persistence.');
     await publishFortisniEventSafely({userId:task.userId,planId:workflow.id,taskId:task.id,type:'step.completed',message:'Automation '+workflow.name+': step '+(index+1)+' completed.',metadata:{step:index+1,totalSteps:workflow.steps.length}});
   }
-  return {workflowId:workflow.id,workflowName:workflow.name,results,completedAt:new Date().toISOString()};
+  return {workflowId:workflow.id,workflowName:workflow.name,completedSteps:results.length,completedAt:new Date().toISOString()};
 }
 async function enqueueDueSchedules(){
   const claims=await store.claimDueAutomationWorkflows(new Date(),50,LEASE_MS);
@@ -255,4 +263,4 @@ async function tick(){
 }
 function startWorker(){if(timer||active)return;stopped=false;timer=setTimeout(tick,0);}
 async function stopWorker(timeoutMs=10000){stopped=true;if(timer){clearTimeout(timer);timer=null;}const timeout=Math.max(100,Math.min(30000,Number(timeoutMs)||10000));const deadline=Date.now()+timeout;while(active&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,50));return !active;}
-module.exports={registerTaskHandler,startWorker,stopWorker,processOneTask,executeApprovedPlan,executeAutomationWorkflow,enqueueDueSchedules,reconcileRecoveredAgentPlan,handlers};
+module.exports={registerTaskHandler,startWorker,stopWorker,processOneTask,executeApprovedPlan,executeAutomationWorkflow,executeKnowledgeSearchForTask,enqueueDueSchedules,reconcileRecoveredAgentPlan,handlers};
