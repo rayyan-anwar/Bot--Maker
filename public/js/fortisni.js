@@ -14,12 +14,14 @@
     concerned: 'I’ll take this seriously and help you through it.',
     angry: 'I can see this is frustrating. Let’s work through it.',
     grateful: 'You’re very welcome!',
+    warm: 'I’m glad you’re here. What’s on your mind?',
     curious: 'That’s an interesting question.',
     confused: 'Let’s slow down and make this clearer.',
     error: 'Something went wrong. Let’s try again.'
   };
 
   const MATCHERS = [
+    ['warm', /\\b(miss you|love you|dear|buddy|best friend)\\b/, ['याद', 'प्यार', 'दोस्त', 'yaad', 'pyaar', 'pyar', 'dost', 'miss you', 'love you']],
     ['sad', /\b(sad|depressed|depressing|lonely|upset|heartbroken|unhappy|crying|miserable)\b/, ['दुखी', 'उदास', 'अकेला', 'अकेली', 'परेशान हूं', 'रो रहा', 'रो रही', 'dukhi', 'udaas', 'akela', 'akeli', 'pareshan hoon', 'pareshan hun', 'rona aa raha', 'rona aa rahi']],
     ['concerned', /\b(scared|afraid|worried|anxious|nervous|unsafe|emergency|help me)\b/, ['डर लग', 'चिंता', 'घबरा', 'डर गया', 'डर गई', 'मदद करो', 'dar lag', 'ghabra', 'tension ho rahi', 'chinta ho rahi', 'darr lag']],
     ['angry', /\b(angry|furious|annoyed|frustrated|frustrating|frustration|irritated|irritating|hate|stupid|useless)\b/, ['गुस्सा', 'नाराज़', 'चिढ़', 'बेकार', 'बकवास', 'gussa', 'naraz', 'chidh', 'bekaar', 'bakwas']],
