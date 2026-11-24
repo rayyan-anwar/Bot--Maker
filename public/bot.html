@@ -57,7 +57,10 @@
   <div class="ad-slot" aria-label="Advertisement"><span>ADVERTISEMENT</span><div>Sponsored placement · available after ad-network approval</div></div>
   <form class="chat-input-row" id="chat-form">
     <textarea id="chat-input" placeholder="Say something…" required></textarea>
+    <button id="fortisni-mic-btn" type="button" class="btn btn-ghost" aria-label="Start voice input" aria-pressed="false">Voice input</button>
+    <button id="fortisni-speech-btn" type="button" class="btn btn-ghost" aria-pressed="false">Read replies: Off</button>
     <button type="submit" class="btn btn-primary">Send</button>
+    <span id="fortisni-voice-status" role="status" aria-live="polite">Voice features are optional and depend on browser support.</span>
   </form>
 </section>
 
@@ -123,6 +126,7 @@
 
 <script src="/js/api.js"></script>
 <script src="/js/fortisni.js"></script>
+<script src="/js/fortisni-voice.js"></script>
 <script>
 (async function init() {
   const user = await requireLogin();
@@ -198,6 +202,13 @@
   const log = document.getElementById('chat-log');
   const form = document.getElementById('chat-form');
   const input = document.getElementById('chat-input');
+  const voiceStatus=document.getElementById('fortisni-voice-status');
+  const micButton=document.getElementById('fortisni-mic-btn');
+  const speechButton=document.getElementById('fortisni-speech-btn');
+  const voiceController=window.BotForgeVoice.createVoiceController({root:window,input,onStatus:message=>{voiceStatus.textContent=message;if(/finished|stopped|permission|No speech|Could not start|not supported/i.test(message)){micButton.setAttribute('aria-pressed','false');micButton.textContent='Voice input';}},onSpeaking:speaking=>{if(speaking)window.setFortisniState('speaking');else window.setFortisniState('idle');}});
+  micButton.addEventListener('click',()=>{if(voiceController.isListening()){voiceController.stopListening();micButton.setAttribute('aria-pressed','false');micButton.textContent='Voice input';}else if(voiceController.startListening()){micButton.setAttribute('aria-pressed','true');micButton.textContent='Stop listening';}});
+  speechButton.addEventListener('click',()=>{const enabled=voiceController.setSpeechEnabled(!voiceController.isSpeechEnabled());speechButton.setAttribute('aria-pressed',String(enabled));speechButton.textContent='Read replies: '+(enabled?'On':'Off');});
+  window.addEventListener('pagehide',()=>voiceController.destroy(),{once:true});
 
   function renderMessage(role, content, pending) {
     const div = document.createElement('div');
@@ -240,9 +251,10 @@
     try{
       const result=await api('/vision/analyze',{method:'POST',body:formData});
       pending.textContent=result.assistant.content;
+      voiceController.speak(result.assistant.content);
       pending.classList.remove('pending');
       window.setFortisniText(result.assistant.content,'assistant');
-      window.setTimeout(()=>window.setFortisniState('idle'),2600);
+      if(!voiceController.isSpeechEnabled())window.setTimeout(()=>window.setFortisniState('idle'),2600);
       visionStatus.textContent='Analysis complete. The uploaded image is not stored by BotForge.';
       visionImage.value='';
       visionPrompt.value='';
@@ -278,8 +290,9 @@
       if(!message)throw new Error('The streaming connection ended before the response was saved.');
       window.clearTimeout(thinkingTimer);
       pending.textContent=message.content;
+      const spoken=voiceController.speak(message.content);
       window.setFortisniText(message.content, 'assistant');
-      window.setTimeout(() => window.setFortisniState('idle'), 2600);
+      if(!spoken)window.setTimeout(() => window.setFortisniState('idle'), 2600);
       if (sendButton) sendButton.disabled = false;
       pending.classList.remove('pending');
       if (sources.length) {
