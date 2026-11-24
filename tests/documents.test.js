@@ -166,7 +166,7 @@ test('knowledge document storage atomically enforces per-bot duplicate and capac
 });
 
 
-test('PDF parser worker concurrency is globally bounded and slots are released',()=>{
+test('PDF parser worker concurrency is globally bounded and slots are released',async()=>{
  const initial=getPdfParserCapacity();
  assert.equal(initial.active,0);
  assert.equal(initial.max,MAX_CONCURRENT_PDF_PARSERS);
