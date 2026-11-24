@@ -86,9 +86,9 @@ webhookRouter.post('/',express.raw({type:'application/json',limit:'256kb'}),asyn
    if(userId&&plans.getPlans()[plan]&&session.mode==='subscription'&&session.status==='complete'&&['paid','no_payment_required'].includes(session.payment_status)&&validEventId(session.subscription)){await store.applySubscriptionEvent(userId,'stripe',session.subscription,{plan,stripeCustomerId:session.customer||null,stripeSubscriptionId:session.subscription});}
   }else if(event.type==='customer.subscription.updated'){
    const sub=event.data&&event.data.object,userId=sub?.metadata?.userId,plan=sub?.metadata?.plan;
-   if(userId&&validEventId(sub?.id)){const active=['active','trialing'].includes(sub.status),nextPlan=active&&plans.getPlans()[plan]?plan:'free';await store.applySubscriptionEvent(userId,'stripe',sub.id,{plan:nextPlan,stripeSubscriptionId:active?sub.id:null},{requireOwnership:!active,ended:!active});}
+   if(userId&&validEventId(sub?.id)){const active=['active','trialing'].includes(sub.status),nextPlan=active&&plans.getPlans()[plan]?plan:'free';await store.applySubscriptionEvent(userId,'stripe',sub.id,{plan:nextPlan,stripeSubscriptionId:active?sub.id:null},{ended:!active});}
   }else if(event.type==='customer.subscription.deleted'){
-   const sub=event.data&&event.data.object,userId=sub?.metadata?.userId;if(userId&&validEventId(sub?.id))await store.applySubscriptionEvent(userId,'stripe',sub.id,{plan:'free',stripeSubscriptionId:null},{requireOwnership:true,ended:true});
+   const sub=event.data&&event.data.object,userId=sub?.metadata?.userId;if(userId&&validEventId(sub?.id))await store.applySubscriptionEvent(userId,'stripe',sub.id,{plan:'free',stripeSubscriptionId:null},{ended:true});
   }
   await store.completeWebhookEvent('stripe',eventId);
   return res.json({received:true});
@@ -102,7 +102,7 @@ razorpayWebhookRouter.post('/',express.raw({type:'application/json',limit:'256kb
  let claimed=false;
  try{
   claimed=await store.claimWebhookEvent('razorpay',eventId);if(!claimed)return res.json({received:true,duplicate:true});
-  const sub=event.payload?.subscription?.entity;if(sub){const userId=sub.notes?.userId,plan=sub.notes?.plan;if(userId&&validEventId(sub.id)){const cancelled=['cancelled','completed'].includes(sub.status);const user=await store.findByIdAsync('users',userId);await store.applySubscriptionEvent(userId,'razorpay',sub.id,{plan:resolveRazorpayPlan(sub.status,plan),razorpaySubscriptionId:cancelled?null:sub.id,razorpaySubscriptionStatus:sub.status||'unknown',razorpayCustomerId:sub.customer_id||user?.razorpayCustomerId||null},{requireOwnership:cancelled,ended:cancelled});}}
+  const sub=event.payload?.subscription?.entity;if(sub){const userId=sub.notes?.userId,plan=sub.notes?.plan;if(userId&&validEventId(sub.id)){const cancelled=['cancelled','completed'].includes(sub.status);const user=await store.findByIdAsync('users',userId);await store.applySubscriptionEvent(userId,'razorpay',sub.id,{plan:resolveRazorpayPlan(sub.status,plan),razorpaySubscriptionId:cancelled?null:sub.id,razorpaySubscriptionStatus:sub.status||'unknown',razorpayCustomerId:sub.customer_id||user?.razorpayCustomerId||null},{ended:cancelled});}}
   await store.completeWebhookEvent('razorpay',eventId);
   return res.json({received:true});
  }catch(error){if(claimed)await store.releaseWebhookEvent('razorpay',eventId).catch(()=>{});console.error('Razorpay webhook processing failed:',error.message);return res.status(500).json({error:'Webhook processing failed.'});}
