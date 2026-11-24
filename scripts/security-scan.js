@@ -9,7 +9,7 @@ const RULES = [
   { id: 'github-token', severity: 'critical', pattern: /\bgh[pousr]_[A-Za-z0-9_]{20,}\b/g, message: 'A GitHub token-like value appears in source.' },
   { id: 'aws-access-key', severity: 'critical', pattern: /\bAKIA[0-9A-Z]{16}\b/g, message: 'An AWS access-key identifier appears in source.' },
   { id: 'dynamic-code', severity: 'high', pattern: /\beval\s*\(|\bnew\s+Function\s*\(/g, message: 'Dynamic code execution primitive found; review whether input can be influenced externally.' },
-  { id: 'shell-execution', severity: 'high', pattern: /\bexec(?:Sync)?\s*\(|\bspawn(?:Sync)?\s*\([^\n]{0,240}shell\s*:\s*true/g, message: 'Shell/process execution primitive found; verify arguments are never user-controlled.' },
+  { id: 'shell-execution', severity: 'high', pattern: /\\b(?:exec|execSync|spawn|spawnSync|execFile|execFileSync)\\s*\\(/g, message: 'Shell/process execution primitive found; verify arguments are never user-controlled.' },
   { id: 'disabled-tls', severity: 'critical', pattern: /rejectUnauthorized\s*:\s*false/g, message: 'TLS certificate verification is disabled.' },
   { id: 'insecure-http', severity: 'medium', pattern: /http:\/\/(?!localhost\b|127\.0\.0\.1\b)[A-Za-z0-9.-]+/g, message: 'Plain HTTP URL found; verify this is not a production endpoint.' }
 ];
