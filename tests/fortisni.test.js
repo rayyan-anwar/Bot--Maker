@@ -94,3 +94,9 @@ test('Fortisni reacts warmly to affectionate English, Hindi and Hinglish message
  for(const message of ['I miss you','Love you buddy','मुझे तुम्हारी याद आती है','Tum mere dost ho'])
   assert.equal(Fortisni.classifyText(message,'user'),'warm',message);
 });
+
+test('Fortisni does not trigger affection from Roman Hindi substrings inside unrelated words',()=>{
+ assert.equal(Fortisni.classifyText('This is a dostana movie','user'),'idle');
+ assert.equal(Fortisni.classifyText('That was a yaadgar moment','user'),'idle');
+ assert.equal(Fortisni.classifyText('Tum mere dost ho','user'),'warm');
+});
