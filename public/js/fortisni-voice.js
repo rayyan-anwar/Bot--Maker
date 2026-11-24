@@ -29,7 +29,8 @@
       if(result.isFinal)finalText+=transcript;else interimText+=transcript;
      }
      if(interimText&&!finalText)status('Hearing: '+interimText.slice(0,120));
-     if(finalText&&input){
+     const text=finalText;
+     if(text&&input){
       const current=input.value.trim();
       input.value=current?(current+' '+text):text;
       if(typeof input.focus==='function')input.focus();
