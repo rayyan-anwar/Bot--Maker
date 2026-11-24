@@ -1,8 +1,8 @@
 # BotForge Master Completion Tracker
 
 **Repository:** `rayyan-anwar/Bot--Maker`  
-**Baseline:** `main` at `dc291a640940d26d791b3b9a44deff57b860b4fe`  
-**Last reconciled:** 2026-11-24 (after PRs #104, #106, #107, #108, #109, #110, #111 and #112)  
+**Baseline:** `main` at `56b4749692353b882b611b70138842f8234ac5e3`  
+**Last reconciled:** 2026-11-24 (after PRs #104, #106, #107, #108, #109, #110, #111, #112 and #113)  
 **Purpose:** One evidence-led view of implementation, automated verification, and release blockers.
 
 ## Status definitions
@@ -45,7 +45,7 @@ Do not calculate a project-wide percentage by counting files, commits, PRs, or c
 
 | Work item | Status | Evidence / exit condition |
 |---|---|---|
-| Text-driven emotion/reaction engine | Implemented foundation; precision improved | PR #107 adds Roman Hindi word-boundary matching, dedicated warm visual state, preserves user emotion during response preparation, and adds unit/browser regression coverage; broader contextual/ambiguous-input coverage remains |
+| Text-driven emotion/reaction engine | Implemented foundation; precision improved | PR #107 adds Roman Hindi word-boundary matching, dedicated warm visual state and preserves user emotion during response preparation. PR #113 adds English/Hindi/Hinglish negation-aware matching with unit and Chromium tests; broader contextual/ambiguous-input coverage remains |
 | Affection reaction consistency | Implemented; automated-tested | PR #104 aligns server/browser affection precedence; PR #107 fixes warm-state mapping and chat-state override; all required CI and browser E2E checks passed on PR #107 head SHA |
 | Voice input/output | Implemented browser foundation; device QA required | Browser speech tests exist; confirm browser permissions, locale, unsupported states and disclosure |
 | Image/vision flow | Implemented foundation; live provider validation required | Authenticated upload/analyze and temporary chat-context handoff are in mainline; verify provider credentials, limits and real device behavior |
@@ -86,8 +86,9 @@ Do not calculate a project-wide percentage by counting files, commits, PRs, or c
 6. **PR #110 merged:** PostgreSQL now performs public-bot filtering, sorting, search, LIMIT/OFFSET and total counting in the storage query; JSON development adapter behavior remains aligned. Node.js 18/20/22, PostgreSQL 16 integration, Docker and Full Chat Browser E2E passed on the exact PR head SHA.
 7. **PR #111 merged:** Public bot responses are regression-tested against leakage of owner instructions, owner IDs, API/provider secrets, internal prompts/notes and knowledge documents. Visitors are denied document listing, reindexing and deletion. Node.js 18/20/22, PostgreSQL 16, Docker and security scans passed on the exact PR head SHA.
 8. **PR #112 merged:** PostgreSQL integration now verifies atomic bot creation plus version history, rollback when history insertion fails, and concurrent version-checked edits. Node.js 18/20/22, PostgreSQL 16, Docker and security checks passed on the exact PR head SHA.
-9. Continue P0/P1 source review and select the next code batch from verified gaps, not feature-count pressure.
-10. Keep infrastructure/device/provider-dependent work explicitly blocked until access and evidence are available.
+9. **PR #113 merged:** Fortisni now masks common negated English, Roman Hindi and Devanagari emotion phrases before classification, preserves contrastive clauses such as “not sad but happy,” and recognizes excitement on the server. Node.js 18/20/22, PostgreSQL 16, Docker, Fortisni Chromium E2E and Full Chat Browser E2E passed on the exact PR head SHA. This remains a rule-based heuristic, not full semantic/sarcasm understanding.
+10. Continue P0/P1 source review and select the next code batch from verified gaps, not feature-count pressure.
+11. Keep infrastructure/device/provider-dependent work explicitly blocked until access and evidence are available.
 
 ## Release authority
 
@@ -111,3 +112,5 @@ The [release acceptance checklist](RELEASE_ACCEPTANCE_CHECKLIST.md) is the contr
 - PR #111 exact head SHA `27d139082d997d5c4c55e5bb9ab6be9353b7a416` passed Node.js 18/20/22 tests, syntax/security checks, PostgreSQL 16 integration including backup/restore rehearsal and Docker build/readiness. This was a test-only security-boundary change; Full Chat Browser E2E was not required by its changed paths.
 
 - PR #112 exact head SHA `ecb7d23b2abb7da6c9a552f14e04a807cea88ca7` passed Node.js 18/20/22 tests, syntax/security checks, PostgreSQL 16 integration including atomic bot rollback/concurrency and backup/restore rehearsal, and Docker build/readiness.
+
+- PR #113 exact head SHA `1d033d1f4d9400f5cc854f995725edcff75aef17` passed Node.js 18/20/22 tests, syntax/security checks, PostgreSQL 16 integration including backup/restore rehearsal, Docker readiness, Fortisni Chromium E2E and Full Chat Browser E2E.
