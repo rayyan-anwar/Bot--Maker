@@ -106,7 +106,10 @@ test('vision analysis stores short-lived context only after provider success and
   assert.equal(found.expiresAt>Date.now(),true);
   assert.equal(Object.hasOwn(found,'imageBase64'),false);
   assert.equal(Object.hasOwn(found,'buffer'),false);
-  await store.updateByIdAsync('aiEngineerRuns',record.id,{used:true,consumedAt:new Date().toISOString()});
+  const consumed=await store.consumeFortisniVisionContext(record.userId);
+  assert.equal(consumed.id,record.id);
+  assert.equal(consumed.used,true);
+  assert.equal(await store.consumeFortisniVisionContext(record.userId),null);
   const updated=await store.findByIdAsync('aiEngineerRuns',record.id);
   assert.equal(updated.used,true);
  }finally{await store.deleteByIdAsync('aiEngineerRuns',record.id);}
