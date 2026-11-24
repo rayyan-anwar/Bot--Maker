@@ -16,6 +16,8 @@ test('automatic memory rejects health and medical details',()=>{
   'User has diabetes and takes insulin.',
   'User was diagnosed with PTSD.',
   'User is pregnant.',
+  'User has anxiety.',
+  'User has chronic pain.',
   'User takes prescription medication.'
  ])assert.equal(isSafeAutomaticMemory(value),false,value);
 });
@@ -26,7 +28,8 @@ test('automatic memory rejects religion, politics, sexuality and identity traits
   'User supports a political party.',
   'User is bisexual.',
   'User belongs to a named caste.',
-  'User shared their nationality.'
+  'User shared their nationality.',
+  'User is female.'
  ])assert.equal(isSafeAutomaticMemory(value),false,value);
 });
 
