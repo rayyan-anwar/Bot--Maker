@@ -10,7 +10,7 @@ test('Fortisni chat exposes explicit user-selected phone photo analysis',()=>{
  assert.match(html,/id="fortisni-vision-form"/);
  assert.match(html,/capture="environment"/);
  assert.match(html,/accept="image\/jpeg,image\/png,image\/webp"/);
- assert.match(html,/Nothing is captured until you select it and submit/);
+ assert.match(html,/image is sent to the configured OpenAI vision service/);
  assert.match(html,/formData\.append\('userInitiated','true'\)/);
  assert.match(html,/api\('\/vision\/analyze'/);
  assert.match(html,/4\*1024\*1024/);
