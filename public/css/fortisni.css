@@ -61,3 +61,14 @@
  .fortisni-companion[data-state="idle"] .fortisni-eyes{animation:none}
  .fortisni-companion[data-state="error"] .fortisni-avatar{animation:none}
 }
+
+
+.fortisni-vision-form{display:grid;grid-template-columns:1fr auto;gap:9px;align-items:center;margin:10px 24px 14px;padding:13px;border:1px solid var(--border);border-radius:14px;background:var(--surface,rgba(120,130,180,.06))}
+.fortisni-vision-copy{grid-column:1/-1;display:grid;gap:3px}
+.fortisni-vision-copy span,.fortisni-vision-form #fortisni-vision-status{font-size:.82rem;color:var(--muted)}
+.fortisni-vision-file{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:8px 12px;border:1px solid var(--border);border-radius:9px;cursor:pointer;font-size:.88rem}
+#fortisni-vision-image{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+#fortisni-vision-prompt{min-width:0;width:100%;grid-column:1/-1}
+.fortisni-vision-form #fortisni-vision-status{grid-column:1/-1;min-height:1.2em}
+.fortisni-vision-file:focus-within,.fortisni-vision-file:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+@media(max-width:560px){.fortisni-vision-form{margin-left:12px;margin-right:12px;grid-template-columns:1fr}.fortisni-vision-form button{width:100%}}
