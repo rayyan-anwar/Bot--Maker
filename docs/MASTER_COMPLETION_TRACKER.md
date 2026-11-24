@@ -21,6 +21,7 @@ Do not calculate a project-wide percentage by counting files, commits, PRs, or c
 |---|---|---|
 | Required CI on exact release SHA | Main-commit CI verified; release-tag verification remains | PRs #114/#115 enable Full Chat, Fortisni and Admin browser E2E on main pushes; exact main SHA `bfec26d6006f18d8f8577e0370a7978e80197fdf` passed BotForge CI, Node 18/20/22, PostgreSQL 16, Docker and all three browser suites |
 | Full signup-to-chat browser journey | Automated-tested on main commit | Full Chat Browser E2E passed on exact main SHA `bfec26d6006f18d8f8577e0370a7978e80197fdf`; repeat for each release candidate |
+| Admin controls browser journey | Automated-tested on main commit | AI Engineer Admin Browser E2E passed on exact main SHA `bfec26d6006f18d8f8577e0370a7978e80197fdf`; repeat for each release candidate |
 | Fortisni browser behavior | Automated-tested on main commit; device QA required | Fortisni Chromium E2E passed on exact main SHA `bfec26d6006f18d8f8577e0370a7978e80197fdf`; physical browser/OS/device matrix remains |
 | Dependency and source security scans | Automated-tested on main commit; review required | `npm audit`/source security scan passed in main-commit CI; review and disposition every high/critical finding before release |
 | PostgreSQL migration and concurrency | Automated-tested on main commit; staging validation required | PostgreSQL 16 migration, concurrency and integration suite passed on exact main SHA; require staging migration and recovery evidence |
@@ -118,5 +119,7 @@ The [release acceptance checklist](RELEASE_ACCEPTANCE_CHECKLIST.md) is the contr
 - PR #113 exact head SHA `1d033d1f4d9400f5cc854f995725edcff75aef17` passed Node.js 18/20/22 tests, syntax/security checks, PostgreSQL 16 integration including backup/restore rehearsal, Docker readiness, Fortisni Chromium E2E and Full Chat Browser E2E.
 
 - Main commit `56042cf635e3391c1a1cab0821bd9fb99a172343` passed BotForge CI run `45373812123`, Full Chat Browser E2E run `45373812187`, and Fortisni Browser E2E run `45373812050`. These are post-merge main-commit results, not a production deployment or release certification.
+
+- Main commit `bfec26d6006f18d8f8577e0370a7978e80197fdf` passed BotForge CI run `45374327630`, Full Chat Browser E2E run `45374327505`, Fortisni Browser E2E run `45374327815`, and AI Engineer Admin Browser E2E run `45374327841`. These are post-merge main-commit results, not production deployment or release certification.
 
 - Main commit `bfec26d6006f18d8f8577e0370a7978e80197fdf` passed BotForge CI run `45374327630`, Full Chat Browser E2E run `45374327505`, Fortisni Browser E2E run `45374327815`, and AI Engineer Admin Browser E2E run `45374327841`. These are post-merge main-commit results, not production deployment or release certification.
