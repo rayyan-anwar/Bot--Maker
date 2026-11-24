@@ -74,6 +74,13 @@ Most mainstream smartwatches do not include a built-in camera. Fortisni must the
 
 Planned product scope only. Implementation, device testing, and release approval remain separate milestones.
 
+
+## Implemented phone visual-analysis API (initial slice)
+
+The server now exposes an authenticated one-shot endpoint at `POST /api/vision/analyze` for the paired-phone companion integration. Send multipart form data with an `image` file, `userInitiated=true`, and an optional `prompt` (up to 1000 characters). The endpoint requires a signed-in account, applies a per-user rate limit, enforces the daily usage reservation, and uses the configured OpenAI vision model. Configure `OPENAI_API_KEY` and optionally `OPENAI_VISION_MODEL` (default `gpt-5.5`).
+
+The endpoint accepts only JPEG, PNG, and WebP files whose file signatures match their MIME type, with a 4 MiB limit. It requests low-detail image processing, stores no image or video, and returns `mediaRetained: false`. Camera capture itself belongs in the native phone companion: this API receives a user-selected still image and does not access any device camera. It does not implement continuous video, watch apps, device pairing, or live streaming. Those remain future milestones.
+
 ## Implemented phone visual-analysis slice
 
 The chat page now offers an explicit photo/camera picker for Fortisni. On supported mobile browsers, `capture="environment"` asks the browser to prefer the rear camera; the user still chooses and submits the image. No camera stream is opened by page load or in the background.
