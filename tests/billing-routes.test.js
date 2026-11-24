@@ -46,6 +46,21 @@ test('billing endpoints enforce authentication and fail closed when providers ar
  assert.equal(duplicate.status,200);
  assert.deepEqual(await duplicate.json(),{received:true,duplicate:true});
 
+ const reservationUser=(await store.findManyAsync('users',{email:'billing-test@example.com'}))[0].id;
+ const reservationAttempts=await Promise.all([
+  store.reserveBillingCheckout(reservationUser,'stripe','plus',uuidv4()),
+  store.reserveBillingCheckout(reservationUser,'razorpay','pro',uuidv4())
+ ]);
+ assert.equal(reservationAttempts.filter(Boolean).length,1,'only one provider may reserve checkout for an account');
+ const winningReservation=reservationAttempts.find(Boolean).billingCheckoutReservation;
+ assert.ok(winningReservation&&winningReservation.id);
+ assert.equal(await store.reserveBillingCheckout(reservationUser,'stripe','pro',uuidv4()),null,'a live checkout reservation blocks a second checkout');
+ assert.equal(await store.releaseBillingCheckout(reservationUser,winningReservation.id),true,'the owning reservation can be released');
+ assert.equal(await store.releaseBillingCheckout(reservationUser,winningReservation.id),false,'a reservation cannot be released twice');
+ const replacementReservation=await store.reserveBillingCheckout(reservationUser,'stripe','pro',uuidv4());
+ assert.ok(replacementReservation,'a new checkout can start after release');
+ assert.equal(await store.releaseBillingCheckout(reservationUser,replacementReservation.billingCheckoutReservation.id),true);
+
  const stripeClaim=store.applySubscriptionEvent(
   (await store.findManyAsync('users',{email:'billing-test@example.com'}))[0].id,
   'stripe','sub_stripe_race_1',{plan:'plus',stripeSubscriptionId:'sub_stripe_race_1'}

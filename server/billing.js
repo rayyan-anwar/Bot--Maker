@@ -59,9 +59,11 @@ router.post('/checkout',requireAuth,checkoutLimiter,async(req,res,next)=>{try{
  if(typeof plan!=='string'||!['plus','pro'].includes(plan)||!available[plan])return res.status(400).json({error:'Choose a paid plan.'});
  const priceId=process.env[plan==='plus'?'STRIPE_PRICE_PLUS':'STRIPE_PRICE_PRO'];
  if(!process.env.STRIPE_SECRET_KEY||!priceId||!process.env.STRIPE_SUCCESS_URL||!process.env.STRIPE_CANCEL_URL)return res.status(503).json({error:'Stripe checkout is not configured by the service operator.'});
- const form=new URLSearchParams({mode:'subscription',success_url:process.env.STRIPE_SUCCESS_URL,cancel_url:process.env.STRIPE_CANCEL_URL,customer_email:req.user.email,client_reference_id:req.user.id,'line_items[0][price]':priceId,'line_items[0][quantity]':'1','metadata[userId]':req.user.id,'metadata[plan]':plan,'subscription_data[metadata][userId]':req.user.id,'subscription_data[metadata][plan]':plan});
+ const reservationId=crypto.randomUUID(),reservation=await store.reserveBillingCheckout(req.user.id,'stripe',plan,reservationId);if(!reservation)return res.status(409).json({error:'A checkout is already in progress or this account has an active subscription. Try again after the existing checkout expires.'});
+ const expiresAt=Math.floor(Date.now()/1000)+24*60*60;
+ const form=new URLSearchParams({mode:'subscription',success_url:process.env.STRIPE_SUCCESS_URL,cancel_url:process.env.STRIPE_CANCEL_URL,expires_at:String(expiresAt),customer_email:req.user.email,client_reference_id:req.user.id,'line_items[0][price]':priceId,'line_items[0][quantity]':'1','metadata[userId]':req.user.id,'metadata[plan]':plan,'metadata[checkoutReservationId]':reservationId,'subscription_data[metadata][userId]':req.user.id,'subscription_data[metadata][plan]':plan,'subscription_data[metadata][checkoutReservationId]':reservationId});
  const response=await fetch('https://api.stripe.com/v1/checkout/sessions',{method:'POST',headers:{authorization:'Bearer '+process.env.STRIPE_SECRET_KEY,'content-type':'application/x-www-form-urlencoded'},body:form,signal:AbortSignal.timeout(15000)});let data={};try{data=await response.json();}catch(_){}
- if(!response.ok||!data.url)return res.status(502).json({error:'Stripe could not create a checkout session.'});res.json({checkoutUrl:data.url,provider:'stripe'});
+ if(!response.ok||!data.url){await store.releaseBillingCheckout(req.user.id,reservationId);return res.status(502).json({error:'Stripe could not create a checkout session.'});}res.json({checkoutUrl:data.url,provider:'stripe'});
  }catch(e){next(e);}});
 router.post('/razorpay/checkout',requireAuth,checkoutLimiter,async(req,res,next)=>{try{
  const {plan}=req.body||{},available=plans.getPlans();if(req.user.stripeSubscriptionId||req.user.razorpaySubscriptionId)return res.status(409).json({error:'This account already has a paid subscription. Manage or cancel it before starting another.'});
@@ -69,10 +71,11 @@ router.post('/razorpay/checkout',requireAuth,checkoutLimiter,async(req,res,next)
  if(!razorpayConfigured())return res.status(503).json({error:'Razorpay is not configured by the service operator.'});
  const planId=process.env[plan==='plus'?'RAZORPAY_PLAN_PLUS':'RAZORPAY_PLAN_PRO'];
  if(!planId)return res.status(503).json({error:'The selected Razorpay subscription plan is not configured.'});
- const subscription=await razorpayRequest('/subscriptions',{plan_id:planId,total_count:Number(process.env.RAZORPAY_SUBSCRIPTION_TOTAL_COUNT||120),quantity:1,customer_notify:1,notes:{userId:req.user.id,plan}});
+ const reservationId=crypto.randomUUID(),reservation=await store.reserveBillingCheckout(req.user.id,'razorpay',plan,reservationId,30*60*1000);if(!reservation)return res.status(409).json({error:'A checkout is already in progress or this account has an active subscription. Try again after the existing checkout expires.'});
+ const subscription=await razorpayRequest('/subscriptions',{plan_id:planId,total_count:Number(process.env.RAZORPAY_SUBSCRIPTION_TOTAL_COUNT||120),quantity:1,customer_notify:1,notes:{userId:req.user.id,plan,checkoutReservationId:reservationId}});
  if(!subscription.id||!subscription.short_url)throw new Error('Razorpay returned an incomplete subscription checkout.');
- const linked=await store.applySubscriptionEvent(req.user.id,'razorpay',subscription.id,{razorpaySubscriptionId:subscription.id,razorpayPlan:plan,razorpaySubscriptionStatus:subscription.status||'created'});if(!linked){try{await razorpayRequest('/subscriptions/'+encodeURIComponent(subscription.id)+'/cancel',{cancel_at_cycle_end:false});}catch(cancelError){console.error('Unlinked Razorpay subscription cancellation failed:',cancelError.message);}return res.status(409).json({error:'A subscription is already linked to this account. The new Razorpay subscription cancellation was requested.'});}
- res.json({checkoutUrl:subscription.short_url,subscriptionId:subscription.id,provider:'razorpay'});
+ const linked=await store.applySubscriptionEvent(req.user.id,'razorpay',subscription.id,{razorpaySubscriptionId:subscription.id,razorpayPlan:plan,razorpaySubscriptionStatus:subscription.status||'created'});if(!linked){try{await razorpayRequest('/subscriptions/'+encodeURIComponent(subscription.id)+'/cancel',{cancel_at_cycle_end:false});}catch(cancelError){console.error('Unlinked Razorpay subscription cancellation failed:',cancelError.message);}await store.releaseBillingCheckout(req.user.id,reservationId);return res.status(409).json({error:'A subscription is already linked to this account. The new Razorpay subscription cancellation was requested.'});}
+ await store.releaseBillingCheckout(req.user.id,reservationId);res.json({checkoutUrl:subscription.short_url,subscriptionId:subscription.id,provider:'razorpay'});
  }catch(e){next(e);}});
 webhookRouter.post('/',express.raw({type:'application/json',limit:'256kb'}),async(req,res)=>{
  const secret=process.env.STRIPE_WEBHOOK_SECRET,header=req.get('stripe-signature');if(!signatureValid(req.body,header,secret))return res.status(400).json({error:'Invalid webhook signature.'});
@@ -82,12 +85,14 @@ webhookRouter.post('/',express.raw({type:'application/json',limit:'256kb'}),asyn
  let claimed=false;
  try{
   claimed=await store.claimWebhookEvent('stripe',eventId);if(!claimed)return res.json({received:true,duplicate:true});
-  if(event.type==='checkout.session.completed'){
+  if(event.type==='checkout.session.expired'){
+   const session=event.data&&event.data.object,userId=session?.metadata?.userId,reservationId=session?.metadata?.checkoutReservationId;if(userId&&validEventId(reservationId))await store.releaseBillingCheckout(userId,reservationId);
+  }else if(event.type==='checkout.session.completed'){
    const session=event.data&&event.data.object,userId=session?.metadata?.userId,plan=session?.metadata?.plan;
-   if(userId&&plans.getPlans()[plan]&&session.mode==='subscription'&&session.status==='complete'&&['paid','no_payment_required'].includes(session.payment_status)&&validEventId(session.subscription)){await store.applySubscriptionEvent(userId,'stripe',session.subscription,{plan,stripeCustomerId:session.customer||null,stripeSubscriptionId:session.subscription});}
+   if(userId&&plans.getPlans()[plan]&&session.mode==='subscription'&&session.status==='complete'&&['paid','no_payment_required'].includes(session.payment_status)&&validEventId(session.subscription)){const linked=await store.applySubscriptionEvent(userId,'stripe',session.subscription,{plan,stripeCustomerId:session.customer||null,stripeSubscriptionId:session.subscription});if(linked&&validEventId(session.metadata?.checkoutReservationId))await store.releaseBillingCheckout(userId,session.metadata.checkoutReservationId);}
   }else if(event.type==='customer.subscription.updated'){
    const sub=event.data&&event.data.object,userId=sub?.metadata?.userId,plan=sub?.metadata?.plan;
-   if(userId&&validEventId(sub?.id)){const active=['active','trialing'].includes(sub.status),terminal=isStripeSubscriptionTerminal(sub.status),nextPlan=active&&plans.getPlans()[plan]?plan:'free';await store.applySubscriptionEvent(userId,'stripe',sub.id,{plan:nextPlan,stripeSubscriptionId:terminal?null:sub.id},{ended:terminal});}
+   if(userId&&validEventId(sub?.id)){const active=['active','trialing'].includes(sub.status),terminal=isStripeSubscriptionTerminal(sub.status),nextPlan=active&&plans.getPlans()[plan]?plan:'free';const linked=await store.applySubscriptionEvent(userId,'stripe',sub.id,{plan:nextPlan,stripeSubscriptionId:terminal?null:sub.id},{ended:terminal});if(linked&&validEventId(sub.metadata?.checkoutReservationId))await store.releaseBillingCheckout(userId,sub.metadata.checkoutReservationId);}
   }else if(event.type==='customer.subscription.deleted'){
    const sub=event.data&&event.data.object,userId=sub?.metadata?.userId;if(userId&&validEventId(sub?.id))await store.applySubscriptionEvent(userId,'stripe',sub.id,{plan:'free',stripeSubscriptionId:null},{ended:true});
   }
@@ -103,7 +108,7 @@ razorpayWebhookRouter.post('/',express.raw({type:'application/json',limit:'256kb
  let claimed=false;
  try{
   claimed=await store.claimWebhookEvent('razorpay',eventId);if(!claimed)return res.json({received:true,duplicate:true});
-  const sub=event.payload?.subscription?.entity;if(sub){const userId=sub.notes?.userId,plan=sub.notes?.plan;if(userId&&validEventId(sub.id)){const cancelled=['cancelled','completed'].includes(sub.status);const user=await store.findByIdAsync('users',userId);await store.applySubscriptionEvent(userId,'razorpay',sub.id,{plan:resolveRazorpayPlan(sub.status,plan),razorpaySubscriptionId:cancelled?null:sub.id,razorpaySubscriptionStatus:sub.status||'unknown',razorpayCustomerId:sub.customer_id||user?.razorpayCustomerId||null},{ended:cancelled});}}
+  const sub=event.payload?.subscription?.entity;if(sub){const userId=sub.notes?.userId,plan=sub.notes?.plan;if(userId&&validEventId(sub.id)){const cancelled=['cancelled','completed'].includes(sub.status);const user=await store.findByIdAsync('users',userId);const linked=await store.applySubscriptionEvent(userId,'razorpay',sub.id,{plan:resolveRazorpayPlan(sub.status,plan),razorpaySubscriptionId:cancelled?null:sub.id,razorpaySubscriptionStatus:sub.status||'unknown',razorpayCustomerId:sub.customer_id||user?.razorpayCustomerId||null},{ended:cancelled});if(linked&&validEventId(sub.notes?.checkoutReservationId))await store.releaseBillingCheckout(userId,sub.notes.checkoutReservationId);}}
   await store.completeWebhookEvent('razorpay',eventId);
   return res.json({received:true});
  }catch(error){if(claimed)await store.releaseWebhookEvent('razorpay',eventId).catch(()=>{});console.error('Razorpay webhook processing failed:',error.message);return res.status(500).json({error:'Webhook processing failed.'});}

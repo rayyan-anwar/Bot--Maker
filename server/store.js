@@ -155,6 +155,31 @@ async function applySubscriptionEvent(userId,provider,subscriptionId,patch,{requ
  return result.rowCount?result.rows[0].data:null;
 }
 
+
+async function reserveBillingCheckout(userId,provider,plan,reservationId,ttlMs=24*60*60*1000){
+ if(!isUuid(userId)||!['stripe','razorpay'].includes(provider)||!['plus','pro'].includes(plan)||typeof reservationId!=='string'||!isUuid(reservationId)||!Number.isSafeInteger(ttlMs)||ttlMs<30000||ttlMs>24*60*60*1000)throw new TypeError('Invalid billing checkout reservation.');
+ const now=Date.now(),expiresAt=new Date(now+ttlMs).toISOString(),reservation={id:reservationId,provider,plan,createdAt:new Date(now).toISOString(),expiresAt};
+ if(!isPostgres()){
+  const user=findById('users',userId);if(!user||user.stripeSubscriptionId||user.razorpaySubscriptionId)return null;
+  const current=user.billingCheckoutReservation;
+  if(current&&current.id&&Date.parse(current.expiresAt)>now)return null;
+  return updateById('users',userId,{billingCheckoutReservation:reservation});
+ }
+ await initialize();
+ const result=await pool.query("UPDATE botforge_records SET data=jsonb_set(data,'{billingCheckoutReservation}',$2::jsonb,true),updated_at=now() WHERE collection='users' AND id=$1 AND COALESCE(data->>'stripeSubscriptionId','')='' AND COALESCE(data->>'razorpaySubscriptionId','')='' AND (data->'billingCheckoutReservation' IS NULL OR data->'billingCheckoutReservation'='null'::jsonb OR COALESCE(NULLIF(data->'billingCheckoutReservation'->>'expiresAt','')::timestamptz,'epoch'::timestamptz)<=now()) RETURNING data",[userId,JSON.stringify(reservation)]);
+ return result.rowCount?result.rows[0].data:null;
+}
+async function releaseBillingCheckout(userId,reservationId){
+ if(!isUuid(userId)||typeof reservationId!=='string'||!isUuid(reservationId))return false;
+ if(!isPostgres()){
+  const user=findById('users',userId);if(!user||user.billingCheckoutReservation?.id!==reservationId)return false;
+  updateById('users',userId,{billingCheckoutReservation:null});return true;
+ }
+ await initialize();
+ const result=await pool.query("UPDATE botforge_records SET data=jsonb_set(data,'{billingCheckoutReservation}','null'::jsonb,true),updated_at=now() WHERE collection='users' AND id=$1 AND data->'billingCheckoutReservation'->>'id'=$2",[userId,reservationId]);
+ return result.rowCount===1;
+}
+
 async function saveAgentTaskCheckpoints(taskId,workerId,now,checkpoints){
  if(typeof taskId!=='string'||!taskId||typeof workerId!=='string'||!workerId||!(now instanceof Date)||!Number.isFinite(now.getTime())||!Array.isArray(checkpoints))throw new TypeError('Invalid agent task checkpoint update.');
  const timestamp=now.toISOString();
@@ -443,4 +468,4 @@ async function consumeSocialOAuthState(stateHash,userId,platform,now=new Date())
 async function query(sql,values=[]){if(!isPostgres())throw new Error('Shared PostgreSQL storage is not configured.');await initialize();return pool.query(sql,values);}
 async function health(){if(!isPostgres())return {ok:true,database:'json-development'};try{await initialize();await pool.query('SELECT 1');return {ok:true,database:'postgres'};}catch(_){return {ok:false,database:'postgres'};}}
 async function close(){if(pool){await pool.end();pool=null;}initialized=false;}
-module.exports={createBotWithVersion,updateBotVersioned,initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findPublicBotsPage,findByIdAsync,insertAsync,applySubscriptionEvent,insertAgentTaskIdempotent,insertAgentTaskWithinCapacity,updateByIdAsync,saveAgentTaskCheckpoints,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,claimDueAutomationWorkflows,finishAutomationScheduleClaim,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,transitionAgentRunStatus,consumeSocialOAuthState,consumeFortisniVisionContext,insertDocumentWithinCapacity,query,health,load,persist};
+module.exports={createBotWithVersion,updateBotVersioned,initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findPublicBotsPage,findByIdAsync,insertAsync,applySubscriptionEvent,reserveBillingCheckout,releaseBillingCheckout,insertAgentTaskIdempotent,insertAgentTaskWithinCapacity,updateByIdAsync,saveAgentTaskCheckpoints,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,claimDueAutomationWorkflows,finishAutomationScheduleClaim,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,transitionAgentRunStatus,consumeSocialOAuthState,consumeFortisniVisionContext,insertDocumentWithinCapacity,query,health,load,persist};

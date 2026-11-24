@@ -40,6 +40,25 @@ test('PostgreSQL integration: shared rate limits, atomic login lockout and quota
    assert.equal(user.failedLoginAttempts,3);
    assert.ok(user.lockedAt);
   });
+  await t.test('billing checkout reservations are atomic across providers and can be released',async()=>{
+   const checkoutUserId=crypto.randomUUID(),checkoutEmail='pg-checkout-'+checkoutUserId+'@example.test';
+   try{
+    await store.insertAsync('users',{id:checkoutUserId,email:checkoutEmail,name:'Checkout reservation test'});
+    const attempts=await Promise.all([
+     store.reserveBillingCheckout(checkoutUserId,'stripe','plus',crypto.randomUUID()),
+     store.reserveBillingCheckout(checkoutUserId,'razorpay','pro',crypto.randomUUID())
+    ]);
+    assert.equal(attempts.filter(Boolean).length,1,'only one concurrent checkout reservation may win');
+    const winner=attempts.find(Boolean).billingCheckoutReservation;
+    assert.ok(winner&&winner.id);
+    assert.equal(await store.reserveBillingCheckout(checkoutUserId,'stripe','pro',crypto.randomUUID()),null,'an unexpired reservation blocks another checkout');
+    assert.equal(await store.releaseBillingCheckout(checkoutUserId,winner.id),true);
+    assert.equal(await store.releaseBillingCheckout(checkoutUserId,winner.id),false,'release is scoped to the reservation owner');
+    const replacement=await store.reserveBillingCheckout(checkoutUserId,'stripe','pro',crypto.randomUUID());
+    assert.ok(replacement,'a new checkout can reserve after release');
+    assert.equal(await store.releaseBillingCheckout(checkoutUserId,replacement.billingCheckoutReservation.id),true);
+   }finally{await store.deleteByIdAsync('users',checkoutUserId);}
+  });
   await t.test('subscription claims are atomic across providers and ended events cannot be resurrected',async()=>{
    const claims=await Promise.all([
     store.applySubscriptionEvent(userId,'stripe','sub_pg_stripe_race',{plan:'plus',stripeSubscriptionId:'sub_pg_stripe_race'}),
