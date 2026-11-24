@@ -355,6 +355,18 @@ async function transitionAgentRunStatus(id,userId,fromStatuses,toStatus,extra={}
  if(!current||current.kind!=='agent-plan'||current.userId!==userId)return {state:'not_found',run:null};
  return {state:'conflict',run:current};
 }
+async function consumeFortisniVisionContext(userId,now=Date.now()){
+ if(typeof userId!=='string'||!userId||!Number.isFinite(now))return null;
+ if(!isPostgres()){
+  const rows=all('aiEngineerRuns');
+  const candidate=rows.filter(row=>row.kind==='fortisni-vision-context'&&row.userId===userId&&row.contextKey===userId&&row.used!==true&&Number.isFinite(row.expiresAt)&&row.expiresAt>now).sort((a,b)=>b.createdAt-a.createdAt)[0];
+  if(!candidate)return null;
+  return updateById('aiEngineerRuns',candidate.id,{used:true,consumedAt:new Date(now).toISOString()});
+ }
+ await initialize();
+ const result=await pool.query("UPDATE botforge_records SET data=data || jsonb_build_object('used',true,'consumedAt',to_timestamp($2/1000.0)::text),updated_at=now() WHERE collection='aiEngineerRuns' AND id=(SELECT id FROM botforge_records WHERE collection='aiEngineerRuns' AND data->>'kind'='fortisni-vision-context' AND data->>'userId'=$1 AND data->>'contextKey'=$1 AND data->>'used'='false' AND (data->>'expiresAt')::double precision>$2 ORDER BY (data->>'createdAt')::double precision DESC,id LIMIT 1 FOR UPDATE SKIP LOCKED) AND data->>'used'='false' RETURNING data",[userId,now]);
+ return result.rowCount?result.rows[0].data:null;
+}
 async function consumeSocialOAuthState(stateHash,userId,platform,now=new Date()){
  if(typeof stateHash!=='string'||typeof userId!=='string'||typeof platform!=='string')return null;
  if(!isPostgres()){
@@ -371,4 +383,4 @@ async function consumeSocialOAuthState(stateHash,userId,platform,now=new Date())
 async function query(sql,values=[]){if(!isPostgres())throw new Error('Shared PostgreSQL storage is not configured.');await initialize();return pool.query(sql,values);}
 async function health(){if(!isPostgres())return {ok:true,database:'json-development'};try{await initialize();await pool.query('SELECT 1');return {ok:true,database:'postgres'};}catch(_){return {ok:false,database:'postgres'};}}
 async function close(){if(pool){await pool.end();pool=null;}initialized=false;}
-module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,insertAgentTaskIdempotent,insertAgentTaskWithinCapacity,updateByIdAsync,saveAgentTaskCheckpoints,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,claimDueAutomationWorkflows,finishAutomationScheduleClaim,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,transitionAgentRunStatus,consumeSocialOAuthState,insertDocumentWithinCapacity,query,health,load,persist};
+module.exports={initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,insertAgentTaskIdempotent,insertAgentTaskWithinCapacity,updateByIdAsync,saveAgentTaskCheckpoints,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,claimDueAutomationWorkflows,finishAutomationScheduleClaim,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,transitionAgentRunStatus,consumeSocialOAuthState,consumeFortisniVisionContext,insertDocumentWithinCapacity,query,health,load,persist};
