@@ -46,3 +46,27 @@ test('billing endpoints enforce authentication and fail closed when providers ar
  assert.equal(duplicate.status,200);
  assert.deepEqual(await duplicate.json(),{received:true,duplicate:true});
 });
+
+
+test('subscription webhooks cannot overwrite a different provider or newer subscription',()=>{
+ const {canClaimSubscription,ownsSubscription}=require('../server/billing');
+ const stripeUser={id:'user-1',stripeSubscriptionId:'sub_stripe_new'};
+ const razorpayUser={id:'user-1',razorpaySubscriptionId:'sub_rzp_new'};
+ assert.equal(canClaimSubscription(stripeUser,'stripe','sub_stripe_old'),false);
+ assert.equal(canClaimSubscription(razorpayUser,'razorpay','sub_rzp_old'),false);
+ assert.equal(canClaimSubscription(stripeUser,'razorpay','sub_rzp_old'),false);
+ assert.equal(canClaimSubscription(razorpayUser,'stripe','sub_stripe_old'),false);
+ assert.equal(ownsSubscription(stripeUser,'stripe','sub_stripe_old'),false);
+ assert.equal(ownsSubscription(razorpayUser,'razorpay','sub_rzp_old'),false);
+ assert.equal(ownsSubscription(stripeUser,'stripe','sub_stripe_new'),true);
+ assert.equal(ownsSubscription(razorpayUser,'razorpay','sub_rzp_new'),true);
+});
+
+test('first subscription event may claim an unlinked account but deletion must match its subscription',()=>{
+ const {canClaimSubscription,ownsSubscription}=require('../server/billing');
+ const user={id:'user-1'};
+ assert.equal(canClaimSubscription(user,'stripe','sub_stripe_1'),true);
+ assert.equal(canClaimSubscription(user,'razorpay','sub_rzp_1'),true);
+ assert.equal(ownsSubscription(user,'stripe','sub_stripe_1'),false);
+ assert.equal(ownsSubscription(user,'razorpay','sub_rzp_1'),false);
+});
