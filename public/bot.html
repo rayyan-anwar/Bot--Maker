@@ -60,7 +60,7 @@
     <button id="fortisni-mic-btn" type="button" class="btn btn-ghost" aria-label="Start voice input" aria-pressed="false">Voice input</button>
     <button id="fortisni-speech-btn" type="button" class="btn btn-ghost" aria-pressed="false">Read replies: Off</button>
     <button type="submit" class="btn btn-primary">Send</button>
-    <span id="fortisni-voice-status" role="status" aria-live="polite">Voice features are optional and depend on browser support.</span>
+    <span id="fortisni-voice-status" role="status" aria-live="polite">Voice input uses your browser’s speech service. Audio is not sent to BotForge.</span>
   </form>
 </section>
 
@@ -251,10 +251,10 @@
     try{
       const result=await api('/vision/analyze',{method:'POST',body:formData});
       pending.textContent=result.assistant.content;
-      voiceController.speak(result.assistant.content);
+      const visionSpoken=voiceController.speak(result.assistant.content);
       pending.classList.remove('pending');
       window.setFortisniText(result.assistant.content,'assistant');
-      if(!voiceController.isSpeechEnabled())window.setTimeout(()=>window.setFortisniState('idle'),2600);
+      if(!visionSpoken)window.setTimeout(()=>window.setFortisniState('idle'),2600);
       visionStatus.textContent='Analysis complete. The uploaded image is not stored by BotForge.';
       visionImage.value='';
       visionPrompt.value='';
