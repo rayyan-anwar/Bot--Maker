@@ -62,6 +62,8 @@ test('vision endpoint requires login and an explicit user-initiated upload',asyn
  const previousAdmin=process.env.BOTFORGE_ADMIN_EMAIL,previousKey=process.env.OPENAI_API_KEY;
  process.env.BOTFORGE_ADMIN_EMAIL='vision-admin@example.test';
  delete process.env.OPENAI_API_KEY;
+ delete require.cache[require.resolve('../server/auth')];
+ delete require.cache[require.resolve('../server/index')];
  const {start,shutdown}=require('../server/index');
  try{
   const server=await start(0,'127.0.0.1');
