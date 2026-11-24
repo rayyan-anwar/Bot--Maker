@@ -84,3 +84,8 @@ The following changes have been merged to `main` and verified through their reco
 The earlier PRs #85, #86, #88, #89 and #90 were closed as superseded by the consolidated merged implementations above.
 
 These checks validate repository code and CI only. Live provider credentials, actual Prometheus/Alertmanager deployment, managed staging, production backup/restore, independent security testing and physical device validation remain separate release gates.
+
+
+- PR #98: Fortisni smartwatch and paired-phone visual-intelligence product/technical specification moved onto current mainline; BotForge CI passed. This is a specification only, not a native watch app or working camera pipeline.
+- Legacy PRs #72–#82 and #84 were closed after confirming their relevant hardening was already present on main or superseded by the current smartwatch specification. Draft PR #40 was closed because the PostgreSQL budget ledger and maintained budget design are already in the repository.
+- Open PR queue was checked after reconciliation and is empty. This is queue cleanup, not a claim that all product roadmap work is complete.
