@@ -149,9 +149,9 @@ async function applySubscriptionEvent(userId,provider,subscriptionId,patch,{requ
  await initialize();
  const currentKey=selected.current,otherKey=selected.other,tombstoneKey=selected.tombstone;
  const condition=requireOwnership
-  ? "data->>$3=$4 AND COALESCE(data->>$5,'')=''"
-  : "COALESCE(data->>$5,'')='' AND (COALESCE(data->>$3,'')='' OR data->>$3=$4) AND COALESCE(data->>$6,'')<>$4";
- const result=await pool.query("UPDATE botforge_records SET data=data || $7::jsonb,updated_at=now() WHERE collection='users' AND id=$1 AND "+condition+" RETURNING data",[userId,provider,currentKey,subscriptionId,otherKey,tombstoneKey,JSON.stringify(update)]);
+  ? "data->>$2=$3 AND COALESCE(data->>$4,'')=''"
+  : "COALESCE(data->>$4,'')='' AND (COALESCE(data->>$2,'')='' OR data->>$2=$3) AND COALESCE(data->>$5,'')<>$3";
+ const result=await pool.query("UPDATE botforge_records SET data=data || $7::jsonb,updated_at=now() WHERE collection='users' AND id=$1 AND "+condition+" RETURNING data",[userId,currentKey,subscriptionId,otherKey,tombstoneKey,JSON.stringify(update)]);
  return result.rowCount?result.rows[0].data:null;
 }
 
