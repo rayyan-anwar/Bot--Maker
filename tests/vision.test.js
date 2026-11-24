@@ -92,7 +92,7 @@ test('vision endpoint requires login and an explicit user-initiated upload',asyn
  }
 });
 
-test('vision analysis stores short-lived context only after provider success and without media bytes',async()=>{
+test('vision context storage supports bounded one-time consumption without media bytes',async()=>{
  const store=require('../server/store');
  const record={id:require('crypto').randomUUID(),kind:'fortisni-vision-context',userId:'vision-context-test-user',botId:null,contextKey:'vision-context-test-user',summary:'A blue cup on a wooden table.',createdAt:Date.now(),expiresAt:Date.now()+600000,used:false};
  await store.insertAsync('aiEngineerRuns',record);
@@ -113,4 +113,18 @@ test('vision analysis stores short-lived context only after provider success and
   const updated=await store.findByIdAsync('aiEngineerRuns',record.id);
   assert.equal(updated.used,true);
  }finally{await store.deleteByIdAsync('aiEngineerRuns',record.id);}
+});
+
+test('vision context consumption ignores expired and cross-account records',async()=>{
+ const store=require('../server/store'),crypto=require('node:crypto'),now=Date.now();
+ const rows=[
+  {id:crypto.randomUUID(),kind:'fortisni-vision-context',userId:'owner-a',contextKey:'owner-b',summary:'cross-account',createdAt:now,expiresAt:now+600000,used:false},
+  {id:crypto.randomUUID(),kind:'fortisni-vision-context',userId:'owner-a',contextKey:'owner-a',summary:'expired',createdAt:now-700000,expiresAt:now-1,used:false}
+ ];
+ try{
+  for(const row of rows)await store.insertAsync('aiEngineerRuns',row);
+  assert.equal(await store.consumeFortisniVisionContext('owner-a'),null);
+  assert.equal((await store.findByIdAsync('aiEngineerRuns',rows[0].id)).used,false);
+  assert.equal((await store.findByIdAsync('aiEngineerRuns',rows[1].id)).used,false);
+ }finally{for(const row of rows)await store.deleteByIdAsync('aiEngineerRuns',row.id);}
 });
