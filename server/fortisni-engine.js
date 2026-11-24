@@ -29,7 +29,7 @@ function analyzeText(text,context={}){
  if(context.isTyping===true&&match.emotion==='neutral')state='thinking';
  if(context.isSpeaking===true)state='speaking';
  const emotion=match.emotion;
- const intensity=originalValue?match.intensity:0.15;
+ const intensity=value?match.intensity:0.15;
  return {emotion,state,intensity,expression:emotion==='joy'?'smile':emotion==='sadness'?'soft':emotion==='anger'?'focused':emotion==='fear'?'concerned':emotion==='curiosity'?'wide_eyes':emotion==='affection'?'warm_smile':'neutral',animation:state,question,transition:prior&&prior!==state?'transition':'steady'};
 }
 function getReaction(text,context={}){
