@@ -32,12 +32,19 @@
     ['curious', /\b(why|how|what|when|where|which|explain|tell me|can you)\b/, ['क्यों', 'कैसे', 'क्या', 'कब', 'कहां', 'कौन', 'समझाओ', 'बताओ', 'kyun', 'kyu', 'kaise', 'kya', 'kab', 'kahan', 'kaun', 'samjhao', 'batao']]
   ];
 
+  function matchesPhrase(text, phrase) {
+    if (/[\\u0900-\\u097F]/.test(phrase)) return text.includes(phrase);
+    const normalizedText = ' ' + text.replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
+    const normalizedPhrase = phrase.replace(/[^a-z0-9]+/g, ' ').trim();
+    return normalizedText.includes(' ' + normalizedPhrase + ' ');
+  }
+
   function classifyText(value, source) {
     const text = String(value == null ? '' : value).toLowerCase().trim();
     if (!text) return 'idle';
 
     for (const [state, pattern, phrases] of MATCHERS) {
-      if (pattern.test(text) || phrases.some(phrase => text.includes(phrase))) return state;
+      if (pattern.test(text) || phrases.some(phrase => matchesPhrase(text, phrase))) return state;
     }
 
     if (source === 'assistant') return 'speaking';
