@@ -153,6 +153,25 @@ test('PostgreSQL integration: shared rate limits, atomic login lockout and quota
     assert.equal(stored.summary,context.summary);
    }finally{await store.deleteByIdAsync('aiEngineerRuns',contextId);}
   });
+  await t.test('public bot discovery pages and filters in PostgreSQL without loading the full collection',async()=>{
+   const otherOwner=crypto.randomUUID(),viewer=crypto.randomUUID(),ids=[crypto.randomUUID(),crypto.randomUUID(),crypto.randomUUID()];
+   const rows=[
+    {id:ids[0],ownerId:userId,name:'Alpha Tutor',description:'Math help',isPublic:true,createdAt:'2026-01-01T00:00:00.000Z'},
+    {id:ids[1],ownerId:otherOwner,name:'Beta Tutor',description:'Programming help',isPublic:true,createdAt:'2026-01-02T00:00:00.000Z'},
+    {id:ids[2],ownerId:otherOwner,name:'Private Tutor',description:'Private bot',isPublic:false,createdAt:'2026-01-03T00:00:00.000Z'}
+   ];
+   try{
+    for(const row of rows)await store.insertAsync('bots',row);
+    const first=await store.findPublicBotsPage({ownerId:viewer,query:'tutor',limit:1,offset:0});
+    assert.equal(first.total,2);
+    assert.deepEqual(first.bots.map(bot=>bot.id),[ids[1]]);
+    const second=await store.findPublicBotsPage({ownerId:viewer,query:'tutor',limit:1,offset:1});
+    assert.equal(second.total,2);
+    assert.deepEqual(second.bots.map(bot=>bot.id),[ids[0]]);
+    const ownerView=await store.findPublicBotsPage({ownerId:otherOwner,query:'tutor',limit:10,offset:0});
+    assert.deepEqual(ownerView.bots.map(bot=>bot.id),[ids[0]]);
+   }finally{for(const id of ids)await store.deleteByIdAsync('bots',id);}
+  });
   await t.test('concurrent quota reservations never exceed the daily limit',async()=>{
    const day=new Date().toISOString().slice(0,10);
    const results=await Promise.all(Array.from({length:8},async()=>{
