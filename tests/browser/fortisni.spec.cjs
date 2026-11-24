@@ -42,3 +42,16 @@ test('Fortisni displays untrusted text as text, never as executable markup', asy
   await expect(page.locator('#fortisni-companion img')).toHaveCount(0);
   expect(await page.evaluate(() => window.__fortisniXss)).toBeUndefined();
 });
+
+test('Fortisni preserves its dedicated warm expression for affectionate Hinglish text', async ({ page }) => {
+  const companion = page.locator('#fortisni-companion');
+  await page.evaluate(() => window.setFortisniText('Tum mere dost ho', 'user'));
+  await expect(companion).toHaveAttribute('data-state', 'warm');
+  await expect(companion.locator('[role="status"]')).toHaveText('I’m glad you’re here. What’s on your mind?');
+});
+
+test('Fortisni ignores accidental affection substrings in unrelated Roman Hindi words', async ({ page }) => {
+  const companion = page.locator('#fortisni-companion');
+  await page.evaluate(() => window.setFortisniText('This is a dostana movie', 'user'));
+  await expect(companion).toHaveAttribute('data-state', 'idle');
+});
