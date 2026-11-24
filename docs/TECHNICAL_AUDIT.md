@@ -74,7 +74,7 @@ This section supersedes the earlier baseline statements where the implementation
 - Chat message/history limits, pre-call quota reservation, usage event recording and quota release on failed provider calls.
 - Upload byte limits, extension checks and extracted-text limits. These controls do not replace malware scanning or parser isolation.
 - Provider adapters for Anthropic, OpenAI and Gemini; provider calls still need live credential, timeout and failure-mode testing.
-- User-scoped memory routes, explicit memory deletion and opt-in automatic extraction with sensitive-trait exclusions in the extraction prompt.
+- User-scoped memory routes, explicit memory deletion and opt-in automatic extraction. AI-generated memory candidates also pass a server-side defense-in-depth filter for common sensitive traits, identifiers and secrets; this pattern-based filter is not an exhaustive guarantee, so automatic memory remains opt-in.
 - PostgreSQL runtime adapter, migration tooling, quota reservation storage and webhook idempotency foundations.
 - CI tests, syntax checks, dependency audit and heuristic security scanning.
 - Admin-only AI Engineer with bounded source paths, 30 KB patch limit, syntax validation, stale-file SHA check, explicit confirmation and draft-PR-only GitHub writes.
