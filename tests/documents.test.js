@@ -7,7 +7,7 @@ const suiteDir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-doc-suite-'));
 process.env.NODE_ENV='test';
 process.env.JWT_SECRET='upload-limit-test-secret-with-at-least-thirty-two-characters';
 process.env.BOTFORGE_DATA_FILE=path.join(suiteDir,'db.json');
-const {extractText,publicDoc,getDocumentCapacityError,documentContentHash,MAX_DOCUMENTS_PER_BOT,MAX_DOCUMENT_TEXT_PER_BOT}=require('../server/documents');
+const {extractText,publicDoc,getDocumentCapacityError,documentContentHash,MAX_DOCUMENTS_PER_BOT,MAX_DOCUMENT_TEXT_PER_BOT,MAX_CONCURRENT_PDF_PARSERS,parsePdfInWorker,acquirePdfParserSlot,releasePdfParserSlot,getPdfParserCapacity}=require('../server/documents');
 
 async function withFile(name,bytes,fn){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-doc-'));
@@ -163,4 +163,22 @@ test('knowledge document storage atomically enforces per-bot duplicate and capac
  const otherBot=uuidv4(),textLimit=await store.insertDocumentWithinCapacity({...second,id:uuidv4(),botId:otherBot,contentHash:documentContentHash('123456') ,characterCount:6,chunks:[{text:'123456'}]},{maxDocuments:2,maxCharacters:5});
  assert.equal(textLimit.reason,'character_limit');
  for(const doc of [first,second])await store.deleteByIdAsync('documents',doc.id);
+});
+
+
+test('PDF parser worker concurrency is globally bounded and slots are released',async()=>{
+ const initial=getPdfParserCapacity();
+ assert.equal(initial.active,0);
+ assert.equal(initial.max,MAX_CONCURRENT_PDF_PARSERS);
+ const acquired=[];
+ try{
+  for(let i=0;i<MAX_CONCURRENT_PDF_PARSERS;i++){assert.equal(acquirePdfParserSlot(),true);acquired.push(true);}
+  assert.equal(getPdfParserCapacity().active,MAX_CONCURRENT_PDF_PARSERS);
+  assert.equal(acquirePdfParserSlot(),false,'additional parser work must be rejected at capacity');
+  await assert.rejects(()=>parsePdfInWorker(Buffer.from('%PDF-1.7')),error=>error.status===503&&/busy/i.test(error.message));
+  releasePdfParserSlot();acquired.pop();
+  assert.equal(acquirePdfParserSlot(),true,'a released parser slot can be reused');acquired.push(true);
+  assert.equal(getPdfParserCapacity().active,MAX_CONCURRENT_PDF_PARSERS);
+ }finally{for(let i=0;i<acquired.length;i++)releasePdfParserSlot();}
+ assert.equal(getPdfParserCapacity().active,0);
 });
