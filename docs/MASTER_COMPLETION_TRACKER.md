@@ -1,8 +1,8 @@
 # BotForge Master Completion Tracker
 
 **Repository:** `rayyan-anwar/Bot--Maker`  
-**Baseline:** `main` at `8e17a7e5610c947b5d2be8d5d940610a6fb5d617`  
-**Last reconciled:** 2026-11-24 (after PRs #104, #106, #107 and #108)  
+**Baseline:** `main` at `2134afeeea68aa2e222510c4fae821d8bf4c644f`  
+**Last reconciled:** 2026-11-24 (after PRs #104, #106, #107, #108 and #109)  
 **Purpose:** One evidence-led view of implementation, automated verification, and release blockers.
 
 ## Status definitions
@@ -82,8 +82,9 @@ Do not calculate a project-wide percentage by counting files, commits, PRs, or c
 2. **PR #106 merged:** Bot creation plus initial history is atomic; edit, restore, publish and unpublish use version-checked atomic persistence in the JSON and PostgreSQL adapters. Node.js 18/20/22, PostgreSQL 16 integration, Docker readiness, security scan and Full Chat Browser E2E passed on the exact PR head SHA.
 3. **PR #107 merged:** Fortisni Roman Hindi/Hinglish affection matching now uses word boundaries; dedicated warm visual state is preserved; emotional user reactions are not overwritten by generic thinking state. Node.js 18/20/22, PostgreSQL 16, Docker, Full Chat Browser E2E and Fortisni Chromium E2E passed on its exact head SHA.
 4. **PR #108 merged:** Automatic memory candidates now pass a server-side defense-in-depth filter for common health, religion, politics, sexuality, identity, credential, government/financial identifier and contact-data patterns. Manual user-entered memory remains unchanged. Node.js 18/20/22, PostgreSQL 16, Docker, security scans and Full Chat Browser E2E passed on the exact PR head SHA.
-5. Continue P0/P1 source review and select the next code batch from verified gaps, not feature-count pressure.
-6. Keep infrastructure/device/provider-dependent work explicitly blocked until access and evidence are available.
+5. **PR #109 merged:** Public bot discovery supports validated search and bounded pages, dashboard search/load-more, owner exclusion and private-bot exclusion. Node.js 18/20/22, PostgreSQL 16, Docker and Full Chat Browser E2E passed on the exact PR head SHA. The current implementation still materializes the public-bot collection before slicing; database-side pagination is a scale follow-up.
+6. Continue P0/P1 source review and select the next code batch from verified gaps, not feature-count pressure.
+7. Keep infrastructure/device/provider-dependent work explicitly blocked until access and evidence are available.
 
 ## Release authority
 
@@ -99,3 +100,5 @@ The [release acceptance checklist](RELEASE_ACCEPTANCE_CHECKLIST.md) is the contr
 - PR #107 exact head SHA `00ba7089d562a4c20313fe2139cf2ddf28f0c76b` passed Node.js 18/20/22 tests, syntax/security checks, PostgreSQL 16 integration and backup/restore rehearsal, Docker readiness, Full Chat Browser E2E, and Fortisni Chromium E2E.
 
 - PR #108 exact head SHA `75d653e483d42470a123f8ca60139e9ba216b0f0` passed Node.js 18/20/22 tests, syntax/security checks, PostgreSQL 16 integration including backup/restore rehearsal, Docker readiness, and Full Chat Browser E2E. Its integration test verifies sensitive AI-generated memory candidates are dropped while a safe preference is retained.
+
+- PR #109 exact head SHA `f96b0b2405c16fa56c86eddaa398bda0231a7ddf` passed Node.js 18/20/22 tests, syntax/security checks, PostgreSQL 16 integration including backup/restore rehearsal, Docker readiness and Full Chat Browser E2E.
