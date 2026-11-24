@@ -100,3 +100,12 @@ test('Fortisni does not trigger affection from Roman Hindi substrings inside unr
  assert.equal(Fortisni.classifyText('That was a yaadgar moment','user'),'idle');
  assert.equal(Fortisni.classifyText('Tum mere dost ho','user'),'warm');
 });
+
+test('Fortisni keeps the dedicated warm visual state for affection',()=>{
+ const status={textContent:''};
+ const host={dataset:{},innerHTML:'',querySelector:()=>status};
+ const mounted=Fortisni.mount({getElementById:()=>host});
+ assert.equal(mounted.setText('I miss you','user'),'warm');
+ assert.equal(host.dataset.state,'warm');
+ assert.equal(host.dataset.emotion,'warm');
+});
