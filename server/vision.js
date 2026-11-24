@@ -48,8 +48,10 @@ router.post('/analyze',requireAuth,limiter,upload.single('image'),async(req,res,
   providerResult=await providers.generateVision({model:generation.model,prompt,imageBase64:req.file.buffer.toString('base64'),mimeType,maxTokens:512});
   if(budget)await usage.settleAiBudget(budget,providerResult);
   await usage.recordUsage({userId:req.user.id,botId:null,provider:'openai',model:generation.model,inputTokens:providerResult.inputTokens,outputTokens:providerResult.outputTokens,reservationId:quota.reservationId});
+  const contextRecord={id:require('crypto').randomUUID(),kind:'fortisni-vision-context',userId:req.user.id,botId:null,summary:providerResult.text.slice(0,3000),createdAt:Date.now(),expiresAt:Date.now()+10*60*1000};
+  await require('./store').insertAsync('aiEngineerRuns',contextRecord);
   quota=null;budget=null;
-  return res.json({assistant:{role:'assistant',content:providerResult.text},provider:'openai',model:generation.model,serverMediaRetained:false});
+  return res.json({assistant:{role:'assistant',content:providerResult.text},provider:'openai',model:generation.model,serverMediaRetained:false,contextAvailableForChat:true});
  }catch(error){
   if(quota){try{if(providerResult)await usage.recordUsage({userId:req.user.id,botId:null,provider:'openai',model:process.env.OPENAI_VISION_MODEL||'gpt-5.5',inputTokens:providerResult.inputTokens,outputTokens:providerResult.outputTokens,reservationId:quota.reservationId});else await usage.releaseReservation(quota.reservationId);}catch(releaseError){console.error('Vision usage reservation requires reconciliation:',releaseError.message);}}
   if(budget&&!providerStarted){try{await usage.releaseAiBudget(budget);}catch(releaseError){console.error('Vision AI budget reservation requires reconciliation:',releaseError.message);}}
