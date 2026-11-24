@@ -72,3 +72,8 @@
 .fortisni-vision-form #fortisni-vision-status{grid-column:1/-1;min-height:1.2em}
 .fortisni-vision-file:focus-within,.fortisni-vision-file:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 @media(max-width:560px){.fortisni-vision-form{margin-left:12px;margin-right:12px;grid-template-columns:1fr}.fortisni-vision-form button{width:100%}}
+
+/* Warm/affectionate companion reaction */
+.fortisni-companion[data-state="warm"] .fortisni-aura{stroke:#34d399}
+.fortisni-companion[data-state="warm"] .fortisni-eyes{transform:scaleY(.45);transform-origin:center}
+.fortisni-companion[data-state="warm"] .fortisni-mouth{transform:scale(1.08);transform-origin:center}

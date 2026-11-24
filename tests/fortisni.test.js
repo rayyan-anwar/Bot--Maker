@@ -89,3 +89,8 @@ test('Fortisni reset clears mood and recent context',()=>{
  session.reset();
  assert.deepEqual(session.snapshot(),{state:'idle',neutralTurns:0,recent:[]});
 });
+
+test('Fortisni reacts warmly to affectionate English, Hindi and Hinglish messages',()=>{
+ for(const message of ['I miss you','Love you buddy','मुझे तुम्हारी याद आती है','Tum mere dost ho'])
+  assert.equal(Fortisni.classifyText(message,'user'),'warm',message);
+});

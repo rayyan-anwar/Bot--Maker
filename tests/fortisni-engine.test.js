@@ -27,3 +27,9 @@ test('server emotion engine preserves neutral fallback for unrelated Hinglish te
  assert.equal(analyzeText('Kal meeting 4 baje hai').emotion,'neutral');
  assert.equal(analyzeText('').state,'idle');
 });
+
+test('affection phrases are not swallowed by the sadness matcher',()=>{
+ assert.equal(analyzeText('I miss you').emotion,'affection');
+ assert.equal(analyzeText('Love you buddy').state,'warm');
+ assert.equal(analyzeText('I feel lonely').emotion,'sadness');
+});
