@@ -37,5 +37,6 @@ test('shutdown force-closes an HTTP connection that does not finish within the g
  await shutdown();
  server=null;
  assert.ok(Date.now()-began<1500,'shutdown should respect its bounded HTTP grace period');
+ await new Promise(resolve=>{if(socket.destroyed)return resolve();socket.once('close',resolve);});
  assert.equal(socket.destroyed,true);
 });
