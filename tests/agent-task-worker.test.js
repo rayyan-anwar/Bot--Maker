@@ -238,7 +238,7 @@ test('automation execution continues when Fortisni event persistence fails',asyn
  try{
   const result=await worker.executeAutomationWorkflow(task);
   assert.equal(result.workflowId,workflow.id);
-  assert.equal(result.results.length,1);
+  assert.equal(result.completedSteps,1);
  }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;store.updateByIdAsync=savedUpdate;store.saveAgentTaskCheckpoints=savedCheckpoint;fortisniEvents.publish=savedPublish;}
 });
 
@@ -309,10 +309,19 @@ test('automation retries resume from durable step checkpoints without repeating 
  store.saveAgentTaskCheckpoints=async(id,workerId,now,checkpoints)=>{if(id!==task.id||workerId!==task.leaseOwner||taskRow.status!=='running'||Date.parse(taskRow.leaseExpiresAt)<=now.getTime())return null;taskRow.executionCheckpoints=checkpoints;return taskRow;};
  try{
   const result=await worker.executeAutomationWorkflow(task);
-  assert.equal(result.results.length,2);
-  assert.deepEqual(result.results[0],prior);
+  assert.equal(result.completedSteps,2);
+  assert.equal(Object.hasOwn(result,'results'),false);
   assert.equal(taskRow.executionCheckpoints.length,2);
   assert.equal(taskRow.executionCheckpoints[0].result.text,'first result');
   assert.equal(taskRow.executionCheckpoints[1].step,2);
  }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;store.updateByIdAsync=savedUpdate;store.saveAgentTaskCheckpoints=savedCheckpoint;}
+});
+
+
+test('knowledge search always uses the authenticated task owner, not workflow-supplied identity',async()=>{
+ let received;
+ await worker.executeKnowledgeSearchForTask({userId:owner},{botId:'owned-bot',query:'private data',userId:'attacker-controlled-user'},async args=>{received=args;return {results:[]};});
+ assert.equal(received.userId,owner);
+ assert.equal(received.botId,'owned-bot');
+ assert.equal(received.query,'private data');
 });
