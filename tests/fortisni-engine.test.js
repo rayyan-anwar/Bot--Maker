@@ -39,3 +39,10 @@ test('affection detection does not match Roman Hindi substrings inside unrelated
  assert.equal(analyzeText('It was a yaadgar moment').emotion,'neutral');
  assert.equal(analyzeText('Tum mere dost ho').emotion,'affection');
 });
+
+test('server emotion engine respects negation in English, Hindi and Hinglish',()=>{
+ for(const message of ['I am not happy today','I am not sad anymore','I do not feel angry','I am not worried','Main khush nahi hoon','Main gussa nahi hoon','मैं दुखी नहीं हूं','मैं खुश नहीं हूँ'])
+  assert.equal(analyzeText(message).emotion,'neutral',message);
+ assert.equal(analyzeText('I am not sad but happy').emotion,'joy');
+ assert.equal(analyzeText('I am not happy but excited').emotion,'joy');
+});
