@@ -60,6 +60,7 @@
     <button id="fortisni-mic-btn" type="button" class="btn btn-ghost" aria-label="Start voice input" aria-pressed="false">Voice input</button>
     <button id="fortisni-speech-btn" type="button" class="btn btn-ghost" aria-pressed="false">Read replies: Off</button>
     <button type="submit" class="btn btn-primary">Send</button>
+    <span id="fortisni-voice-status" role="status" aria-live="polite">Voice features are optional and depend on browser support.</span>
   </form>
 </section>
 
@@ -253,7 +254,7 @@
       voiceController.speak(result.assistant.content);
       pending.classList.remove('pending');
       window.setFortisniText(result.assistant.content,'assistant');
-      window.setTimeout(()=>window.setFortisniState('idle'),2600);
+      if(!voiceController.isSpeechEnabled())window.setTimeout(()=>window.setFortisniState('idle'),2600);
       visionStatus.textContent='Analysis complete. The uploaded image is not stored by BotForge.';
       visionImage.value='';
       visionPrompt.value='';
@@ -289,9 +290,9 @@
       if(!message)throw new Error('The streaming connection ended before the response was saved.');
       window.clearTimeout(thinkingTimer);
       pending.textContent=message.content;
-      voiceController.speak(message.content);
+      const spoken=voiceController.speak(message.content);
       window.setFortisniText(message.content, 'assistant');
-      window.setTimeout(() => window.setFortisniState('idle'), 2600);
+      if(!spoken)window.setTimeout(() => window.setFortisniState('idle'), 2600);
       if (sendButton) sendButton.disabled = false;
       pending.classList.remove('pending');
       if (sources.length) {
