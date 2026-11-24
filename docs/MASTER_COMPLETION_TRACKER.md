@@ -1,8 +1,8 @@
 # BotForge Master Completion Tracker
 
 **Repository:** `rayyan-anwar/Bot--Maker`  
-**Baseline:** `223b18945279f7edfe16eaea9ff1284755c7ecd2` at `56042cf635e3391c1a1cab0821bd9fb99a172343`  
-**Last reconciled:** 2026-11-24 (after PR #121; PR #104–#121 reconciled)
+**Baseline:** `797234fd3d7ffec049d2292249b9f9c181653dee` at `56042cf635e3391c1a1cab0821bd9fb99a172343`  
+**Last reconciled:** 2026-11-24 (after PR #122; PR #104–#122 reconciled)
 **Purpose:** One evidence-led view of implementation, automated verification, and release blockers.
 
 ## Status definitions
@@ -141,3 +141,5 @@ The [release acceptance checklist](RELEASE_ACCEPTANCE_CHECKLIST.md) is the contr
 - Main commit `e40073d77b2c47fe36a0e64ecbaf78e3171a92f9` passed all nine post-merge checks after PR #118 and tracker PR #119: Node.js 18/20/22, PostgreSQL 16 integration, Docker image build, Full Chat Browser E2E, Fortisni Chromium E2E, AI Engineer Admin Browser E2E and workflow generation. This validates this main commit in CI only, not a live deployment.
 
 - Main commit `223b18945279f7edfe16eaea9ff1284755c7ecd2` passed all nine post-merge checks after PR #121: Node.js 18/20/22, PostgreSQL 16 integration, Docker image build, Full Chat Browser E2E, Fortisni Chromium E2E, AI Engineer Admin Browser E2E and workflow generation. CI success does not establish staging or production behavior.
+
+- Documentation PR #122 merged tracker reconciliation for PR #121. Main commit `223b18945279f7edfe16eaea9ff1284755c7ecd2` passed all nine post-merge CI checks after the PDF parser concurrency hardening. The current baseline is the subsequent documentation-only main commit `797234fd3d7ffec049d2292249b9f9c181653dee`.
