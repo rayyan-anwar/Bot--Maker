@@ -68,3 +68,19 @@ The staging smoke command is implemented, but no real staging URL was supplied o
 5. **Cross-platform QA:** complete responsive/accessibility/browser test matrix first; native Capacitor/Tauri packaging remains a separate milestone and must not be represented as completed.
 
 These are sequencing decisions, not claims that the listed work is already implemented.
+
+
+## Verified checkpoint — 2026-11-24
+
+The following changes have been merged to `main` and verified through their recorded CI checks:
+
+- PR #92: bounded HTTP server shutdown and lingering-socket cleanup; BotForge CI and Full Chat Browser E2E passed.
+- PR #93: strict plain-JSON Agent Lab tool argument validation; BotForge CI and Full Chat Browser E2E passed.
+- PR #94: bounded automation completion payloads with durable checkpoints, workflow revision pinning, and authenticated-owner-scoped knowledge search; Node.js 18/20/22 verification, PostgreSQL 16 integration, Docker image build, and Full Chat Browser E2E passed.
+- PR #95: strict single-hop trusted proxy configuration and forwarding-header spoofing tests; BotForge CI and Full Chat Browser E2E passed.
+- PR #96: deterministic English/Hindi retrieval golden dataset and recall@k / mean reciprocal rank quality gate; BotForge CI passed.
+- PR #97: Prometheus starter alert rules for server error rate, average request duration and resident memory; BotForge CI passed.
+
+The earlier PRs #85, #86, #88, #89 and #90 were closed as superseded by the consolidated merged implementations above.
+
+These checks validate repository code and CI only. Live provider credentials, actual Prometheus/Alertmanager deployment, managed staging, production backup/restore, independent security testing and physical device validation remain separate release gates.
