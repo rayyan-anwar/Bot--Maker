@@ -130,6 +130,31 @@ async function insertAgentTaskWithinCapacity(record,maxActive=100){
  }catch(error){try{await client.query('ROLLBACK');}catch(_){}throw error;}finally{client.release();}
 }
 async function updateByIdAsync(c,id,patch){assertCollection(c);if(!isUuid(id))return null;if(!isPostgres())return updateById(c,id,patch);await initialize();const r=await pool.query("UPDATE botforge_records SET data=data || $3::jsonb,updated_at=now() WHERE collection=$1 AND id=$2 RETURNING data",[c,id,JSON.stringify(patch)]);return r.rowCount?r.rows[0].data:null;}
+
+async function applySubscriptionEvent(userId,provider,subscriptionId,patch,{requireOwnership=false,ended=false}={}){
+ const fields={stripe:{current:'stripeSubscriptionId',other:'razorpaySubscriptionId',tombstone:'stripeEndedSubscriptionId'},razorpay:{current:'razorpaySubscriptionId',other:'stripeSubscriptionId',tombstone:'razorpayEndedSubscriptionId'}};
+ const selected=fields[provider];
+ if(!selected||!isUuid(userId)||typeof subscriptionId!=='string'||!subscriptionId.trim()||subscriptionId!==subscriptionId.trim()||subscriptionId.length>255||/[\u0000-\u001f\u007f]/.test(subscriptionId)||!patch||typeof patch!=='object'||Array.isArray(patch))throw new TypeError('Invalid subscription event update.');
+ const update={...patch,...(ended?{[selected.tombstone]:subscriptionId}:{})};
+ const matches=user=>{
+  if(!user||user[selected.other])return false;
+  const current=user[selected.current]||null;
+  if(requireOwnership)return current===subscriptionId;
+  return (!current||current===subscriptionId)&&user[selected.tombstone]!==subscriptionId;
+ };
+ if(!isPostgres()){
+  const user=findById('users',userId);
+  return matches(user)?updateById('users',userId,update):null;
+ }
+ await initialize();
+ const currentKey=selected.current,otherKey=selected.other,tombstoneKey=selected.tombstone;
+ const condition=requireOwnership
+  ? "data->>$2=$3 AND COALESCE(data->>$4,'')=''"
+  : "COALESCE(data->>$4,'')='' AND (COALESCE(data->>$2,'')='' OR data->>$2=$3) AND COALESCE(data->>$5,'')<>$3";
+ const result=await pool.query("UPDATE botforge_records SET data=data || $6::jsonb,updated_at=now() WHERE collection='users' AND id=$1 AND "+condition+" RETURNING data",[userId,currentKey,subscriptionId,otherKey,tombstoneKey,JSON.stringify(update)]);
+ return result.rowCount?result.rows[0].data:null;
+}
+
 async function saveAgentTaskCheckpoints(taskId,workerId,now,checkpoints){
  if(typeof taskId!=='string'||!taskId||typeof workerId!=='string'||!workerId||!(now instanceof Date)||!Number.isFinite(now.getTime())||!Array.isArray(checkpoints))throw new TypeError('Invalid agent task checkpoint update.');
  const timestamp=now.toISOString();
@@ -418,4 +443,4 @@ async function consumeSocialOAuthState(stateHash,userId,platform,now=new Date())
 async function query(sql,values=[]){if(!isPostgres())throw new Error('Shared PostgreSQL storage is not configured.');await initialize();return pool.query(sql,values);}
 async function health(){if(!isPostgres())return {ok:true,database:'json-development'};try{await initialize();await pool.query('SELECT 1');return {ok:true,database:'postgres'};}catch(_){return {ok:false,database:'postgres'};}}
 async function close(){if(pool){await pool.end();pool=null;}initialized=false;}
-module.exports={createBotWithVersion,updateBotVersioned,initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findPublicBotsPage,findByIdAsync,insertAsync,insertAgentTaskIdempotent,insertAgentTaskWithinCapacity,updateByIdAsync,saveAgentTaskCheckpoints,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,claimDueAutomationWorkflows,finishAutomationScheduleClaim,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,transitionAgentRunStatus,consumeSocialOAuthState,consumeFortisniVisionContext,insertDocumentWithinCapacity,query,health,load,persist};
+module.exports={createBotWithVersion,updateBotVersioned,initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findPublicBotsPage,findByIdAsync,insertAsync,applySubscriptionEvent,insertAgentTaskIdempotent,insertAgentTaskWithinCapacity,updateByIdAsync,saveAgentTaskCheckpoints,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,claimDueAutomationWorkflows,finishAutomationScheduleClaim,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,transitionAgentRunStatus,consumeSocialOAuthState,consumeFortisniVisionContext,insertDocumentWithinCapacity,query,health,load,persist};

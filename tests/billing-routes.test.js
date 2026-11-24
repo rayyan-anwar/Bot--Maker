@@ -45,4 +45,65 @@ test('billing endpoints enforce authentication and fail closed when providers ar
  const duplicate=await fetch(base+'/api/billing/razorpay/webhook',{method:'POST',headers:eventHeaders,body:webhookBody});
  assert.equal(duplicate.status,200);
  assert.deepEqual(await duplicate.json(),{received:true,duplicate:true});
+
+ const stripeClaim=store.applySubscriptionEvent(
+  (await store.findManyAsync('users',{email:'billing-test@example.com'}))[0].id,
+  'stripe','sub_stripe_race_1',{plan:'plus',stripeSubscriptionId:'sub_stripe_race_1'}
+ );
+ const razorpayClaim=store.applySubscriptionEvent(
+  (await store.findManyAsync('users',{email:'billing-test@example.com'}))[0].id,
+  'razorpay','sub_rzp_race_1',{plan:'pro',razorpaySubscriptionId:'sub_rzp_race_1'}
+ );
+ const [stripeResult,razorpayResult]=await Promise.all([stripeClaim,razorpayClaim]);
+ assert.equal(Number(!!stripeResult)+Number(!!razorpayResult),1,'only one provider may claim an unlinked account');
+ const provider=stripeResult?'stripe':'razorpay';
+ const subscriptionId=stripeResult?'sub_stripe_race_1':'sub_rzp_race_1';
+ const endedPatch=provider==='stripe'?{plan:'free',stripeSubscriptionId:null}:{plan:'free',razorpaySubscriptionId:null};
+ const ended=await store.applySubscriptionEvent(
+  (await store.findManyAsync('users',{email:'billing-test@example.com'}))[0].id,
+  provider,subscriptionId,endedPatch,{requireOwnership:true,ended:true}
+ );
+ assert.ok(ended,'the current subscription can be ended');
+ const stale=await store.applySubscriptionEvent(
+  (await store.findManyAsync('users',{email:'billing-test@example.com'}))[0].id,
+  provider,subscriptionId,{plan:'pro',[provider==='stripe'?'stripeSubscriptionId':'razorpaySubscriptionId']:subscriptionId}
+ );
+ assert.equal(stale,null,'a stale active event cannot resurrect an ended subscription');
+ const replacementId=provider==='stripe'?'sub_stripe_replacement':'sub_rzp_replacement';
+ const replacement=await store.applySubscriptionEvent(
+  (await store.findManyAsync('users',{email:'billing-test@example.com'}))[0].id,
+  provider,replacementId,{plan:'plus',[provider==='stripe'?'stripeSubscriptionId':'razorpaySubscriptionId']:replacementId}
+ );
+ assert.ok(replacement,'a distinct replacement subscription can be linked');
+});
+
+
+test('subscription webhooks cannot overwrite a different provider or newer subscription',()=>{
+ const {canClaimSubscription,ownsSubscription}=require('../server/billing');
+ const stripeUser={id:'user-1',stripeSubscriptionId:'sub_stripe_new'};
+ const razorpayUser={id:'user-1',razorpaySubscriptionId:'sub_rzp_new'};
+ assert.equal(canClaimSubscription(stripeUser,'stripe','sub_stripe_old'),false);
+ assert.equal(canClaimSubscription(razorpayUser,'razorpay','sub_rzp_old'),false);
+ assert.equal(canClaimSubscription(stripeUser,'razorpay','sub_rzp_old'),false);
+ assert.equal(canClaimSubscription(razorpayUser,'stripe','sub_stripe_old'),false);
+ assert.equal(ownsSubscription(stripeUser,'stripe','sub_stripe_old'),false);
+ assert.equal(ownsSubscription(razorpayUser,'razorpay','sub_rzp_old'),false);
+ assert.equal(ownsSubscription(stripeUser,'stripe','sub_stripe_new'),true);
+ assert.equal(ownsSubscription(razorpayUser,'razorpay','sub_rzp_new'),true);
+});
+
+test('first subscription event may claim an unlinked account but deletion must match its subscription',()=>{
+ const {canClaimSubscription,ownsSubscription}=require('../server/billing');
+ const user={id:'user-1'};
+ assert.equal(canClaimSubscription(user,'stripe','sub_stripe_1'),true);
+ assert.equal(canClaimSubscription(user,'razorpay','sub_rzp_1'),true);
+ assert.equal(ownsSubscription(user,'stripe','sub_stripe_1'),false);
+ assert.equal(ownsSubscription(user,'razorpay','sub_rzp_1'),false);
+});
+
+test('Stripe subscription terminal-state detection preserves recoverable statuses',()=>{
+ const {isStripeSubscriptionTerminal}=require('../server/billing');
+ assert.equal(isStripeSubscriptionTerminal('canceled'),true);
+ assert.equal(isStripeSubscriptionTerminal('incomplete_expired'),true);
+ for(const status of ['incomplete','active','trialing','past_due','unpaid','paused','unknown'])assert.equal(isStripeSubscriptionTerminal(status),false,status);
 });

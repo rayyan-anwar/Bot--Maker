@@ -40,6 +40,39 @@ test('PostgreSQL integration: shared rate limits, atomic login lockout and quota
    assert.equal(user.failedLoginAttempts,3);
    assert.ok(user.lockedAt);
   });
+  await t.test('subscription claims are atomic across providers and ended events cannot be resurrected',async()=>{
+   const claims=await Promise.all([
+    store.applySubscriptionEvent(userId,'stripe','sub_pg_stripe_race',{plan:'plus',stripeSubscriptionId:'sub_pg_stripe_race'}),
+    store.applySubscriptionEvent(userId,'razorpay','sub_pg_razorpay_race',{plan:'pro',razorpaySubscriptionId:'sub_pg_razorpay_race'})
+   ]);
+   assert.equal(claims.filter(Boolean).length,1);
+   const provider=claims[0]?'stripe':'razorpay';
+   const subscriptionId=provider==='stripe'?'sub_pg_stripe_race':'sub_pg_razorpay_race';
+   const idField=provider==='stripe'?'stripeSubscriptionId':'razorpaySubscriptionId';
+   const ended=await store.applySubscriptionEvent(userId,provider,subscriptionId,{plan:'free',[idField]:null},{ended:true});
+   assert.ok(ended);
+   assert.equal(await store.applySubscriptionEvent(userId,provider,subscriptionId,{plan:'pro',[idField]:subscriptionId}),null);
+   const replacementId=provider==='stripe'?'sub_pg_stripe_replacement':'sub_pg_razorpay_replacement';
+   assert.ok(await store.applySubscriptionEvent(userId,provider,replacementId,{plan:'plus',[idField]:replacementId}));
+   const outOfOrderUserId=crypto.randomUUID();
+   try{
+    await store.insertAsync('users',{id:outOfOrderUserId,email:'pg-out-of-order-'+outOfOrderUserId+'@example.test',name:'Out of order webhook test'});
+    assert.ok(await store.applySubscriptionEvent(outOfOrderUserId,provider,'sub_pg_cancel_first',{plan:'free',[idField]:null},{ended:true}));
+    assert.equal(await store.applySubscriptionEvent(outOfOrderUserId,provider,'sub_pg_cancel_first',{plan:'plus',[idField]:'sub_pg_cancel_first'}),null);
+   }finally{await store.deleteByIdAsync('users',outOfOrderUserId);}
+  });
+  await t.test('recoverable Stripe states retain ownership until activation or terminal cancellation',async()=>{
+   const recoverableUserId=crypto.randomUUID(),subscriptionId='sub_pg_recoverable';
+   try{
+    await store.insertAsync('users',{id:recoverableUserId,email:'pg-recoverable-'+recoverableUserId+'@example.test',name:'Recoverable Stripe state'});
+    assert.ok(await store.applySubscriptionEvent(recoverableUserId,'stripe',subscriptionId,{plan:'free',stripeSubscriptionId:subscriptionId}));
+    const activated=await store.applySubscriptionEvent(recoverableUserId,'stripe',subscriptionId,{plan:'plus',stripeSubscriptionId:subscriptionId});
+    assert.equal(activated.plan,'plus');
+    const cancelled=await store.applySubscriptionEvent(recoverableUserId,'stripe',subscriptionId,{plan:'free',stripeSubscriptionId:null},{ended:true});
+    assert.ok(cancelled);
+    assert.equal(await store.applySubscriptionEvent(recoverableUserId,'stripe',subscriptionId,{plan:'plus',stripeSubscriptionId:subscriptionId}),null);
+   }finally{await store.deleteByIdAsync('users',recoverableUserId);}
+  });
   await t.test('bot deletion removes version snapshots in PostgreSQL',async()=>{
    const botId=crypto.randomUUID(),versionId=crypto.randomUUID(),now=new Date().toISOString();
    await store.insertAsync('bots',{id:botId,ownerId:userId,name:'Version cleanup test',instructions:'Test',createdAt:now});
