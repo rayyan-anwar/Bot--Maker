@@ -41,7 +41,7 @@
      const reason=event&&event.error;
      status(reason==='not-allowed'||reason==='service-not-allowed'?'Microphone permission was denied. Allow microphone access or type your message.':reason==='no-speech'?'No speech detected. Try again.':'Voice input stopped. You can type your message.');
     };
-    recognition.onend=()=>{listening=false;recognition=null;};
+    recognition.onend=()=>{const wasListening=listening;listening=false;recognition=null;if(wasListening)status('Voice input finished. Review the text, then press Send.');};
     recognition.start();
     return true;
    }catch(error){listening=false;recognition=null;status('Could not start voice input. Check microphone permission and try again.');return false;}
