@@ -74,7 +74,6 @@ Most mainstream smartwatches do not include a built-in camera. Fortisni must the
 
 Planned product scope only. Implementation, device testing, and release approval remain separate milestones.
 
-
 ## Implemented phone visual-analysis slice
 
 The chat page now offers an explicit photo/camera picker for Fortisni. On supported mobile browsers, `capture="environment"` asks the browser to prefer the rear camera; the user still chooses and submits the image. No camera stream is opened by page load or in the background.
