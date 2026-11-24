@@ -238,7 +238,7 @@ test('automation execution continues when Fortisni event persistence fails',asyn
  try{
   const result=await worker.executeAutomationWorkflow(task);
   assert.equal(result.workflowId,workflow.id);
-  assert.equal(result.results.length,1);
+  assert.equal(result.completedSteps,1);
  }finally{automation.getOwned=savedGet;store.findByIdAsync=savedFind;store.updateByIdAsync=savedUpdate;store.saveAgentTaskCheckpoints=savedCheckpoint;fortisniEvents.publish=savedPublish;}
 });
 
