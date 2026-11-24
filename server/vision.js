@@ -11,6 +11,8 @@ const router=express.Router();
 
 const MAX_IMAGE_BYTES=4*1024*1024;
 const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:MAX_IMAGE_BYTES,files:1,fields:2,fieldSize:1000,parts:3}});
+router.use((_req,res,next)=>{res.setHeader('Cache-Control','no-store');next();});
+
 const limiter=rateLimit({
  windowMs:60*1000,
  limit:process.env.NODE_ENV==='test'?1000:5,
