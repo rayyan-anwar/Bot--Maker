@@ -36,7 +36,7 @@ test('Bot Studio dashboard exposes owner publish and unpublish controls',()=>{
  assert.match(html,/class="bot-publish-toggle"/);
  assert.match(html,/data-published=/);
  assert.match(html,/api\('\/bots\/'\+encodeURIComponent\(id\)\+\'\/\'/);
- assert.match(html,/const theirs = pub;/);
+ assert.ok(html.includes('async function loadPublicBots(append=false)'));
 });
 
 test('Bot Studio dashboard exposes version history and restore actions for owned bots',()=>{
@@ -51,4 +51,11 @@ test('Bot Studio version history uses DOM text APIs for saved summaries',()=>{
  assert.ok(html.includes("label.textContent='Version '+version.version"));
  assert.ok(html.includes("detail.textContent=' · '+version.summary"));
  assert.match(html,/panel\.replaceChildren\(\)/);
+});
+
+test('Bot Studio public discovery exposes search, pagination and load-more controls',()=>{
+ for(const id of ['public-bots-search','public-bots-search-btn','public-bots-load-more'])assert.ok(html.includes('id="'+id+'"'),id);
+ assert.match(html,/PUBLIC_BOT_PAGE_SIZE=24/);
+ assert.match(html,/publicBotOffset\+=PUBLIC_BOT_PAGE_SIZE/);
+ assert.match(html,/encodeURIComponent\(publicBotQuery\)/);
 });
