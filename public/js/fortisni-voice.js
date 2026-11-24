@@ -28,8 +28,8 @@
       if(typeof transcript!=='string')continue;
       if(result.isFinal)finalText+=transcript;else interimText+=transcript;
      }
-     const text=finalText||interimText;
-     if(text&&input){
+     if(interimText&&!finalText)status('Hearing: '+interimText.slice(0,120));
+     if(finalText&&input){
       const current=input.value.trim();
       input.value=current?(current+' '+text):text;
       if(typeof input.focus==='function')input.focus();
