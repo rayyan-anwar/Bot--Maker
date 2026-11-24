@@ -68,7 +68,7 @@ test('vision endpoint requires login and an explicit user-initiated upload',asyn
   const base='http://127.0.0.1:'+server.address().port;
   const unauthForm=new FormData();
   unauthForm.append('userInitiated','true');
-  unauthForm.append('image',new Blob([Buffer.from([137,80,78,71,13,10,26,10])],{type:'image/png}),'photo.png');
+  unauthForm.append('image',new Blob([Buffer.from([137,80,78,71,13,10,26,10])],{type:'image/png'}),'photo.png');
   const unauth=await fetch(base+'/api/vision/analyze',{method:'POST',body:unauthForm});
   assert.equal(unauth.status,401);
 
