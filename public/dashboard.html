@@ -63,10 +63,17 @@
 
   <div class="section-head">
     <h2 style="margin:0">Bots others have shared</h2>
+    <div class="public-bot-search">
+      <input id="public-bots-search" type="search" maxlength="80" placeholder="Search shared bots" aria-label="Search shared bots">
+      <button type="button" class="btn btn-secondary" id="public-bots-search-btn">Search</button>
+    </div>
   </div>
   <div id="public-bots" class="bot-grid"></div>
   <div id="public-bots-empty" class="empty-state" style="display:none">
     No public bots yet. Make one and share it!
+  </div>
+  <div style="display:flex;justify-content:center;margin:18px 0">
+    <button type="button" class="btn btn-secondary" id="public-bots-load-more" style="display:none">Load more bots</button>
   </div>
 </main>
 
@@ -205,18 +212,41 @@
       });
     }catch(error){panel.replaceChildren();const msg=document.createElement('p');msg.className='error-msg';msg.textContent=error.message||'Version history unavailable.';panel.appendChild(msg);}
   }
+  const PUBLIC_BOT_PAGE_SIZE=24;
+  let publicBotOffset=0,publicBotQuery='';
+  async function loadPublicBots(append=false){
+    const path='/bots/public?limit='+PUBLIC_BOT_PAGE_SIZE+'&offset='+publicBotOffset+'&q='+encodeURIComponent(publicBotQuery);
+    const {bots=[],pagination={}}=await api(path);
+    const pubEl=document.getElementById('public-bots');
+    const cards=bots.map(bot=>botCard(bot,false)).join('');
+    if(append)pubEl.insertAdjacentHTML('beforeend',cards);else pubEl.innerHTML=cards;
+    const empty=document.getElementById('public-bots-empty');
+    empty.textContent=publicBotQuery?'No shared bots match this search.':'No public bots yet. Make one and share it!';
+    empty.style.display=pubEl.children.length?'none':'block';
+    document.getElementById('public-bots-load-more').style.display=pagination.hasMore?'inline-flex':'none';
+  }
   async function loadBots() {
     const { bots: mine } = await api('/bots/mine');
     const mineEl = document.getElementById('my-bots');
     mineEl.innerHTML = mine.map((b) => botCard(b, true)).join('');
     document.getElementById('my-bots-empty').style.display = mine.length ? 'none' : 'block';
-
-    const { bots: pub } = await api('/bots/public');
-    const theirs = pub;
-    const pubEl = document.getElementById('public-bots');
-    pubEl.innerHTML = theirs.map((b) => botCard(b, false)).join('');
-    document.getElementById('public-bots-empty').style.display = theirs.length ? 'none' : 'block';
+    publicBotOffset=0;
+    await loadPublicBots(false);
   }
+  async function searchPublicBots(){
+    publicBotQuery=document.getElementById('public-bots-search').value.trim();
+    publicBotOffset=0;
+    await loadPublicBots(false);
+  }
+  document.getElementById('public-bots-search-btn').addEventListener('click',()=>searchPublicBots().catch(error=>{const empty=document.getElementById('public-bots-empty');empty.textContent=error.message;empty.style.display='block';}));
+  document.getElementById('public-bots-search').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();searchPublicBots().catch(error=>{const empty=document.getElementById('public-bots-empty');empty.textContent=error.message;empty.style.display='block';});}});
+  document.getElementById('public-bots-load-more').addEventListener('click',async()=>{
+    const button=document.getElementById('public-bots-load-more');
+    button.disabled=true;
+    try{publicBotOffset+=PUBLIC_BOT_PAGE_SIZE;await loadPublicBots(true);}
+    catch(error){publicBotOffset=Math.max(0,publicBotOffset-PUBLIC_BOT_PAGE_SIZE);const empty=document.getElementById('public-bots-empty');empty.textContent=error.message;empty.style.display='block';}
+    finally{button.disabled=false;}
+  });
   // Agent Lab: planning and owner-controlled review lifecycle.
   const agentForm=document.getElementById('agent-plan-form');
   const agentList=document.getElementById('agent-plan-list');
