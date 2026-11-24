@@ -272,9 +272,10 @@
     if (!text) return;
     input.value = '';
     renderMessage('user', text, false);
-    window.setFortisniText(text, 'user');
-    window.setFortisniState('thinking');
-    const thinkingTimer = window.setTimeout(() => window.setFortisniState('thinking'), 700);
+    const userReaction = window.setFortisniText(text, 'user');
+    const thinkingTimer = userReaction === 'idle' || userReaction === 'thinking'
+      ? window.setTimeout(() => window.setFortisniState('thinking'), 700)
+      : null;
     const sendButton = form.querySelector('button[type="submit"]');
     if (sendButton) sendButton.disabled = true;
     const pending = renderMessage('assistant', 'Thinking…', true);
