@@ -123,3 +123,14 @@ test('chunkText keeps hard size bounds when no sentence boundary exists',()=>{
  assert.ok(chunks.every(chunk=>chunk.split(' ').length<=4));
  assert.match(chunks.join(' '),/ten/);
 });
+
+
+test('golden retrieval dataset meets bilingual recall and ranking thresholds',()=>{
+ const fs=require('node:fs');
+ const path=require('node:path');
+ const dataset=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures/retrieval-golden.json'),'utf8'));
+ const metrics=evaluateRetrieval(dataset.documents,dataset.cases,dataset.k);
+ assert.equal(metrics.queries,dataset.cases.length);
+ assert.ok(metrics.recallAtK>=dataset.minimumRecallAtK,'recall@k below configured threshold: '+JSON.stringify(metrics));
+ assert.ok(metrics.meanReciprocalRank>=dataset.minimumMeanReciprocalRank,'MRR below configured threshold: '+JSON.stringify(metrics));
+});
