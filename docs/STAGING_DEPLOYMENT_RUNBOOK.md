@@ -8,7 +8,7 @@ This runbook prepares a controlled staging deployment. It does not claim that a 
 - A managed PostgreSQL database reachable from the application host.
 - A private persistent volume or S3-compatible object store if original uploads will be retained in a future release. The current app extracts text and deletes temporary upload files.
 - At least one server-side AI provider API key with billing enabled.
-- A trusted reverse proxy/load balancer. Set `TRUST_PROXY=1` only when the app is behind exactly one trusted proxy.
+- A trusted reverse proxy/load balancer. `TRUST_PROXY` accepts only `0` (default, ignore all forwarding headers) or `1` (trust exactly the directly connected proxy hop). The app intentionally does not support blanket `trust proxy=true`, arbitrary CIDR chains, or hop counts greater than one. Set `TRUST_PROXY=1` only when the application is reachable exclusively through one controlled proxy that overwrites client-supplied `X-Forwarded-For`, `X-Forwarded-Proto` and `X-Forwarded-Host` headers. Do not expose the app port directly to the public internet in this mode.
 - A private ClamAV daemon reachable from the application. Production document uploads fail closed when malware scanning is unavailable or not configured.
 
 ## 2. Configure secrets
