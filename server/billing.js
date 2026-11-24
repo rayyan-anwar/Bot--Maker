@@ -70,7 +70,7 @@ router.post('/razorpay/checkout',requireAuth,checkoutLimiter,async(req,res,next)
  if(!planId)return res.status(503).json({error:'The selected Razorpay subscription plan is not configured.'});
  const subscription=await razorpayRequest('/subscriptions',{plan_id:planId,total_count:Number(process.env.RAZORPAY_SUBSCRIPTION_TOTAL_COUNT||120),quantity:1,customer_notify:1,notes:{userId:req.user.id,plan}});
  if(!subscription.id||!subscription.short_url)throw new Error('Razorpay returned an incomplete subscription checkout.');
- const linked=await store.applySubscriptionEvent(req.user.id,'razorpay',subscription.id,{razorpaySubscriptionId:subscription.id,razorpayPlan:plan,razorpaySubscriptionStatus:subscription.status||'created'});if(!linked)return res.status(409).json({error:'A subscription is already linked to this account. Cancel the new provider subscription if it was created.'});
+ const linked=await store.applySubscriptionEvent(req.user.id,'razorpay',subscription.id,{razorpaySubscriptionId:subscription.id,razorpayPlan:plan,razorpaySubscriptionStatus:subscription.status||'created'});if(!linked){try{await razorpayRequest('/subscriptions/'+encodeURIComponent(subscription.id)+'/cancel',{cancel_at_cycle_end:false});}catch(cancelError){console.error('Unlinked Razorpay subscription cancellation failed:',cancelError.message);}return res.status(409).json({error:'A subscription is already linked to this account. The new Razorpay subscription cancellation was requested.'});}
  res.json({checkoutUrl:subscription.short_url,subscriptionId:subscription.id,provider:'razorpay'});
  }catch(e){next(e);}});
 webhookRouter.post('/',express.raw({type:'application/json',limit:'256kb'}),async(req,res)=>{
