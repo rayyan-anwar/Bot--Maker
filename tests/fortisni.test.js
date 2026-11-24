@@ -109,3 +109,10 @@ test('Fortisni keeps the dedicated warm visual state for affection',()=>{
  assert.equal(host.dataset.state,'warm');
  assert.equal(host.dataset.emotion,'warm');
 });
+
+test('Fortisni does not misread negated emotions in English, Hindi or Hinglish',()=>{
+ for(const message of ['I am not happy today','I am not sad anymore','I do not feel angry','I am not worried about it','Main khush nahi hoon','Main gussa nahi hoon','मैं दुखी नहीं हूं','मैं खुश नहीं हूँ'])
+  assert.equal(Fortisni.classifyText(message,'user'),'idle',message);
+ assert.equal(Fortisni.classifyText('I am not sad but happy','user'),'happy');
+ assert.equal(Fortisni.classifyText('I am not happy but excited','user'),'excited');
+});
