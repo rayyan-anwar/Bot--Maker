@@ -4,6 +4,9 @@ const store=require('./store');
 const plans=require('./plans');
 const {requireAuth}=require('./auth');
 const router=express.Router(),webhookRouter=express.Router(),razorpayWebhookRouter=express.Router();
+const rateLimit=require('express-rate-limit');
+const {PostgresRateLimitStore}=require('./rate-limit-store');
+const checkoutLimiter=rateLimit({windowMs:60*60*1000,limit:5,standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:req=>'user:'+req.user.id,store:store.isPostgres()?new PostgresRateLimitStore('billing-checkout',store.query):undefined,message:{error:'Too many checkout attempts. Try again later.'}});
 function validEventId(value){return typeof value==='string'&&!!value.trim()&&value===value.trim()&&value.length<=255&&!/[\u0000-\u001f\u007f]/.test(value);}
 function validWebhookPayload(value){return value!==null&&typeof value==='object'&&!Array.isArray(value);}
 function safeEqualHex(expected,provided){if(typeof expected!=='string'||typeof provided!=='string'||! /^[a-f0-9]{64}$/i.test(expected)||! /^[a-f0-9]{64}$/i.test(provided))return false;try{const a=Buffer.from(expected,'hex'),b=Buffer.from(provided,'hex');return a.length===b.length&&crypto.timingSafeEqual(a,b);}catch(_){return false;}}
@@ -40,7 +43,7 @@ async function razorpayRequest(path,payload){
 }
 router.get('/plans',requireAuth,async(req,res,next)=>{try{const user=await store.findByIdAsync('users',req.user.id);res.json({plans:plans.getPlans(),currentPlan:plans.getPlanName(user),hasBillingCustomer:!!user.stripeCustomerId,providers:{stripe:!!process.env.STRIPE_SECRET_KEY,razorpay:razorpayConfigured()}});}catch(e){next(e);}});
 router.post('/portal',requireAuth,async(req,res,next)=>{try{if(!process.env.STRIPE_SECRET_KEY||!req.user.stripeCustomerId)return res.status(409).json({error:'No Stripe billing customer is linked to this account.'});const returnUrl=process.env.STRIPE_PORTAL_RETURN_URL||process.env.STRIPE_SUCCESS_URL;if(!returnUrl)return res.status(503).json({error:'Billing portal return URL is not configured.'});const form=new URLSearchParams({customer:req.user.stripeCustomerId,return_url:returnUrl});const response=await fetch('https://api.stripe.com/v1/billing_portal/sessions',{method:'POST',headers:{authorization:'Bearer '+process.env.STRIPE_SECRET_KEY,'content-type':'application/x-www-form-urlencoded'},body:form,signal:AbortSignal.timeout(15000)});let data={};try{data=await response.json();}catch(_){}if(!response.ok||!data.url)return res.status(502).json({error:'The payment provider could not open the billing portal.'});res.json({portalUrl:data.url});}catch(e){next(e);}});
-router.post('/checkout',requireAuth,async(req,res,next)=>{try{
+router.post('/checkout',requireAuth,checkoutLimiter,async(req,res,next)=>{try{
  const {plan}=req.body||{},available=plans.getPlans();if(req.user.stripeSubscriptionId||req.user.razorpaySubscriptionId)return res.status(409).json({error:'This account already has a paid subscription. Manage or cancel it before starting another.'});
  if(typeof plan!=='string'||!['plus','pro'].includes(plan)||!available[plan])return res.status(400).json({error:'Choose a paid plan.'});
  const priceId=process.env[plan==='plus'?'STRIPE_PRICE_PLUS':'STRIPE_PRICE_PRO'];
@@ -49,7 +52,7 @@ router.post('/checkout',requireAuth,async(req,res,next)=>{try{
  const response=await fetch('https://api.stripe.com/v1/checkout/sessions',{method:'POST',headers:{authorization:'Bearer '+process.env.STRIPE_SECRET_KEY,'content-type':'application/x-www-form-urlencoded'},body:form,signal:AbortSignal.timeout(15000)});let data={};try{data=await response.json();}catch(_){}
  if(!response.ok||!data.url)return res.status(502).json({error:'Stripe could not create a checkout session.'});res.json({checkoutUrl:data.url,provider:'stripe'});
  }catch(e){next(e);}});
-router.post('/razorpay/checkout',requireAuth,async(req,res,next)=>{try{
+router.post('/razorpay/checkout',requireAuth,checkoutLimiter,async(req,res,next)=>{try{
  const {plan}=req.body||{},available=plans.getPlans();if(req.user.stripeSubscriptionId||req.user.razorpaySubscriptionId)return res.status(409).json({error:'This account already has a paid subscription. Manage or cancel it before starting another.'});
  if(typeof plan!=='string'||!['plus','pro'].includes(plan)||!available[plan])return res.status(400).json({error:'Choose a paid plan.'});
  if(!razorpayConfigured())return res.status(503).json({error:'Razorpay is not configured by the service operator.'});
