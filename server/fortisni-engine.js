@@ -10,12 +10,12 @@ const RULES=[
 ];
 function maskNegatedEmotionPhrases(value){
  let text=String(value==null?'':value);
- const englishTargets='(?:happy|glad|sad|depressed|lonely|upset|heartbroken|unhappy|angry|furious|annoyed|frustrated|worried|anxious|nervous|scared|afraid|excited|grateful|love you|miss you|dear|buddy|best friend|hate)';
- text=text.replace(new RegExp('\\\\b(?:not|never|no longer|dont|don\\'t|do not|doesnt|doesn\\'t|isnt|isn\\'t|arent|aren\\'t|cant|can\\'t)(?:\\\\s+\\\\w+){0,3}\\\\s+'+englishTargets+'\\\\b','gi'),' ');
- text=text.replace(/\\b(?:khush|khushi|dukhi|udaas|gussa|naraz|pareshan|akela|akeli|darr?|ghabra\\w*)\\s+(?:nahi|nahin)\\b/gi,' ');
- text=text.replace(/\\b(?:nahi|nahin)\\s+(?:khush|khushi|dukhi|udaas|gussa|naraz|pareshan|akela|akeli|darr?|ghabra\\w*)\\b/gi,' ');
- text=text.replace(/(?:खुश|खुशी|दुखी|उदास|गुस्सा|नाराज़|डर|परेशान|अकेला|अकेली)\\s*(?:नहीं|नही|मत)(?:\\s+\\S+){0,2}/g,' ');
- text=text.replace(/(?:नहीं|नही|मत)\\s*(?:खुश|खुशी|दुखी|उदास|गुस्सा|नाराज़|डर|परेशान|अकेला|अकेली)(?:\\s+\\S+){0,2}/g,' ');
+ const englishNegation=/\b(?:not|never|no longer|don't|do not|doesn't|isn't|aren't|can't|cannot)(?:\s+\w+){0,3}\s+(?:happy|glad|sad|depressed|lonely|upset|heartbroken|unhappy|angry|furious|annoyed|frustrated|worried|anxious|nervous|scared|afraid|excited|grateful|love you|miss you|dear|buddy|best friend|hate)\b/gi;
+ text=text.replace(englishNegation,' ');
+ text=text.replace(/\b(?:khush|khushi|dukhi|udaas|gussa|naraz|pareshan|akela|akeli|darr?|ghabra\w*)\s+(?:nahi|nahin)\b/gi,' ');
+ text=text.replace(/\b(?:nahi|nahin)\s+(?:khush|khushi|dukhi|udaas|gussa|naraz|pareshan|akela|akeli|darr?|ghabra\w*)\b/gi,' ');
+ text=text.replace(/(?:खुश|खुशी|दुखी|उदास|गुस्सा|नाराज़|डर|परेशान|अकेला|अकेली)\s*(?:नहीं|नही|मत)(?:\s+\S+){0,2}/g,' ');
+ text=text.replace(/(?:नहीं|नही|मत)\s*(?:खुश|खुशी|दुखी|उदास|गुस्सा|नाराज़|डर|परेशान|अकेला|अकेली)(?:\s+\S+){0,2}/g,' ');
  return text;
 }
 const STATES=new Set(['idle','celebrating','comforting','calming','reassuring','attentive','warm','thinking','speaking']);
