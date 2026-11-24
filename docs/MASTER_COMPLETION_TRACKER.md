@@ -1,8 +1,8 @@
 # BotForge Master Completion Tracker
 
 **Repository:** `rayyan-anwar/Bot--Maker`  
-**Baseline:** `fae9792bb4549f7e89e6ca6af417d30f2e8ff08c` at `56042cf635e3391c1a1cab0821bd9fb99a172343`  
-**Last reconciled:** 2026-11-24 (after PR #116; PR #104–#116 reconciled)
+**Baseline:** `a4d347dca643a9c7a2d348df0b29e7b63a622136` at `56042cf635e3391c1a1cab0821bd9fb99a172343`  
+**Last reconciled:** 2026-11-24 (after PR #118; PR #104–#118 reconciled)
 **Purpose:** One evidence-led view of implementation, automated verification, and release blockers.
 
 ## Status definitions
@@ -93,6 +93,9 @@ Do not calculate a project-wide percentage by counting files, commits, PRs, or c
 12. **PR #115 merged:** AI Engineer Admin Browser E2E now runs on pushes to `main`. Exact main SHA `bfec26d6006f18d8f8577e0370a7978e80197fdf` passed BotForge CI (Node.js 18/20/22, PostgreSQL 16, Docker, security scan and backup/restore rehearsal), Full Chat Browser E2E, Fortisni Chromium E2E and Admin Browser E2E.
 13. Keep infrastructure/device/provider-dependent work explicitly blocked until access and evidence are available.
 
+
+15. **PR #118 merged:** Streaming chat now aborts the upstream provider request when the SSE client disconnects. Caller cancellation is propagated into the provider fetch; quota reservations are released when cancellation occurs before provider work starts, while post-start AI budget holds remain for reconciliation because partial provider cost may have been incurred. Exact PR head SHA `00579500f45dddd283e7e98e308f1e00d59cb2b8` passed Node.js 18/20/22, PostgreSQL 16 integration, Docker build and Full Chat Browser E2E. Main-branch post-merge checks were queued at checkpoint time.
+
 14. **PR #116 merged:** Chat response-style and safety-mode prompt suffixes now use actual newline separators; extracted prompt construction into a pure helper and added regression coverage for concise, detailed, strict, basic and default modes. Exact PR head SHA `70491f121625681f44823f8352fe52e695a27b92` passed Node.js 18/20/22 verification, PostgreSQL 16 integration, Docker image build and Full Chat Browser E2E. Main-branch post-merge workflows were still running at tracker reconciliation; no live provider or production behavior is implied.
 
 ## Release authority
@@ -129,3 +132,5 @@ The [release acceptance checklist](RELEASE_ACCEPTANCE_CHECKLIST.md) is the contr
 - PR #116 exact head SHA `70491f121625681f44823f8352fe52e695a27b92` passed all six PR checks: Node.js 18/20/22, PostgreSQL 16 integration, Docker image build and Full Chat Browser E2E. It was squash-merged to `main` as `fae9792bb4549f7e89e6ca6af417d30f2e8ff08c`. Post-merge main-branch workflows were initiated and were still running when this checkpoint was written.
 
 - Production-hardening issue #3 was reconciled against main: automated proxy spoof-resistance/topology tests are present in `tests/proxy-trust.test.js`; 40-way concurrent shared PostgreSQL rate-limit increments are covered in `tests/postgres.integration.test.js`. Issue #3 now marks those repository-verifiable tasks complete. Real reverse-proxy, HTTPS/cookie behavior and multi-instance staging validation remain open.
+
+- PR #118 exact head SHA `00579500f45dddd283e7e98e308f1e00d59cb2b8` passed all six PR checks: Node.js 18/20/22, PostgreSQL 16 integration, Docker image build and Full Chat Browser E2E. It was squash-merged to `main` as `a4d347dca643a9c7a2d348df0b29e7b63a622136`. Main-branch post-merge checks were queued when this checkpoint was written.
