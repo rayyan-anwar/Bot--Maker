@@ -10,7 +10,7 @@ const RULES=[
 ];
 function maskNegatedEmotionPhrases(value){
  let text=String(value==null?'':value);
- const englishNegation=/\b(?:not|never|no longer|don't|do not|doesn't|isn't|aren't|can't|cannot)(?:\s+\w+){0,3}\s+(?:happy|glad|sad|depressed|lonely|upset|heartbroken|unhappy|angry|furious|annoyed|frustrated|worried|anxious|nervous|scared|afraid|excited|grateful|love you|miss you|dear|buddy|best friend|hate)\b/gi;
+ const englishNegation=/\b(?:not|never|no longer|don't|do not|doesn't|isn't|aren't|can't|cannot)(?:\s+(?!but\b|however\b|though\b)\w+){0,3}\s+(?:happy|glad|sad|depressed|lonely|upset|heartbroken|unhappy|angry|furious|annoyed|frustrated|worried|anxious|nervous|scared|afraid|excited|grateful|love you|miss you|dear|buddy|best friend|hate)\b/gi;
  text=text.replace(englishNegation,' ');
  text=text.replace(/\b(?:khush|khushi|dukhi|udaas|gussa|naraz|pareshan|akela|akeli|darr?|ghabra\w*)\s+(?:nahi|nahin)\b/gi,' ');
  text=text.replace(/\b(?:nahi|nahin)\s+(?:khush|khushi|dukhi|udaas|gussa|naraz|pareshan|akela|akeli|darr?|ghabra\w*)\b/gi,' ');
