@@ -140,6 +140,19 @@ test('PostgreSQL integration: shared rate limits, atomic login lockout and quota
     assert.equal(finished.scheduleClaimToken,null);
    }finally{await store.deleteByIdAsync('aiEngineerRuns',workflowId);}
   });
+  await t.test('Fortisni vision context is consumed once across concurrent PostgreSQL chat requests',async()=>{
+   const contextId=crypto.randomUUID(),now=Date.now();
+   const context={id:contextId,userId,kind:'fortisni-vision-context',botId:null,contextKey:userId,summary:'A user-submitted image description.',createdAt:now,expiresAt:now+600000,used:false};
+   try{
+    await store.insertAsync('aiEngineerRuns',context);
+    const results=await Promise.all(Array.from({length:12},()=>store.consumeFortisniVisionContext(userId)));
+    assert.equal(results.filter(Boolean).length,1);
+    assert.equal(results.filter(row=>row&&row.id===contextId).length,1);
+    const stored=await store.findByIdAsync('aiEngineerRuns',contextId);
+    assert.equal(stored.used,true);
+    assert.equal(stored.summary,context.summary);
+   }finally{await store.deleteByIdAsync('aiEngineerRuns',contextId);}
+  });
   await t.test('concurrent quota reservations never exceed the daily limit',async()=>{
    const day=new Date().toISOString().slice(0,10);
    const results=await Promise.all(Array.from({length:8},async()=>{
