@@ -113,3 +113,10 @@ These checks validate repository code and CI only. Live provider credentials, ac
 - Latest BotForge CI passed on Node.js 18/20/22, PostgreSQL 16 integration and Docker build/readiness; Full Chat Browser E2E passed.
 - Browser/OS locale support and physical microphone/speaker behavior still require real-device QA. Browser speech recognition may use the browser vendor's speech service; no audio is sent to the BotForge API.
 
+
+
+## Verified checkpoint — 2026-11-24 (Fortisni affection reaction consistency)
+
+- PR #103 merged to `main` at `dcdf763ba423c6a781ffeb923e5e9141a57a0b7f`; BotForge CI and Full Chat Browser E2E both completed successfully.
+- Follow-up batch created on `feat/fortisni-affection-reaction-consistency`: align browser and server reactions for affectionate English/Hindi/Hinglish messages and prevent `miss you` from being classified as sadness before the affection rule can run.
+- This follow-up is not yet merged or verified; its PR checks must pass before integration.
