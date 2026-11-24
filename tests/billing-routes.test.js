@@ -100,3 +100,10 @@ test('first subscription event may claim an unlinked account but deletion must m
  assert.equal(ownsSubscription(user,'stripe','sub_stripe_1'),false);
  assert.equal(ownsSubscription(user,'razorpay','sub_rzp_1'),false);
 });
+
+test('Stripe subscription terminal-state detection preserves recoverable statuses',()=>{
+ const {isStripeSubscriptionTerminal}=require('../server/billing');
+ assert.equal(isStripeSubscriptionTerminal('canceled'),true);
+ assert.equal(isStripeSubscriptionTerminal('incomplete_expired'),true);
+ for(const status of ['incomplete','active','trialing','past_due','unpaid','paused','unknown'])assert.equal(isStripeSubscriptionTerminal(status),false,status);
+});
