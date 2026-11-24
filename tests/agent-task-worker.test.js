@@ -83,7 +83,7 @@ test('stopWorker times out instead of waiting indefinitely for an active handler
  const originals={claim:service.claimTask,complete:service.completeTask,recover:service.recoverExpiredTasks};
  let release,startedResolve;const started=new Promise(resolve=>{startedResolve=resolve;});const gate=new Promise(resolve=>{release=resolve;});
  const type='test.shutdown.wait';const task={id:'shutdown-task',userId:owner,taskType:type,status:'running',attempt:1};
- service.claimTask=async()=>task;service.completeTask=async()=>task;service.recoverExpiredTasks=async()=>{};
+ service.claimTask=async()=>task;service.completeTask=async()=>task;service.recoverExpiredTasks=async()=>[];
  worker.registerTaskHandler(type,async()=>{startedResolve();await gate;return {ok:true};});
  try{worker.startWorker();await started;const began=Date.now();const result=await worker.stopWorker(200);assert.equal(result,false);assert.ok(Date.now()-began<1000);release();}
  finally{release();service.claimTask=originals.claim;service.completeTask=originals.complete;service.recoverExpiredTasks=originals.recover;}
