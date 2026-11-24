@@ -46,8 +46,9 @@
       <strong>Ask Fortisni about an image</strong>
       <span>Choose a photo or open your phone camera. Nothing is captured until you select it and submit.</span>
     </div>
-    <label class="fortisni-vision-file" for="fortisni-vision-image">Choose photo / camera</label>
-    <input id="fortisni-vision-image" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" required>
+    <label class="fortisni-vision-file">Choose photo / camera
+      <input id="fortisni-vision-image" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" required>
+    </label>
     <input id="fortisni-vision-prompt" type="text" maxlength="1000" placeholder="What should Fortisni look for? (optional)" aria-label="Question about the image">
     <button class="btn btn-ghost" type="submit">Analyze image</button>
     <span id="fortisni-vision-status" role="status" aria-live="polite"></span>
