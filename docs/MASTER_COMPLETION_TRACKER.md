@@ -1,8 +1,8 @@
 # BotForge Master Completion Tracker
 
 **Repository:** `rayyan-anwar/Bot--Maker`  
-**Baseline:** `main` at `9117498580aa96a62b24a00427677a931db7b309`  
-**Last reconciled:** 2026-11-24 (after PRs #104, #106 and #107)  
+**Baseline:** `main` at `8e17a7e5610c947b5d2be8d5d940610a6fb5d617`  
+**Last reconciled:** 2026-11-24 (after PRs #104, #106, #107 and #108)  
 **Purpose:** One evidence-led view of implementation, automated verification, and release blockers.
 
 ## Status definitions
@@ -35,7 +35,7 @@ Do not calculate a project-wide percentage by counting files, commits, PRs, or c
 | Bot create, configure, edit and delete | Implemented; validation ongoing | Run full owner journey and malformed-input tests |
 | Public bot discovery and safe public view | Partial | Verify private instructions, secrets and private knowledge never leak |
 | Chat with supported providers | Implemented; live validation required | Anthropic, OpenAI and Gemini adapters/tests exist; verify real credentials, timeouts, limits and provider errors |
-| Conversation history and memory | Partial | Verify retention, inspect/edit/disable/delete and cross-account isolation |
+| Conversation history and memory | Partial; privacy guard automated-tested | User-scoped routes and deletion exist; PR #108 adds server-side filtering for common sensitive automatic-memory candidates plus unit and authenticated chat integration tests. Pattern filtering is not exhaustive; inspect/edit/disable/delete, retention and cross-account isolation still need broader verification |
 | Knowledge uploads and retrieval | Partial | Upload/retrieval tests exist; verify malware scanning, parser limits, citations, prompt-injection resistance and deletion |
 | Usage quotas and AI spend budget | Implemented foundation; live validation required | Ledger/reservation tests exist; validate real model pricing and reconciliation before enabling |
 | Billing foundations | Implemented foundation; external validation required | Stripe/Razorpay signature and idempotency tests exist; perform provider sandbox checkout, refunds and entitlement tests |
@@ -81,8 +81,9 @@ Do not calculate a project-wide percentage by counting files, commits, PRs, or c
 1. **PR #104 merged:** Fortisni affection reaction consistency. BotForge CI, Fortisni Browser E2E and Full Chat Browser E2E passed on the exact PR head SHA.
 2. **PR #106 merged:** Bot creation plus initial history is atomic; edit, restore, publish and unpublish use version-checked atomic persistence in the JSON and PostgreSQL adapters. Node.js 18/20/22, PostgreSQL 16 integration, Docker readiness, security scan and Full Chat Browser E2E passed on the exact PR head SHA.
 3. **PR #107 merged:** Fortisni Roman Hindi/Hinglish affection matching now uses word boundaries; dedicated warm visual state is preserved; emotional user reactions are not overwritten by generic thinking state. Node.js 18/20/22, PostgreSQL 16, Docker, Full Chat Browser E2E and Fortisni Chromium E2E passed on its exact head SHA.
-4. Continue P0/P1 source review and select the next code batch from verified gaps, not feature-count pressure.
-5. Keep infrastructure/device/provider-dependent work explicitly blocked until access and evidence are available.
+4. **PR #108 merged:** Automatic memory candidates now pass a server-side defense-in-depth filter for common health, religion, politics, sexuality, identity, credential, government/financial identifier and contact-data patterns. Manual user-entered memory remains unchanged. Node.js 18/20/22, PostgreSQL 16, Docker, security scans and Full Chat Browser E2E passed on the exact PR head SHA.
+5. Continue P0/P1 source review and select the next code batch from verified gaps, not feature-count pressure.
+6. Keep infrastructure/device/provider-dependent work explicitly blocked until access and evidence are available.
 
 ## Release authority
 
@@ -96,3 +97,5 @@ The [release acceptance checklist](RELEASE_ACCEPTANCE_CHECKLIST.md) is the contr
 - These results validate the tested commit and automated environment only. They do not establish live provider credentials, production deployment, production monitoring, real-device behavior or production certification.
 
 - PR #107 exact head SHA `00ba7089d562a4c20313fe2139cf2ddf28f0c76b` passed Node.js 18/20/22 tests, syntax/security checks, PostgreSQL 16 integration and backup/restore rehearsal, Docker readiness, Full Chat Browser E2E, and Fortisni Chromium E2E.
+
+- PR #108 exact head SHA `75d653e483d42470a123f8ca60139e9ba216b0f0` passed Node.js 18/20/22 tests, syntax/security checks, PostgreSQL 16 integration including backup/restore rehearsal, Docker readiness, and Full Chat Browser E2E. Its integration test verifies sensitive AI-generated memory candidates are dropped while a safe preference is retained.
