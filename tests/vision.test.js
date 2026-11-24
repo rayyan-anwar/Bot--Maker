@@ -91,3 +91,23 @@ test('vision endpoint requires login and an explicit user-initiated upload',asyn
   }
  }
 });
+
+test('vision analysis stores short-lived context only after provider success and without media bytes',async()=>{
+ const store=require('../server/store');
+ const record={id:require('crypto').randomUUID(),kind:'fortisni-vision-context',userId:'vision-context-test-user',botId:null,contextKey:'vision-context-test-user',summary:'A blue cup on a wooden table.',createdAt:Date.now(),expiresAt:Date.now()+600000,used:false};
+ await store.insertAsync('aiEngineerRuns',record);
+ try{
+  const rows=await store.findManyAsync('aiEngineerRuns',{userId:record.userId});
+  const found=rows.find(x=>x.id===record.id);
+  assert.ok(found);
+  assert.equal(found.summary,'A blue cup on a wooden table.');
+  assert.equal(found.contextKey,record.userId);
+  assert.equal(found.used,false);
+  assert.equal(found.expiresAt>Date.now(),true);
+  assert.equal(Object.hasOwn(found,'imageBase64'),false);
+  assert.equal(Object.hasOwn(found,'buffer'),false);
+  await store.updateByIdAsync('aiEngineerRuns',record.id,{used:true,consumedAt:new Date().toISOString()});
+  const updated=await store.findByIdAsync('aiEngineerRuns',record.id);
+  assert.equal(updated.used,true);
+ }finally{await store.deleteByIdAsync('aiEngineerRuns',record.id);}
+});
