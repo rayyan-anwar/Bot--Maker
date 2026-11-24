@@ -13,3 +13,6 @@ Covered examples include:
 The browser and server engines keep their own lightweight deterministic classifiers. This is a best-effort signal for expressive UI and response guidance, not a clinical assessment or a substitute for interpreting the actual conversation. Unknown or unrelated text remains neutral. Existing safe state allowlists and reduced-motion styling remain in place.
 
 Tests cover representative Roman Hindi/Hinglish cases and neutral fallback behavior.
+
+
+Roman Hindi affection tokens are matched as complete words in both browser and server classifiers, preventing accidental matches inside unrelated words such as `dostana` or `yaadgar`. Regression tests cover both false-positive and intended positive cases.

@@ -33,3 +33,9 @@ test('affection phrases are not swallowed by the sadness matcher',()=>{
  assert.equal(analyzeText('Love you buddy').state,'warm');
  assert.equal(analyzeText('I feel lonely').emotion,'sadness');
 });
+
+test('affection detection does not match Roman Hindi substrings inside unrelated words',()=>{
+ assert.equal(analyzeText('The Dostana movie was released').emotion,'neutral');
+ assert.equal(analyzeText('It was a yaadgar moment').emotion,'neutral');
+ assert.equal(analyzeText('Tum mere dost ho').emotion,'affection');
+});
