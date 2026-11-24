@@ -41,6 +41,17 @@
     <div id="memory-list" style="margin-top:8px"></div>
   </details>
   <div id="fortisni-companion" class="fortisni-companion" data-state="idle"></div>
+  <form id="fortisni-vision-form" class="fortisni-vision-form">
+    <div class="fortisni-vision-copy">
+      <strong>Ask Fortisni about an image</strong>
+      <span>Choose a photo or open your phone camera. Nothing is captured until you select it and submit.</span>
+    </div>
+    <label class="fortisni-vision-file" for="fortisni-vision-image">Choose photo / camera</label>
+    <input id="fortisni-vision-image" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" required>
+    <input id="fortisni-vision-prompt" type="text" maxlength="1000" placeholder="What should Fortisni look for? (optional)" aria-label="Question about the image">
+    <button class="btn btn-ghost" type="submit">Analyze image</button>
+    <span id="fortisni-vision-status" role="status" aria-live="polite"></span>
+  </form>
   <div class="chat-log" id="chat-log"></div>
   <div class="ad-slot" aria-label="Advertisement"><span>ADVERTISEMENT</span><div>Sponsored placement · available after ad-network approval</div></div>
   <form class="chat-input-row" id="chat-form">
@@ -204,6 +215,42 @@
       messages.forEach((m) => renderMessage(m.role, m.content, false));
     }
   })();
+
+  const visionForm=document.getElementById('fortisni-vision-form');
+  const visionImage=document.getElementById('fortisni-vision-image');
+  const visionPrompt=document.getElementById('fortisni-vision-prompt');
+  const visionStatus=document.getElementById('fortisni-vision-status');
+  visionForm.addEventListener('submit',async(e)=>{
+    e.preventDefault();
+    const file=visionImage.files&&visionImage.files[0];
+    if(!file){visionStatus.textContent='Choose a photo first.';return;}
+    if(file.size>4*1024*1024){visionStatus.textContent='Image must be 4 MiB or smaller.';return;}
+    const formData=new FormData();
+    formData.append('image',file);
+    formData.append('userInitiated','true');
+    formData.append('prompt',visionPrompt.value.trim());
+    const button=visionForm.querySelector('button[type="submit"]');
+    button.disabled=true;
+    visionStatus.textContent='Fortisni is examining the selected image…';
+    window.setFortisniState('thinking');
+    renderMessage('user','Shared an image with Fortisni: '+file.name,false);
+    const pending=renderMessage('assistant','Analyzing image…',true);
+    try{
+      const result=await api('/vision/analyze',{method:'POST',body:formData});
+      pending.textContent=result.assistant.content;
+      pending.classList.remove('pending');
+      window.setFortisniText(result.assistant.content,'assistant');
+      window.setTimeout(()=>window.setFortisniState('idle'),2600);
+      visionStatus.textContent='Analysis complete. The uploaded image is not stored by BotForge.';
+      visionImage.value='';
+      visionPrompt.value='';
+    }catch(error){
+      pending.textContent='Error: '+error.message;
+      pending.classList.remove('pending');
+      window.setFortisniState('error');
+      visionStatus.textContent=error.message;
+    }finally{button.disabled=false;}
+  });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
