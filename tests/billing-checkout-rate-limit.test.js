@@ -36,10 +36,12 @@ test('billing checkout creation is limited per authenticated account',async(t)=>
   if(String(url)==='https://api.stripe.com/v1/checkout/sessions')return {ok:true,status:200,json:async()=>({url:'https://checkout.example.test/session'})};
   return originalFetch(url,options);
  };
- for(let i=0;i<5;i++){
-  const response=await global.fetch(base+'/api/billing/checkout',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({plan:'plus'})});
-  assert.equal(response.status,200);
-  assert.equal((await response.json()).provider,'stripe');
+ const first=await global.fetch(base+'/api/billing/checkout',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({plan:'plus'})});
+ assert.equal(first.status,200);
+ assert.equal((await first.json()).provider,'stripe');
+ for(let i=0;i<4;i++){
+  const blocked=await global.fetch(base+'/api/billing/checkout',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({plan:'plus'})});
+  assert.equal(blocked.status,409,'a live checkout reservation blocks duplicate provider sessions');
  }
  const limited=await global.fetch(base+'/api/billing/checkout',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({plan:'plus'})});
  assert.equal(limited.status,429);
