@@ -1,7 +1,7 @@
 # BotForge Master Completion Tracker
 
 **Repository:** `rayyan-anwar/Bot--Maker`  
-**Baseline:** `main` at `7c0d90688e6e35afe026496634038acceffea135`  
+**Baseline:** `main` at `870e32e142b229e5d7c33b0d7c001af23a1de155`  
 **Last reconciled:** 2026-11-24 (after PRs #104, #106, #107, #108, #109 and #110)  
 **Purpose:** One evidence-led view of implementation, automated verification, and release blockers.
 
@@ -33,7 +33,7 @@ Do not calculate a project-wide percentage by counting files, commits, PRs, or c
 | Work item | Status | Evidence / exit condition |
 |---|---|---|
 | Bot create, configure, edit and delete | Implemented; validation ongoing | Run full owner journey and malformed-input tests |
-| Public bot discovery and safe public view | Partial | Verify private instructions, secrets and private knowledge never leak |
+| Public bot discovery and safe public view | Implemented baseline; further scale/security review required | PR #109 adds bounded search/pagination, owner/private filtering, input validation and dashboard search/load-more. PR #110 moves filtering, sorting, LIMIT/OFFSET and total count into PostgreSQL; query indexes, abuse controls and production-scale testing remain |
 | Chat with supported providers | Implemented; live validation required | Anthropic, OpenAI and Gemini adapters/tests exist; verify real credentials, timeouts, limits and provider errors |
 | Conversation history and memory | Partial; privacy guard automated-tested | User-scoped routes and deletion exist; PR #108 adds server-side filtering for common sensitive automatic-memory candidates plus unit and authenticated chat integration tests. Pattern filtering is not exhaustive; inspect/edit/disable/delete, retention and cross-account isolation still need broader verification |
 | Knowledge uploads and retrieval | Partial | Upload/retrieval tests exist; verify malware scanning, parser limits, citations, prompt-injection resistance and deletion |
@@ -82,7 +82,7 @@ Do not calculate a project-wide percentage by counting files, commits, PRs, or c
 2. **PR #106 merged:** Bot creation plus initial history is atomic; edit, restore, publish and unpublish use version-checked atomic persistence in the JSON and PostgreSQL adapters. Node.js 18/20/22, PostgreSQL 16 integration, Docker readiness, security scan and Full Chat Browser E2E passed on the exact PR head SHA.
 3. **PR #107 merged:** Fortisni Roman Hindi/Hinglish affection matching now uses word boundaries; dedicated warm visual state is preserved; emotional user reactions are not overwritten by generic thinking state. Node.js 18/20/22, PostgreSQL 16, Docker, Full Chat Browser E2E and Fortisni Chromium E2E passed on its exact head SHA.
 4. **PR #108 merged:** Automatic memory candidates now pass a server-side defense-in-depth filter for common health, religion, politics, sexuality, identity, credential, government/financial identifier and contact-data patterns. Manual user-entered memory remains unchanged. Node.js 18/20/22, PostgreSQL 16, Docker, security scans and Full Chat Browser E2E passed on the exact PR head SHA.
-5. **PR #109 merged:** Public bot discovery supports validated search and bounded pages, dashboard search/load-more, owner exclusion and private-bot exclusion. Node.js 18/20/22, PostgreSQL 16, Docker and Full Chat Browser E2E passed on the exact PR head SHA. The current implementation still materializes the public-bot collection before slicing; database-side pagination is a scale follow-up.
+5. **PR #109 merged:** Public bot discovery supports validated search and bounded pages, dashboard search/load-more, owner exclusion and private-bot exclusion. Node.js 18/20/22, PostgreSQL 16, Docker and Full Chat Browser E2E passed on the exact PR head SHA.
 6. **PR #110 merged:** PostgreSQL now performs public-bot filtering, sorting, search, LIMIT/OFFSET and total counting in the storage query; JSON development adapter behavior remains aligned. Node.js 18/20/22, PostgreSQL 16 integration, Docker and Full Chat Browser E2E passed on the exact PR head SHA.
 7. Continue P0/P1 source review and select the next code batch from verified gaps, not feature-count pressure.
 8. Keep infrastructure/device/provider-dependent work explicitly blocked until access and evidence are available.
