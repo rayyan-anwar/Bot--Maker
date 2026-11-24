@@ -71,7 +71,7 @@ router.post('/razorpay/checkout',requireAuth,checkoutLimiter,async(req,res,next)
  if(!razorpayConfigured())return res.status(503).json({error:'Razorpay is not configured by the service operator.'});
  const planId=process.env[plan==='plus'?'RAZORPAY_PLAN_PLUS':'RAZORPAY_PLAN_PRO'];
  if(!planId)return res.status(503).json({error:'The selected Razorpay subscription plan is not configured.'});
- const reservationId=crypto.randomUUID(),reservation=await store.reserveBillingCheckout(req.user.id,'razorpay',plan,reservationId);if(!reservation)return res.status(409).json({error:'A checkout is already in progress or this account has an active subscription. Try again after the existing checkout expires.'});
+ const reservationId=crypto.randomUUID(),reservation=await store.reserveBillingCheckout(req.user.id,'razorpay',plan,reservationId,30*60*1000);if(!reservation)return res.status(409).json({error:'A checkout is already in progress or this account has an active subscription. Try again after the existing checkout expires.'});
  const subscription=await razorpayRequest('/subscriptions',{plan_id:planId,total_count:Number(process.env.RAZORPAY_SUBSCRIPTION_TOTAL_COUNT||120),quantity:1,customer_notify:1,notes:{userId:req.user.id,plan,checkoutReservationId:reservationId}});
  if(!subscription.id||!subscription.short_url)throw new Error('Razorpay returned an incomplete subscription checkout.');
  const linked=await store.applySubscriptionEvent(req.user.id,'razorpay',subscription.id,{razorpaySubscriptionId:subscription.id,razorpayPlan:plan,razorpaySubscriptionStatus:subscription.status||'created'});if(!linked){try{await razorpayRequest('/subscriptions/'+encodeURIComponent(subscription.id)+'/cancel',{cancel_at_cycle_end:false});}catch(cancelError){console.error('Unlinked Razorpay subscription cancellation failed:',cancelError.message);}await store.releaseBillingCheckout(req.user.id,reservationId);return res.status(409).json({error:'A subscription is already linked to this account. The new Razorpay subscription cancellation was requested.'});}
@@ -85,7 +85,9 @@ webhookRouter.post('/',express.raw({type:'application/json',limit:'256kb'}),asyn
  let claimed=false;
  try{
   claimed=await store.claimWebhookEvent('stripe',eventId);if(!claimed)return res.json({received:true,duplicate:true});
-  if(event.type==='checkout.session.completed'){
+  if(event.type==='checkout.session.expired'){
+   const session=event.data&&event.data.object,userId=session?.metadata?.userId,reservationId=session?.metadata?.checkoutReservationId;if(userId&&validEventId(reservationId))await store.releaseBillingCheckout(userId,reservationId);
+  }else if(event.type==='checkout.session.completed'){
    const session=event.data&&event.data.object,userId=session?.metadata?.userId,plan=session?.metadata?.plan;
    if(userId&&plans.getPlans()[plan]&&session.mode==='subscription'&&session.status==='complete'&&['paid','no_payment_required'].includes(session.payment_status)&&validEventId(session.subscription)){const linked=await store.applySubscriptionEvent(userId,'stripe',session.subscription,{plan,stripeCustomerId:session.customer||null,stripeSubscriptionId:session.subscription});if(linked&&validEventId(session.metadata?.checkoutReservationId))await store.releaseBillingCheckout(userId,session.metadata.checkoutReservationId);}
   }else if(event.type==='customer.subscription.updated'){
