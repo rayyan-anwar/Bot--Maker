@@ -2,6 +2,12 @@
 
 const test=require('node:test');
 const assert=require('node:assert/strict');
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const testDir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-vision-tests-'));
+process.env.NODE_ENV='test';
+process.env.JWT_SECRET=process.env.JWT_SECRET||'fortisni-vision-test-secret-at-least-thirty-two-characters';
+process.env.BOTFORGE_DATA_FILE=path.join(testDir,'db.json');
+test.after(()=>fs.rmSync(testDir,{recursive:true,force:true}));
 const {detectImageType,MAX_IMAGE_BYTES}=require('../server/vision');
 const providers=require('../server/providers');
 
@@ -52,14 +58,8 @@ test('OpenAI vision adapter rejects unsupported media and malformed prompts befo
 });
 
 
-test('vision endpoint requires login and an explicit user-initiated upload',async(t)=>{
- const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
- const keys=['NODE_ENV','JWT_SECRET','BOTFORGE_DATA_FILE','BOTFORGE_ADMIN_EMAIL','OPENAI_API_KEY'];
- const previous=Object.fromEntries(keys.map(key=>[key,process.env[key]]));
- const dir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-vision-api-'));
- process.env.NODE_ENV='test';
- process.env.JWT_SECRET='fortisni-vision-test-secret-at-least-thirty-two-characters';
- process.env.BOTFORGE_DATA_FILE=path.join(dir,'db.json');
+test('vision endpoint requires login and an explicit user-initiated upload',async()=>{
+ const previousAdmin=process.env.BOTFORGE_ADMIN_EMAIL,previousKey=process.env.OPENAI_API_KEY;
  process.env.BOTFORGE_ADMIN_EMAIL='vision-admin@example.test';
  delete process.env.OPENAI_API_KEY;
  const {start,shutdown}=require('../server/index');
@@ -68,7 +68,7 @@ test('vision endpoint requires login and an explicit user-initiated upload',asyn
   const base='http://127.0.0.1:'+server.address().port;
   const unauthForm=new FormData();
   unauthForm.append('userInitiated','true');
-  unauthForm.append('image',new Blob([Buffer.from([137,80,78,71,13,10,26,10])],{type:'image/png'}),'photo.png');
+  unauthForm.append('image',new Blob([Buffer.from([137,80,78,71,13,10,26,10])],{type:'image/png}),'photo.png');
   const unauth=await fetch(base+'/api/vision/analyze',{method:'POST',body:unauthForm});
   assert.equal(unauth.status,401);
 
@@ -78,7 +78,6 @@ test('vision endpoint requires login and an explicit user-initiated upload',asyn
   const login=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:user.email,password:'vision-password-123'})});
   assert.equal(login.status,200);
   const cookie=(login.headers.get('set-cookie')||'').split(';')[0];
-
   const form=new FormData();
   form.append('userInitiated','false');
   form.append('image',new Blob([Buffer.from([137,80,78,71,13,10,26,10])],{type:'image/png'}),'photo.png');
@@ -87,8 +86,8 @@ test('vision endpoint requires login and an explicit user-initiated upload',asyn
   assert.match((await denied.json()).error,/explicitly/);
  }finally{
   try{await shutdown();}finally{
-   fs.rmSync(dir,{recursive:true,force:true});
-   for(const key of keys){if(previous[key]===undefined)delete process.env[key];else process.env[key]=previous[key];}
+   if(previousAdmin===undefined)delete process.env.BOTFORGE_ADMIN_EMAIL;else process.env.BOTFORGE_ADMIN_EMAIL=previousAdmin;
+   if(previousKey===undefined)delete process.env.OPENAI_API_KEY;else process.env.OPENAI_API_KEY=previousKey;
   }
  }
 });
