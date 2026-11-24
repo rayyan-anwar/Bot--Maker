@@ -72,6 +72,22 @@ async function updateBotVersioned({botId,ownerId,expectedVersion,patch,versionRe
 
 async function allAsync(c){assertCollection(c);if(!isPostgres())return all(c);await initialize();const r=await pool.query('SELECT data FROM botforge_records WHERE collection=$1 ORDER BY updated_at,id',[c]);return r.rows.map(x=>x.data);}
 async function findManyAsync(c,filters={}){assertCollection(c);const allowed=new Set(['ownerId','botId','userId','isPublic','email']);const entries=Object.entries(filters);if(entries.some(([key,value])=>!allowed.has(key)||value===undefined||value===null))throw new Error('Unsupported data filter.');if(!isPostgres())return all(c).filter(row=>entries.every(([key,value])=>row[key]===value));await initialize();if(!entries.length)return allAsync(c);const clauses=entries.map((_,i)=>`data->>$${i*2+3}=$${i*2+2}`);const values=[c,...entries.flatMap(([key,value])=>[String(value),key])];const result=await pool.query(`SELECT data FROM botforge_records WHERE collection=$1 AND ${clauses.join(' AND ')} ORDER BY updated_at,id`,values);return result.rows.map(row=>row.data);}
+async function findPublicBotsPage({ownerId,query='',limit=24,offset=0}={}){
+ if(typeof ownerId!=='string'||!ownerId.trim())throw new TypeError('A valid ownerId is required.');
+ if(typeof query!=='string'||query.length>80)throw new TypeError('Search query must be at most 80 characters.');
+ if(!Number.isSafeInteger(limit)||limit<1||limit>50||!Number.isSafeInteger(offset)||offset<0||offset>100000)throw new RangeError('Invalid public bot page bounds.');
+ const normalizedQuery=query.trim().toLowerCase();
+ const matches=bot=>bot&&bot.isPublic===true&&bot.ownerId!==ownerId&&(!normalizedQuery||[bot.name,bot.description,bot.purpose,bot.audience].some(value=>typeof value==='string'&&value.toLowerCase().includes(normalizedQuery)));
+ const compare=(a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))||String(a.name||'').localeCompare(String(b.name||''));
+ if(!isPostgres()){const visible=all('bots').filter(matches).sort(compare);return {bots:visible.slice(offset,offset+limit),total:visible.length};}
+ await initialize();
+ const where="collection='bots' AND data->>'isPublic'='true' AND data->>'ownerId' IS DISTINCT FROM $1 AND ($2='' OR position($2 in lower(concat_ws(' ',data->>'name',data->>'description',data->>'purpose',data->>'audience'))) > 0)";
+ const [page,count]=await Promise.all([
+  pool.query("SELECT data FROM botforge_records WHERE "+where+" ORDER BY data->>'createdAt' DESC NULLS LAST,data->>'name' ASC,id ASC LIMIT $3 OFFSET $4",[ownerId,normalizedQuery,limit,offset]),
+  pool.query("SELECT count(*)::bigint AS total FROM botforge_records WHERE "+where,[ownerId,normalizedQuery])
+ ]);
+ return {bots:page.rows.map(row=>row.data),total:Number(count.rows[0]?.total||0)};
+}
 async function findByIdAsync(c,id){assertCollection(c);if(!isUuid(id))return null;if(!isPostgres())return findById(c,id);await initialize();const r=await pool.query('SELECT data FROM botforge_records WHERE collection=$1 AND id=$2',[c,id]);return r.rowCount?r.rows[0].data:null;}
 async function insertAsync(c,record){assertCollection(c);if(!isPostgres()){if(c==='users'&&all('users').some(u=>String(u.email).toLowerCase()===String(record.email).toLowerCase())){const e=new Error('Duplicate user email.');e.code='23505';throw e;}return insert(c,record);}await initialize();await pool.query('INSERT INTO botforge_records(collection,id,data) VALUES($1,$2,$3::jsonb)',[c,record.id,JSON.stringify(record)]);return record;}
 async function insertAgentTaskIdempotent(record){
@@ -402,4 +418,4 @@ async function consumeSocialOAuthState(stateHash,userId,platform,now=new Date())
 async function query(sql,values=[]){if(!isPostgres())throw new Error('Shared PostgreSQL storage is not configured.');await initialize();return pool.query(sql,values);}
 async function health(){if(!isPostgres())return {ok:true,database:'json-development'};try{await initialize();await pool.query('SELECT 1');return {ok:true,database:'postgres'};}catch(_){return {ok:false,database:'postgres'};}}
 async function close(){if(pool){await pool.end();pool=null;}initialized=false;}
-module.exports={createBotWithVersion,updateBotVersioned,initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findByIdAsync,insertAsync,insertAgentTaskIdempotent,insertAgentTaskWithinCapacity,updateByIdAsync,saveAgentTaskCheckpoints,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,claimDueAutomationWorkflows,finishAutomationScheduleClaim,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,transitionAgentRunStatus,consumeSocialOAuthState,consumeFortisniVisionContext,insertDocumentWithinCapacity,query,health,load,persist};
+module.exports={createBotWithVersion,updateBotVersioned,initialize,close,isPostgres,all,insert,findById,updateById,deleteById,allAsync,findManyAsync,findPublicBotsPage,findByIdAsync,insertAsync,insertAgentTaskIdempotent,insertAgentTaskWithinCapacity,updateByIdAsync,saveAgentTaskCheckpoints,deleteByIdAsync,deleteBotAndData,findUserByPasswordResetTokenHash,consumePasswordResetToken,reserveUsageSlot,releaseUsageSlot,commitUsageRecord,commitChatTurn,usageStats,claimWebhookEvent,completeWebhookEvent,releaseWebhookEvent,claimDueAutomationWorkflows,finishAutomationScheduleClaim,recordFailedLoginAttempt,getEngineerApproval,claimEngineerApproval,updateEngineerApproval,transitionAgentRunStatus,consumeSocialOAuthState,consumeFortisniVisionContext,insertDocumentWithinCapacity,query,health,load,persist};
