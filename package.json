@@ -14,7 +14,8 @@
     "admin:reset-password": "node scripts/reset-admin-password.js",
     "admin:create": "node scripts/create-admin.js",
     "security:scan": "node scripts/security-scan.js",
-    "staging:smoke": "node scripts/staging-smoke.js"
+    "staging:smoke": "node scripts/staging-smoke.js",
+    "knowledge:evaluate": "node scripts/evaluate-knowledge-retrieval.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
