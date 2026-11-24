@@ -100,18 +100,18 @@ async function streamProviderResponse(response,provider,onToken){
  if(!text.trim())throw new Error('The provider returned an empty response.');
  return {text,inputTokens,outputTokens};
 }
-async function generateStream({provider='anthropic',model,system,messages,maxTokens=1024,temperature,onToken=()=>{},timeoutMs=60000}){
+async function generateStream({provider='anthropic',model,system,messages,maxTokens=1024,temperature,onToken=()=>{},timeoutMs=60000,signal}){
  if(provider==='mock'){const result=await generate({provider,model,system,messages,maxTokens,temperature});for(const word of result.text.match(/\S+\s*/g)||[])await onToken(word);return result;}
  const adapter=PROVIDERS[provider];if(!adapter)throw new Error('Unsupported AI provider.');
  if(!process.env[adapter.keyEnv])throw new Error('The selected AI provider is not configured on this server.');
  const actualModel=model||adapter.defaultModel;let response;
- const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);const abortFromCaller=()=>controller.abort();if(signal){if(signal.aborted)controller.abort();else signal.addEventListener('abort',abortFromCaller,{once:true});}
  try{
   if(provider==='anthropic')response=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',signal:controller.signal,headers:{'content-type':'application/json','x-api-key':process.env.ANTHROPIC_API_KEY,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:actualModel,max_tokens:maxTokens,temperature,system,messages,stream:true})});
   else if(provider==='openai'){const input=[{role:'system',content:[{type:'input_text',text:system}]},...messages.map(m=>({role:m.role,content:[{type:'input_text',text:m.content}]}))];response=await fetch('https://api.openai.com/v1/responses',{method:'POST',signal:controller.signal,headers:{'content-type':'application/json',authorization:'Bearer '+process.env.OPENAI_API_KEY},body:JSON.stringify({model:actualModel,max_output_tokens:maxTokens,temperature,input,stream:true})});}
   else {const url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(actualModel)+':streamGenerateContent?alt=sse';const contents=messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));response=await fetch(url,{method:'POST',signal:controller.signal,headers:{'content-type':'application/json','x-goog-api-key':process.env.GOOGLE_GEMINI_API_KEY},body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents,generationConfig:{maxOutputTokens:maxTokens,temperature}})});}
   return await streamProviderResponse(response,provider,onToken);
- }catch(error){if(error.name==='AbortError')throw new Error('The AI provider timed out. Please try again.');throw error;}finally{clearTimeout(timer);}
+ }catch(error){if(signal?.aborted)throw new Error('The streaming client disconnected.');if(error.name==='AbortError')throw new Error('The AI provider timed out. Please try again.');throw error;}finally{clearTimeout(timer);if(signal)signal.removeEventListener('abort',abortFromCaller);}
 }
 
 async function generateVision({model=process.env.OPENAI_VISION_MODEL||'gpt-5.5',prompt,imageBase64,mimeType,maxTokens=512,timeoutMs=30000}){
