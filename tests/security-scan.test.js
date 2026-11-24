@@ -31,3 +31,21 @@ test('reports plain HTTP external endpoints as review findings', () => {
 test('does not flag secure HTTPS provider endpoints', () => {
   assert.deepEqual(scanText('const endpoint = "https://api.example.com";'), []);
 });
+
+test('detects GitHub and AWS credential identifiers as critical findings', () => {
+  const findings = scanText('const gh = "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";\nconst aws = "AKIA1234567890ABCDEF";');
+  assert.deepEqual(findings.map(item => item.ruleId).sort(), ['aws-access-key', 'github-token']);
+  assert.ok(findings.every(item => item.severity === 'critical'));
+  assert.ok(findings.every(item => !Object.hasOwn(item, 'matchedText')));
+});
+
+test('reports shell execution primitives for manual review', () => {
+  const findings = scanText('exec(command);\nspawnSync("echo", args, { shell: true });');
+  assert.ok(findings.some(item => item.ruleId === 'shell-execution'));
+});
+
+test('reports correct line numbers for findings across multiline input', () => {
+  const findings = scanText('safe();\n\nconst tls = { rejectUnauthorized: false };');
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].line, 3);
+});
