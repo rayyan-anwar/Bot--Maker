@@ -89,3 +89,15 @@ These checks validate repository code and CI only. Live provider credentials, ac
 - PR #98: Fortisni smartwatch and paired-phone visual-intelligence product/technical specification moved onto current mainline; BotForge CI passed. This is a specification only, not a native watch app or working camera pipeline.
 - Legacy PRs #72–#82 and #84 were closed after confirming their relevant hardening was already present on main or superseded by the current smartwatch specification. Draft PR #40 was closed because the PostgreSQL budget ledger and maintained budget design are already in the repository.
 - Open PR queue was checked after reconciliation and is empty. This is queue cleanup, not a claim that all product roadmap work is complete.
+
+
+## Verified checkpoint — 2026-11-24 (Fortisni phone vision continuity)
+
+- PR #101 merged to `main` at merge commit `2cf10229d1cc9af2bbc5614486cc164cfce6dc02`.
+- A successful, explicitly user-initiated phone image analysis stores only a bounded text summary (maximum 3,000 characters) for 10 minutes; image bytes are not persisted.
+- The next authenticated chat request for the same account atomically consumes the newest eligible summary once. The prompt explicitly treats it as untrusted descriptive context, not instructions.
+- JSON-store tests cover one-time consumption, expiry and cross-account isolation.
+- PostgreSQL 16 integration test exercises 12 concurrent consumers and confirms only one can claim the context.
+- Latest verified CI: Node.js 18/20/22, PostgreSQL 16 integration, Docker build/readiness smoke test, and Full Chat Browser E2E all passed. The Node 18 job was rerun after an infrastructure cancellation and passed.
+- External OpenAI credentials, physical camera behavior, and real-device UX remain outside CI verification.
+
