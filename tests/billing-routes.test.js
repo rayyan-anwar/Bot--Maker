@@ -57,7 +57,9 @@ test('billing endpoints enforce authentication and fail closed when providers ar
  assert.equal(await store.reserveBillingCheckout(reservationUser,'stripe','pro',uuidv4()),null,'a live checkout reservation blocks a second checkout');
  assert.equal(await store.releaseBillingCheckout(reservationUser,winningReservation.id),true,'the owning reservation can be released');
  assert.equal(await store.releaseBillingCheckout(reservationUser,winningReservation.id),false,'a reservation cannot be released twice');
- assert.ok(await store.reserveBillingCheckout(reservationUser,'stripe','pro',uuidv4()),'a new checkout can start after release');
+ const replacementReservation=await store.reserveBillingCheckout(reservationUser,'stripe','pro',uuidv4());
+ assert.ok(replacementReservation,'a new checkout can start after release');
+ assert.equal(await store.releaseBillingCheckout(reservationUser,replacementReservation.billingCheckoutReservation.id),true);
 
  const stripeClaim=store.applySubscriptionEvent(
   (await store.findManyAsync('users',{email:'billing-test@example.com'}))[0].id,
