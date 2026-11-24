@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "description": "Small deterministic bilingual golden set for lexical and hybrid retrieval regression checks.",
+  "k": 1,
+  "minimumRecallAtK": 0.9,
+  "minimumMeanReciprocalRank": 0.9,
+  "documents": [
+    {
+      "id": "doc-auth",
+      "filename": "account-guide.md",
+      "chunks": [
+        {
+          "id": "c-auth",
+          "text": "Password reset recovery instructions explain how to restore account access securely."
+        }
+      ]
+    },
+    {
+      "id": "doc-refund",
+      "filename": "refund-policy.md",
+      "chunks": [
+        {
+          "id": "c-refund",
+          "text": "Refund and return policy allows unopened products to be returned within thirty days."
+        }
+      ]
+    },
+    {
+      "id": "doc-billing",
+      "filename": "billing.md",
+      "chunks": [
+        {
+          "id": "c-billing",
+          "text": "Invoice billing subscription payments and renewal receipts are available in account settings."
+        }
+      ]
+    },
+    {
+      "id": "doc-hi",
+      "filename": "hindi-ai.md",
+      "chunks": [
+        {
+          "id": "c-hi",
+          "text": "कृत्रिम बुद्धिमत्ता और मशीन लर्निंग के माध्यम से भाषा और चित्रों का विश्लेषण किया जाता है।"
+        }
+      ]
+    },
+    {
+      "id": "doc-camera",
+      "filename": "camera-privacy.md",
+      "chunks": [
+        {
+          "id": "c-camera",
+          "text": "Camera permission and visual analysis require an explicit user-initiated session on the paired phone."
+        }
+      ]
+    },
+    {
+      "id": "doc-workflow",
+      "filename": "automation.md",
+      "chunks": [
+        {
+          "id": "c-workflow",
+          "text": "Workflow revision pinning preserves execution checkpoints when an automation definition changes."
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "query": "password reset recovery",
+      "relevantChunkIds": [
+        "c-auth"
+      ]
+    },
+    {
+      "query": "refund return policy",
+      "relevantChunkIds": [
+        "c-refund"
+      ]
+    },
+    {
+      "query": "invoice billing subscription",
+      "relevantChunkIds": [
+        "c-billing"
+      ]
+    },
+    {
+      "query": "कृत्रिम बुद्धिमत्ता मशीन लर्निंग",
+      "relevantChunkIds": [
+        "c-hi"
+      ]
+    },
+    {
+      "query": "camera permission visual analysis",
+      "relevantChunkIds": [
+        "c-camera"
+      ]
+    },
+    {
+      "query": "workflow revision checkpoint",
+      "relevantChunkIds": [
+        "c-workflow"
+      ]
+    }
+  ]
+}
