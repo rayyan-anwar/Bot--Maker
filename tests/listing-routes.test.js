@@ -40,12 +40,21 @@ test('administrator-only bot and document listing routes require the configured 
  const visitorLogin=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'visitor@example.com',password:'visitor-password-123'})});
  assert.equal(visitorLogin.status,200);
  const visitorCookie=(visitorLogin.headers.get('set-cookie')||'').split(';')[0];
+ await store.updateByIdAsync('bots',bot.id,{apiKey:'private-api-key',providerApiKey:'provider-secret',secret:'private-secret',systemPrompt:'internal system prompt',internalNotes:'owner-only notes'});
  const publicDetail=await fetch(base+'/api/bots/'+bot.id,{headers:{cookie:visitorCookie}});
  assert.equal(publicDetail.status,200);
  const publicPayload=(await publicDetail.json()).bot;
  assert.equal(publicPayload.name,'Test bot');
- assert.equal(Object.hasOwn(publicPayload,'instructions'),false);
- assert.equal(Object.hasOwn(publicPayload,'ownerId'),false);
+ for(const field of ['instructions','ownerId','apiKey','providerApiKey','secret','systemPrompt','internalNotes'])assert.equal(Object.hasOwn(publicPayload,field),false,field);
+ const documentId=uuidv4();
+ await store.insertAsync('documents',{id:documentId,botId:bot.id,filename:'private-knowledge.txt',chunks:[{id:uuidv4(),text:'Confidential knowledge base content.'}],createdAt:new Date().toISOString()});
+ const visitorDocuments=await fetch(base+'/api/documents/'+bot.id,{headers:{cookie:visitorCookie}});
+ assert.equal(visitorDocuments.status,403);
+ const visitorReindex=await fetch(base+'/api/documents/'+bot.id+'/'+documentId+'/reindex',{method:'POST',headers:{cookie:visitorCookie}});
+ assert.equal(visitorReindex.status,403);
+ const visitorDocumentDelete=await fetch(base+'/api/documents/'+bot.id+'/'+documentId,{method:'DELETE',headers:{cookie:visitorCookie}});
+ assert.equal(visitorDocumentDelete.status,403);
+ assert.ok(await store.findByIdAsync('documents',documentId),'public visitor must not delete owner knowledge');
  const visitorEdit=await fetch(base+'/api/bots/'+bot.id,{method:'PUT',headers:{cookie:visitorCookie,'content-type':'application/json'},body:JSON.stringify({name:'Hijacked'})});
  assert.equal(visitorEdit.status,403);
  const visitorDelete=await fetch(base+'/api/bots/'+bot.id,{method:'DELETE',headers:{cookie:visitorCookie}});
@@ -57,7 +66,10 @@ test('administrator-only bot and document listing routes require the configured 
  assert.equal(privateDetail.status,403);
  const publicList=await fetch(base+'/api/bots/public',{headers:{cookie:visitorCookie}});
  assert.equal(publicList.status,200);
- assert.deepEqual((await publicList.json()).bots.map(item=>item.id),[bot.id]);
+ const listed=(await publicList.json()).bots;
+ assert.deepEqual(listed.map(item=>item.id),[bot.id]);
+ assert.equal(JSON.stringify(listed).includes('provider-secret'),false);
+ assert.equal(JSON.stringify(listed).includes('Confidential knowledge base content.'),false);
 });
 
 
