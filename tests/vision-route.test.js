@@ -45,7 +45,7 @@ test('Fortisni vision endpoint requires authentication and explicit user initiat
 
   const invalidForm=new FormData();
   invalidForm.append('userInitiated','true');
-  invalidForm.append('image',new Blob(['not an image'],{type:'image/png}),'spoofed.png');
+  invalidForm.append('image',new Blob(['not an image'],{type:'image/png'}),'spoofed.png');
   const invalid=await fetch(base+'/api/vision/analyze',{method:'POST',headers:{cookie},body:invalidForm});
   assert.equal(invalid.status,415);
 
