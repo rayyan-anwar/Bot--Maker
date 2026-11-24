@@ -165,3 +165,15 @@ test('Gemini streaming adapter emits candidate text and usage metadata',async()=
   assert.deepEqual(result,{text:'Gemini stream',inputTokens:17,outputTokens:8});
  }));
 });
+
+
+test('caller cancellation aborts an in-flight provider stream without misreporting a timeout',async()=>{
+ await withEnv({ANTHROPIC_API_KEY:'anthropic-stream-key'},()=>withFetch((_url,{signal})=>new Promise((resolve,reject)=>{
+  signal.addEventListener('abort',()=>{const error=new Error('aborted');error.name='AbortError';reject(error);},{once:true});
+ }),async()=>{
+  const controller=new AbortController();
+  const pending=providers.generateStream({provider:'anthropic',system:'Rules',messages:[{role:'user',content:'Hi'}],signal:controller.signal});
+  setTimeout(()=>controller.abort(),5);
+  await assert.rejects(()=>pending,/streaming client disconnected/i);
+ }));
+});
