@@ -36,7 +36,7 @@ test('Bot Studio dashboard exposes owner publish and unpublish controls',()=>{
  assert.match(html,/class="bot-publish-toggle"/);
  assert.match(html,/data-published=/);
  assert.match(html,/api\('\/bots\/'\+encodeURIComponent\(id\)\+\'\/\'/);
- assert.match(html,/async function loadPublicBots\\(append=false\\)/);
+ assert.ok(html.includes('async function loadPublicBots(append=false)'));
 });
 
 test('Bot Studio dashboard exposes version history and restore actions for owned bots',()=>{
