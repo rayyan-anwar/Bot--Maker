@@ -205,7 +205,7 @@
   const voiceStatus=document.getElementById('fortisni-voice-status');
   const micButton=document.getElementById('fortisni-mic-btn');
   const speechButton=document.getElementById('fortisni-speech-btn');
-  const voiceController=window.BotForgeVoice.createVoiceController({root:window,input,onStatus:message=>{voiceStatus.textContent=message;},onSpeaking:speaking=>{if(speaking)window.setFortisniState('speaking');else window.setFortisniState('idle');}});
+  const voiceController=window.BotForgeVoice.createVoiceController({root:window,input,onStatus:message=>{voiceStatus.textContent=message;if(/finished|stopped|permission|No speech|Could not start|not supported/i.test(message)){micButton.setAttribute('aria-pressed','false');micButton.textContent='Voice input';}},onSpeaking:speaking=>{if(speaking)window.setFortisniState('speaking');else window.setFortisniState('idle');}});
   micButton.addEventListener('click',()=>{if(voiceController.isListening()){voiceController.stopListening();micButton.setAttribute('aria-pressed','false');micButton.textContent='Voice input';}else if(voiceController.startListening()){micButton.setAttribute('aria-pressed','true');micButton.textContent='Stop listening';}});
   speechButton.addEventListener('click',()=>{const enabled=voiceController.setSpeechEnabled(!voiceController.isSpeechEnabled());speechButton.setAttribute('aria-pressed',String(enabled));speechButton.textContent='Read replies: '+(enabled?'On':'Off');});
   window.addEventListener('pagehide',()=>voiceController.destroy(),{once:true});
