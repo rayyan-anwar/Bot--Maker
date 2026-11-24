@@ -1,8 +1,8 @@
 # BotForge Master Completion Tracker
 
 **Repository:** `rayyan-anwar/Bot--Maker`  
-**Baseline:** `797234fd3d7ffec049d2292249b9f9c181653dee` at `56042cf635e3391c1a1cab0821bd9fb99a172343`  
-**Last reconciled:** 2026-11-24 (after PR #122; PR #104–#122 reconciled)
+**Baseline:** `c664957ab6598ea9c8443878b215e0d1bc3dedd8` at `56042cf635e3391c1a1cab0821bd9fb99a172343`  
+**Last reconciled:** 2026-11-24 (after PR #124; PR #104–#124 reconciled)
 **Purpose:** One evidence-led view of implementation, automated verification, and release blockers.
 
 ## Status definitions
@@ -39,7 +39,7 @@ Do not calculate a project-wide percentage by counting files, commits, PRs, or c
 | Conversation history and memory | Partial; privacy guard automated-tested | User-scoped routes and deletion exist; PR #108 adds server-side filtering for common sensitive automatic-memory candidates plus unit and authenticated chat integration tests. Pattern filtering is not exhaustive; inspect/edit/disable/delete, retention and cross-account isolation still need broader verification |
 | Knowledge uploads and retrieval | Partial | Upload/retrieval tests exist; verify malware scanning, parser limits, citations, prompt-injection resistance and deletion |
 | Usage quotas and AI spend budget | Implemented foundation; live validation required | Ledger/reservation tests exist; validate real model pricing and reconciliation before enabling |
-| Billing foundations | Implemented foundation; external validation required | Stripe/Razorpay signature and idempotency tests exist; perform provider sandbox checkout, refunds and entitlement tests |
+| Billing foundations | Implemented foundation; external validation required | Stripe/Razorpay signature and idempotency tests exist; PR #124 adds a shared five-attempt/hour per-account checkout limiter backed by PostgreSQL when configured. Perform provider sandbox checkout, refunds and entitlement tests |
 | Responsive UI and themes | Implemented foundation; device QA required | PWA/theme tests exist; verify real mobile and desktop browsers |
 
 ## P2 — Fortisni companion
@@ -95,6 +95,9 @@ Do not calculate a project-wide percentage by counting files, commits, PRs, or c
 
 
 
+
+17. **PR #124 merged:** Stripe and Razorpay checkout routes now share a five-attempt-per-hour limit per authenticated account. PostgreSQL-backed rate-limit storage is used when PostgreSQL is active, sharing the limit across instances. Route regression coverage verifies the sixth Stripe checkout attempt returns HTTP 429. Exact PR head SHA `e3e8838035c24168957a9b7308a5549a4b55d599` passed Node.js 18/20/22, PostgreSQL 16 integration, Docker build and Full Chat Browser E2E.
+
 16. **PR #121 merged:** PDF parsing now permits at most two concurrent parser workers per application process and rejects excess work with HTTP 503. Parser slots are released on completion, error, timeout and worker-construction failure; capacity/overload/slot-reuse tests were added. Exact PR head SHA `f78d16071033478cb48001d7c6575518a9f8ce9a` passed Node.js 18/20/22, PostgreSQL 16 integration, Docker build and Full Chat Browser E2E. This is a per-process guard, not OS/container isolation or multi-instance capacity certification.
 
 15. **PR #118 merged:** Streaming chat now aborts the upstream provider request when the SSE client disconnects. Caller cancellation is propagated into the provider fetch; quota reservations are released when cancellation occurs before provider work starts, while post-start AI budget holds remain for reconciliation because partial provider cost may have been incurred. Exact PR head SHA `00579500f45dddd283e7e98e308f1e00d59cb2b8` passed Node.js 18/20/22, PostgreSQL 16 integration, Docker build and Full Chat Browser E2E. Main-branch post-merge checks were queued at checkpoint time.
@@ -143,3 +146,5 @@ The [release acceptance checklist](RELEASE_ACCEPTANCE_CHECKLIST.md) is the contr
 - Main commit `223b18945279f7edfe16eaea9ff1284755c7ecd2` passed all nine post-merge checks after PR #121: Node.js 18/20/22, PostgreSQL 16 integration, Docker image build, Full Chat Browser E2E, Fortisni Chromium E2E, AI Engineer Admin Browser E2E and workflow generation. CI success does not establish staging or production behavior.
 
 - Documentation PR #122 merged tracker reconciliation for PR #121. Main commit `223b18945279f7edfe16eaea9ff1284755c7ecd2` passed all nine post-merge CI checks after the PDF parser concurrency hardening. The current baseline is the subsequent documentation-only main commit `797234fd3d7ffec049d2292249b9f9c181653dee`.
+
+- Main commit `c664957ab6598ea9c8443878b215e0d1bc3dedd8` passed all nine post-merge checks after PR #124: Node.js 18/20/22, PostgreSQL 16 integration, Docker image build, Full Chat Browser E2E, Fortisni Chromium E2E, AI Engineer Admin Browser E2E and workflow generation. This is CI evidence, not live billing or production validation.
