@@ -119,3 +119,10 @@ The admin panel includes a read-only AI diagnosis action. To enable it, set `BOT
 ## 9. Password recovery email
 
 To enable self-service customer password recovery, configure `RESEND_API_KEY`, `BOTFORGE_EMAIL_FROM` with a verified sender domain, and `PUBLIC_BASE_URL` with the HTTPS production origin. The app sends one-time reset links that expire after 20 minutes; only a SHA-256 token hash is stored, and a successful reset clears the failed-login lockout. Without these settings, the forgot-password endpoint deliberately returns a generic response and sends no email. Test delivery and expired/replayed links in staging before launch.
+
+
+## 10. Prometheus alert rules
+
+The repository provides starter alert rules at `deploy/prometheus-alerts.yml` for sustained HTTP 5xx rate, average request duration and process resident memory. Load the file with Prometheus `rule_files`, configure a scrape target for each BotForge instance, and set the scrape job label to include `botforge` for the target-down conventions used by your monitoring setup. If `METRICS_TOKEN` is configured, supply it through a protected bearer-token file in the Prometheus scrape configuration; never commit the token.
+
+These rules only generate Prometheus alerts. Configure Alertmanager receivers, routing, grouping, inhibition and contact escalation in the deployment environment. The in-process counters are per application process and reset on restart; Prometheus rate/increase functions are used to tolerate counter resets. Tune thresholds against real staging traffic before production use.
