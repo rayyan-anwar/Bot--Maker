@@ -1,8 +1,8 @@
 # BotForge Master Completion Tracker
 
 **Repository:** `rayyan-anwar/Bot--Maker`  
-**Baseline:** `main` at `870e32e142b229e5d7c33b0d7c001af23a1de155`  
-**Last reconciled:** 2026-11-24 (after PRs #104, #106, #107, #108, #109 and #110)  
+**Baseline:** `main` at `45c7c2e1feebc0c09f4acab4e56766141ed61688`  
+**Last reconciled:** 2026-11-24 (after PRs #104, #106, #107, #108, #109, #110 and #111)  
 **Purpose:** One evidence-led view of implementation, automated verification, and release blockers.
 
 ## Status definitions
@@ -33,7 +33,7 @@ Do not calculate a project-wide percentage by counting files, commits, PRs, or c
 | Work item | Status | Evidence / exit condition |
 |---|---|---|
 | Bot create, configure, edit and delete | Implemented; validation ongoing | Run full owner journey and malformed-input tests |
-| Public bot discovery and safe public view | Implemented baseline; further scale/security review required | PR #109 adds bounded search/pagination, owner/private filtering, input validation and dashboard search/load-more. PR #110 moves filtering, sorting, LIMIT/OFFSET and total count into PostgreSQL; query indexes, abuse controls and production-scale testing remain |
+| Public bot discovery and safe public view | Implemented baseline; privacy boundaries automated-tested | PR #109 adds bounded search/pagination, owner/private filtering, input validation and dashboard search/load-more. PR #110 moves filtering, sorting, LIMIT/OFFSET and total count into PostgreSQL. PR #111 verifies private instructions, API/provider secrets and owner knowledge documents are not exposed or mutable by visitors. Query indexes, abuse controls and production-scale testing remain |
 | Chat with supported providers | Implemented; live validation required | Anthropic, OpenAI and Gemini adapters/tests exist; verify real credentials, timeouts, limits and provider errors |
 | Conversation history and memory | Partial; privacy guard automated-tested | User-scoped routes and deletion exist; PR #108 adds server-side filtering for common sensitive automatic-memory candidates plus unit and authenticated chat integration tests. Pattern filtering is not exhaustive; inspect/edit/disable/delete, retention and cross-account isolation still need broader verification |
 | Knowledge uploads and retrieval | Partial | Upload/retrieval tests exist; verify malware scanning, parser limits, citations, prompt-injection resistance and deletion |
@@ -84,8 +84,9 @@ Do not calculate a project-wide percentage by counting files, commits, PRs, or c
 4. **PR #108 merged:** Automatic memory candidates now pass a server-side defense-in-depth filter for common health, religion, politics, sexuality, identity, credential, government/financial identifier and contact-data patterns. Manual user-entered memory remains unchanged. Node.js 18/20/22, PostgreSQL 16, Docker, security scans and Full Chat Browser E2E passed on the exact PR head SHA.
 5. **PR #109 merged:** Public bot discovery supports validated search and bounded pages, dashboard search/load-more, owner exclusion and private-bot exclusion. Node.js 18/20/22, PostgreSQL 16, Docker and Full Chat Browser E2E passed on the exact PR head SHA.
 6. **PR #110 merged:** PostgreSQL now performs public-bot filtering, sorting, search, LIMIT/OFFSET and total counting in the storage query; JSON development adapter behavior remains aligned. Node.js 18/20/22, PostgreSQL 16 integration, Docker and Full Chat Browser E2E passed on the exact PR head SHA.
-7. Continue P0/P1 source review and select the next code batch from verified gaps, not feature-count pressure.
-8. Keep infrastructure/device/provider-dependent work explicitly blocked until access and evidence are available.
+7. **PR #111 merged:** Public bot responses are regression-tested against leakage of owner instructions, owner IDs, API/provider secrets, internal prompts/notes and knowledge documents. Visitors are denied document listing, reindexing and deletion. Node.js 18/20/22, PostgreSQL 16, Docker and security scans passed on the exact PR head SHA.
+8. Continue P0/P1 source review and select the next code batch from verified gaps, not feature-count pressure.
+9. Keep infrastructure/device/provider-dependent work explicitly blocked until access and evidence are available.
 
 ## Release authority
 
@@ -105,3 +106,5 @@ The [release acceptance checklist](RELEASE_ACCEPTANCE_CHECKLIST.md) is the contr
 - PR #109 exact head SHA `f96b0b2405c16fa56c86eddaa398bda0231a7ddf` passed Node.js 18/20/22 tests, syntax/security checks, PostgreSQL 16 integration including backup/restore rehearsal, Docker readiness and Full Chat Browser E2E.
 
 - PR #110 exact head SHA `0986817d179e186285ef6a679052389b78d4b06e` passed Node.js 18/20/22 tests, syntax/security checks, PostgreSQL 16 integration including the new public-discovery pagination test and backup/restore rehearsal, Docker readiness and Full Chat Browser E2E.
+
+- PR #111 exact head SHA `27d139082d997d5c4c55e5bb9ab6be9353b7a416` passed Node.js 18/20/22 tests, syntax/security checks, PostgreSQL 16 integration including backup/restore rehearsal and Docker build/readiness. This was a test-only security-boundary change; Full Chat Browser E2E was not required by its changed paths.
