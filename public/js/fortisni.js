@@ -95,7 +95,7 @@
     const session = createSession();
     const STATE_ALIASES = {
       celebrating: 'excited', comforting: 'sad', calming: 'concerned',
-      reassuring: 'concerned', attentive: 'curious', warm: 'grateful'
+      reassuring: 'concerned', attentive: 'curious'
     };
     function setState(state, customMessage, syncSession = true) {
       const requested = String(state || 'idle');
