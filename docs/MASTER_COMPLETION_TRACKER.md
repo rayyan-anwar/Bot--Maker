@@ -3,6 +3,15 @@
 **Repository:** `rayyan-anwar/Bot--Maker`  
 **Baseline:** `3709635f028b7e29fa8c66e6b845e07f1af793e6`  
 **Last reconciled:** 2026-11-25 (after PR #132; PR #129–#132 and current launch gates reconciled)
+
+## Recent reconciliation checkpoint (2026-11-25)
+
+- PR #138–#141 are merged; PR #141 reconciles PR #140 and post-merge evidence.
+- The open-PR queue was checked and is empty at this checkpoint.
+- PR #140 production Origin canonicalization and PR #139 cookie/Origin regression checks are automated-tested; actual reverse-proxy behavior still requires staging.
+- Release issues #2 and #3 remain open because staging infrastructure, credentials, proxy topology, restore/operations evidence, and independent testing are not available in repository-only work.
+- This checkpoint does not claim deployment readiness or percentage completion.
+
 **Purpose:** One evidence-led view of implementation, automated verification, and release blockers.
 
 ## Status definitions
