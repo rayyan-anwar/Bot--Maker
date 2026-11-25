@@ -218,3 +218,19 @@ Do not publish a single exact completion percentage from commit count or checkli
 - Exact PR head SHA `19c9cf268e596129f9cad7840948a73defc1bc10` passed all six checks: Node.js 18/20/22, PostgreSQL 16 integration, Docker image build and Full Chat browser flow.
 - Post-merge main CI for `0ad03a272cf53412dfbc00bac1155625aee72bdf` was queued at this checkpoint; record final results only after verification.
 - This reduces exposure in the visible URL/history. It does not remove the token from the initial HTTP request, email, browser extensions or server-side logging, and does not replace HTTPS or short-lived single-use token controls.
+
+
+## Verified checkpoint — 2026-11-25 (password-reset transport protections)
+
+- PR #138 merged to `main` at `9e7d7057b442cc056a3ae542c116734d424e29be`.
+- The reset page sets `Referrer-Policy` via a strict `no-referrer` meta policy, preventing the one-time reset token in the initial URL from being forwarded in subsequent `Referer` headers.
+- The reset page response is served with `Cache-Control: no-store, max-age=0` and `Pragma: no-cache` before static-file handling.
+- Regression tests cover both the referrer policy and cache-prevention headers. All six PR checks passed on head `da1d6db7cbf98884d52a9359a8f690ce6569c4ac`.
+- Post-merge main CI passed all nine checks on merge commit `9e7d7057b442cc056a3ae542c116734d424e29be`: Node.js 18/20/22, PostgreSQL 16 integration, Docker image build, Full Chat browser flow, Fortisni Chromium flow, workflow generation and Admin control flow.
+- This does not remove the token from the initial request URL, email URL, browser extensions or server-side request logs. Those require separate controls.
+
+## Verified checkpoint — 2026-11-25 (production cookie regression coverage)
+
+- Added regression assertions for production session cookies: `Secure`, `HttpOnly` and `SameSite=Strict`.
+- Added an explicit assertion that a production cookie-authenticated mutation without an `Origin` header is rejected.
+- These assertions verify the application middleware and cookie configuration in tests. They do not replace a real HTTPS reverse-proxy staging test.
