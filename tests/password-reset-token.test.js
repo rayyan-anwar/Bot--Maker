@@ -50,5 +50,5 @@ test('password reset page removes the one-time token from browser URL history im
 
 test('password reset page prevents the one-time token from being sent in a Referer header',()=>{
  const html=fs.readFileSync(path.join(__dirname,'../public/reset-password.html'),'utf8');
- assert.match(html,/<meta\\s+name="referrer"\\s+content="no-referrer">/i);
+ assert.match(html,/<meta\s+name="referrer"\s+content="no-referrer">/i);
 });
