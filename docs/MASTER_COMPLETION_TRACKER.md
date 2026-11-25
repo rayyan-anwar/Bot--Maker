@@ -207,3 +207,14 @@ Do not publish a single exact completion percentage from commit count or checkli
 - Exact PR head SHA `1df4ee9395f2f1ab840ea649e8f406f9f7128f85` passed all five PR checks: Node.js 18, Node.js 20, Node.js 22, PostgreSQL 16 integration and Docker image build.
 - Post-merge main-commit CI for `0e30c69ed33f43b767e6968db31f9b877b9cbbf1` was still running at this checkpoint; record its final result only after verification.
 - This is regression coverage for reset-token lifecycle and session revocation. It does not validate live email delivery, production rate limiting or staging deployment.
+
+
+## Verified integration checkpoint — 2026-11-25 (PR #136)
+
+- PR #135 merged the preceding tracker reconciliation at main commit `1bb733bc743f2a6cf7d20f7b6f9c310f61cdaa0f`.
+- PR #136 merged at commit `0ad03a272cf53412dfbc00bac1155625aee72bdf`.
+- Password reset page now captures the one-time token and immediately calls `history.replaceState` to remove the query string from the visible URL and current browser-history entry. The captured token remains available for the reset POST.
+- Added a regression test that checks token capture, URL cleanup ordering, and continued submission after cleanup.
+- Exact PR head SHA `19c9cf268e596129f9cad7840948a73defc1bc10` passed all six checks: Node.js 18/20/22, PostgreSQL 16 integration, Docker image build and Full Chat browser flow.
+- Post-merge main CI for `0ad03a272cf53412dfbc00bac1155625aee72bdf` was queued at this checkpoint; record final results only after verification.
+- This reduces exposure in the visible URL/history. It does not remove the token from the initial HTTP request, email, browser extensions or server-side logging, and does not replace HTTPS or short-lived single-use token controls.
