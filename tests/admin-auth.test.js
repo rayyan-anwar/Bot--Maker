@@ -136,7 +136,11 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
   const ownerLogin=await post('/api/auth/login',{email:'owner@example.com',password:'strong-admin-password-123'});
   assert.equal(ownerLogin.status,200);
   const ownerCookie=ownerLogin.headers.get('set-cookie');
-  assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:ownerCookie}})).status,403);
+  assert.ok(ownerCookie&&ownerCookie.includes('session='));
+  assert.match(ownerCookie,/; Secure/i,'production session cookies must be Secure');
+  assert.match(ownerCookie,/; HttpOnly/i,'session cookies must be HttpOnly');
+  assert.match(ownerCookie,/; SameSite=Strict/i,'session cookies must use SameSite=Strict');
+  assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:ownerCookie}})).status,403,'production mutations must reject a missing Origin');
   assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:ownerCookie,origin:base}})).status,403);
   assert.equal((await fetch(base+'/api/auth/me',{headers:{cookie:ownerCookie}})).status,200);
   assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:customerCookie}})).status,403);
