@@ -36,3 +36,14 @@ test('password reset token can be consumed only once and expired tokens cannot b
  assert.equal(await store.consumePasswordResetToken(tokenHash,{passwordHash:'replayed-token'}),null,'a consumed token must not be reusable');
  assert.equal(await store.consumePasswordResetToken(expiredHash,{passwordHash:'expired-token'}),null,'an expired token must not be accepted');
 });
+
+test('password reset page removes the one-time token from browser URL history immediately',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'../public/reset-password.html'),'utf8');
+ const capture=html.indexOf("token=new URLSearchParams(location.search).get('token')");
+ const cleanup=html.indexOf("history.replaceState(null,document.title,location.pathname)",capture);
+ const submit=html.indexOf("send('reset',{token,password:",cleanup);
+ assert.ok(capture>=0,'page must read the token from the reset link');
+ assert.ok(cleanup>capture,'page must replace the URL after capturing the token');
+ assert.ok(submit>cleanup,'captured token must still be submitted after URL cleanup');
+ assert.match(html,/history\.replaceState\(null,document\.title,location\.pathname\)/);
+});
