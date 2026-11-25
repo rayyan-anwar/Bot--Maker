@@ -234,3 +234,13 @@ Do not publish a single exact completion percentage from commit count or checkli
 - Added regression assertions for production session cookies: `Secure`, `HttpOnly` and `SameSite=Strict`.
 - Added an explicit assertion that a production cookie-authenticated mutation without an `Origin` header is rejected.
 - These assertions verify the application middleware and cookie configuration in tests. They do not replace a real HTTPS reverse-proxy staging test.
+
+
+## Verified checkpoint — 2026-11-25 (canonical production Origin validation)
+
+- PR #140 merged to `main` at commit `d3097e8a21546111e87a0e9d1d84c3c2129cb9bf`.
+- Cookie-authenticated mutation requests now reject Origin values that do not exactly match their canonical URL serialization, in addition to the existing same-host and production-HTTPS checks.
+- Regression coverage rejects opaque `null`, cross-origin, path-bearing/non-canonical and insecure production Origin values.
+- Exact PR head `b1be951304d1bfc0aa9cc2732f7398686690a0ac` passed all six PR checks before merge.
+- Post-merge main CI passed all nine checks on merge commit `d3097e8a21546111e87a0e9d1d84c3c2129cb9bf`: Node.js 18/20/22, PostgreSQL 16 integration, Docker image build, Full Chat browser flow, Fortisni Chromium flow, Admin control flow and workflow generation.
+- This is application-level Origin validation and automated regression coverage. Actual HTTPS reverse-proxy behavior, trusted forwarded headers and multi-instance rate limits still require staging evidence under open issues #2 and #3.
