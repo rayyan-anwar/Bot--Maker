@@ -1,8 +1,8 @@
 # BotForge Master Completion Tracker
 
 **Repository:** `rayyan-anwar/Bot--Maker`  
-**Baseline:** `d049afa1e6b6524a35624b97badb65c683469c7f`  
-**Last reconciled:** 2026-11-24 (after PR #124; PR #104–#124 reconciled)
+**Baseline:** `3709635f028b7e29fa8c66e6b845e07f1af793e6`  
+**Last reconciled:** 2026-11-25 (after PR #132; PR #129–#132 and current launch gates reconciled)
 **Purpose:** One evidence-led view of implementation, automated verification, and release blockers.
 
 ## Status definitions
@@ -148,3 +148,53 @@ The [release acceptance checklist](RELEASE_ACCEPTANCE_CHECKLIST.md) is the contr
 - Documentation PR #122 merged tracker reconciliation for PR #121. Main commit `223b18945279f7edfe16eaea9ff1284755c7ecd2` passed all nine post-merge CI checks after the PDF parser concurrency hardening. The current baseline is the subsequent documentation-only main commit `797234fd3d7ffec049d2292249b9f9c181653dee`.
 
 - Main commit `c664957ab6598ea9c8443878b215e0d1bc3dedd8` passed all nine post-merge checks after PR #124: Node.js 18/20/22, PostgreSQL 16 integration, Docker image build, Full Chat Browser E2E, Fortisni Chromium E2E, AI Engineer Admin Browser E2E and workflow generation. This is CI evidence, not live billing or production validation.
+
+
+## Verified main checkpoint — 2026-11-25
+
+- Current `main` SHA: `3709635f028b7e29fa8c66e6b845e07f1af793e6`.
+- PR #132 is merged. It adds regression coverage for all six supported process-execution APIs detected by the heuristic scanner: `exec`, `execSync`, `spawn`, `spawnSync`, `execFile` and `execFileSync`.
+- Post-merge CI on the exact current main SHA passed **9/9**: Node.js 18, Node.js 20, Node.js 22, PostgreSQL 16 integration, Docker image build, workflow generation, Full Chat browser flow, Fortisni Chromium flow and Admin control flow.
+- PR #129 staging hardening, PR #130 scanner regression tests and PR #131 process-execution detection fix are already in the mainline history; PR #132 completes API-by-API scanner regression coverage.
+- The scanner is heuristic review tooling. Its findings are not a penetration test and absence of findings is not proof of safety.
+
+## Current open release blockers — reconciled 2026-11-25
+
+### Issue #3 — trusted proxy and edge security (OPEN)
+Repository-verifiable work already present:
+- [x] Spoofed `X-Forwarded-For` tests with `TRUST_PROXY=0`.
+- [x] One-hop trust configuration and rejection of ambiguous/blanket trust values.
+- [x] Middleware-ordering regression coverage.
+- [x] Shared PostgreSQL rate-limit concurrency coverage, including 40 concurrent increments.
+
+Still pending in a real staging topology:
+- [ ] Verify the proxy overwrites forwarded headers and the application is not publicly reachable around the proxy.
+- [ ] Exercise auth/API rate limits through the actual reverse proxy and at least two app instances.
+- [ ] Verify secure cookies, Origin/CSRF enforcement and HTTPS redirects behind the actual proxy.
+- [ ] Attach dated staging evidence before enabling public traffic.
+
+### Issue #2 — staging rehearsal and production operations (OPEN)
+- [ ] Provision private HTTPS staging host and managed PostgreSQL with TLS.
+- [ ] Configure secrets through the host secret manager; create the single administrator securely. Never put credentials in Git or chat.
+- [ ] Provision private ClamAV and verify signature readiness/fail-closed upload behavior.
+- [ ] Rehearse migrations with synthetic data and verify counts/markers.
+- [ ] Run staging auth/admin/chat/provider/upload/deletion/restart-persistence smoke tests.
+- [ ] Validate quota and shared rate limits across multiple app instances.
+- [ ] Enable managed backups and restore into a separate clean staging database; record recovery evidence/RPO/RTO.
+- [ ] Verify secret rotation, log redaction, metrics, alerts, incident response and rollback.
+- [ ] Complete browser E2E, representative load testing and independent security review.
+- [ ] Verify provider and payment sandbox flows, including billing webhooks/refunds/entitlements.
+- [ ] Review privacy, terms, retention/export/deletion and billing disclosures with qualified counsel.
+- [ ] Confirm PDF parser OS/container sandboxing and malware scanning in the actual staging runtime.
+
+### Product and scale work still not release-certified
+- [ ] Complete remaining security checklist review: auth/session lifecycle, CSRF/Origin, tenant isolation across all routes, upload storage/deletion, prompt-injection/tool threat model, spend ceilings and data lifecycle.
+- [ ] Validate live AI provider behavior and real model cost/quota reconciliation.
+- [ ] Validate Stripe/Razorpay sandbox checkout, webhook idempotency, cancellation, refunds and entitlement revocation.
+- [ ] Validate Fortisni on a representative physical mobile/desktop browser and OS matrix; smartwatch support remains specification-only.
+- [ ] Validate AI Engineer sandbox restrictions and failure recovery in a disposable worker with no production secrets/database access.
+- [ ] Complete monitoring/alert delivery, operational rollback and independent penetration/load testing.
+
+## Progress reporting rule
+
+Do not publish a single exact completion percentage from commit count or checklist item count. The current repository state has a green 9/9 main CI suite and substantial implemented/tested foundations, but the product is **not production-certified**. The open issues #2 and #3 are intentional release gates because their remaining tasks require real infrastructure, credentials and operator evidence. Recalculate a percentage only from a weighted, scoped work breakdown with explicit exclusions (for example, production launch vs. full long-term roadmap).
