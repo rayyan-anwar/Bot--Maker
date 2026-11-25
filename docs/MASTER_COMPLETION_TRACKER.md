@@ -198,3 +198,12 @@ Still pending in a real staging topology:
 ## Progress reporting rule
 
 Do not publish a single exact completion percentage from commit count or checklist item count. The current repository state has a green 9/9 main CI suite and substantial implemented/tested foundations, but the product is **not production-certified**. The open issues #2 and #3 are intentional release gates because their remaining tasks require real infrastructure, credentials and operator evidence. Recalculate a percentage only from a weighted, scoped work breakdown with explicit exclusions (for example, production launch vs. full long-term roadmap).
+
+
+## Verified integration checkpoint — 2026-11-25 (PR #134)
+
+- PR #134 merged to `main` at commit `0e30c69ed33f43b767e6968db31f9b877b9cbbf1`.
+- Added `tests/password-reset-token.test.js`: concurrent token consumption allows exactly one successful reset; replayed and expired tokens are rejected; successful consumption clears reset-token fields and increments `sessionVersion` to revoke existing sessions.
+- Exact PR head SHA `1df4ee9395f2f1ab840ea649e8f406f9f7128f85` passed all five PR checks: Node.js 18, Node.js 20, Node.js 22, PostgreSQL 16 integration and Docker image build.
+- Post-merge main-commit CI for `0e30c69ed33f43b767e6968db31f9b877b9cbbf1` was still running at this checkpoint; record its final result only after verification.
+- This is regression coverage for reset-token lifecycle and session revocation. It does not validate live email delivery, production rate limiting or staging deployment.
