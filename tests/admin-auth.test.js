@@ -141,6 +141,10 @@ test('public signup works, admin email is reserved, and three wrong passwords lo
   assert.match(ownerCookie,/; HttpOnly/i,'session cookies must be HttpOnly');
   assert.match(ownerCookie,/; SameSite=Strict/i,'session cookies must use SameSite=Strict');
   assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:ownerCookie}})).status,403,'production mutations must reject a missing Origin');
+  assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:ownerCookie,origin:'null'}})).status,403,'opaque origins must be rejected');
+  assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:ownerCookie,origin:'https://attacker.example'}})).status,403,'cross-origin mutations must be rejected');
+  assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:ownerCookie,origin:base.replace(/^http:/,'https:')+'/unexpected-path'}})).status,403,'non-canonical Origin values with paths must be rejected');
+  assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:ownerCookie,origin:'http://127.0.0.1:'+server.address().port}})).status,403,'insecure production origins must be rejected');
   assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:ownerCookie,origin:base}})).status,403);
   assert.equal((await fetch(base+'/api/auth/me',{headers:{cookie:ownerCookie}})).status,200);
   assert.equal((await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:customerCookie}})).status,403);
