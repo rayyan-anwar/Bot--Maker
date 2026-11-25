@@ -49,3 +49,10 @@ test('reports correct line numbers for findings across multiline input', () => {
   assert.equal(findings.length, 1);
   assert.equal(findings[0].line, 3);
 });
+
+test('detects all supported process execution APIs', () => {
+  for (const api of ['exec', 'execSync', 'spawn', 'spawnSync', 'execFile', 'execFileSync']) {
+    const findings = scanText(api + '(command);', 'process-fixture.js');
+    assert.ok(findings.some(item => item.ruleId === 'shell-execution'), api + ' should be detected');
+  }
+});
