@@ -52,3 +52,12 @@ test('password reset page prevents the one-time token from being sent in a Refer
  const html=fs.readFileSync(path.join(__dirname,'../public/reset-password.html'),'utf8');
  assert.match(html,/<meta\s+name="referrer"\s+content="no-referrer">/i);
 });
+
+test('password reset HTML is served with cache-prevention headers',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'../server/index.js'),'utf8');
+ const policy=source.indexOf("req.path==='/reset-password.html'");
+ const staticFiles=source.indexOf("app.use(express.static");
+ assert.ok(policy>=0 && policy<staticFiles,'reset page cache policy must run before static file serving');
+ assert.match(source,/Cache-Control','no-store, max-age=0/);
+ assert.match(source,/Pragma','no-cache/);
+});
