@@ -253,3 +253,44 @@ Do not publish a single exact completion percentage from commit count or checkli
 - Exact PR head `b1be951304d1bfc0aa9cc2732f7398686690a0ac` passed all six PR checks before merge.
 - Post-merge main CI passed all nine checks on merge commit `d3097e8a21546111e87a0e9d1d84c3c2129cb9bf`: Node.js 18/20/22, PostgreSQL 16 integration, Docker image build, Full Chat browser flow, Fortisni Chromium flow, Admin control flow and workflow generation.
 - This is application-level Origin validation and automated regression coverage. Actual HTTPS reverse-proxy behavior, trusted forwarded headers and multi-instance rate limits still require staging evidence under open issues #2 and #3.
+
+
+## Consolidated P0–P2 execution batch — 2026-11-25
+
+This batch is a completion-oriented scope ledger, not a claim that unavailable staging or live services have been exercised.
+
+### P0 acceptance checklist
+- [ ] Authentication/session lifecycle: login, expiry, logout, revocation, reset replay, cookie flags, Origin/CSRF and lockout behavior reviewed across all mutating routes.
+- [ ] Authorization/tenant isolation: route-by-route owner/admin boundaries; no cross-user access to bots, conversations, memory, files, usage, billing or tool outputs.
+- [ ] Edge/proxy: real proxy overwrites forwarded headers; app cannot be reached bypassing proxy; HTTPS redirects/cookies and rate limits verified at edge.
+- [ ] Upload safety: content/type/size validation, malware scanning fail-closed, parser timeout/concurrency, isolated execution, storage permissions and deletion lifecycle.
+- [ ] Secrets/privacy: secret-manager use, no secrets in logs/PRs, redaction, rotation, memory controls, retention/export/deletion review.
+- [ ] Database operations: migrations, rollback, synthetic rehearsal, backups, clean restore, RPO/RTO, multi-instance shared quota/rate limit evidence.
+- [ ] CI/release: required checks green on release SHA, dependency/source scan reviewed, browser journeys, rollback and incident runbook.
+- [ ] Observability: health/readiness, metrics, alerts and alert delivery tested; operator response and rollback rehearsal.
+
+### P1 acceptance checklist
+- [ ] Bot lifecycle: create/configure/version/edit/restore/publish/unpublish/delete and concurrency/malformed input journeys.
+- [ ] Chat reliability: provider timeout/retry/cancellation, stream disconnect, error handling, safe output and usage accounting.
+- [ ] Provider integrations: real sandbox/credentials for supported providers, model capability/limits, provider outage and cost reconciliation.
+- [ ] Memory/history: user inspection/edit/disable/clear, per-bot and account scope, privacy filters, session continuity and deletion.
+- [ ] Knowledge retrieval: uploads, scan, parse, chunk, retrieval relevance/citations, injection defense, file removal and reindex boundaries.
+- [ ] Admin: privileged controls, auditability, secure recovery, role boundaries and browser E2E.
+- [ ] Billing: checkout, webhook signature/idempotency, subscription state, cancellation, refund, entitlement revocation, sandbox reconciliation.
+- [ ] UX: responsive desktop/mobile, accessibility/keyboard, empty/loading/error states, settings/themes and safe feedback.
+
+### P2 acceptance checklist
+- [ ] AI Engineer: approval gates, worker isolation, filesystem/network/resource limits, task cancellation, retries, failure recovery, secrets/database isolation.
+- [ ] Tool calling: allowlist, schema validation, permissions, prompt-injection threat model, human approval for consequential actions and audit log.
+- [ ] Model routing: capability-aware routing, fallback, latency/cost controls, provider availability and graceful degradation.
+- [ ] Discovery/marketplace: bounded search/pagination, privacy-safe public profile, abuse/reporting/moderation, indexes and load validation.
+- [ ] Fortisni: contextual reaction accuracy, negation/ambiguity, reset/session boundaries, voice/image permissions and physical device/browser QA.
+- [ ] Analytics: privacy-preserving usage metrics, quota/budget reconciliation, dashboard correctness and alert thresholds.
+- [ ] Scale: representative load/soak tests, queue backpressure, worker restart/recovery, database pool limits and capacity plan.
+- [ ] Collaboration/SaaS: workspace ownership, roles, invites, tenant isolation, billing boundaries and data export/deletion tests before public registration.
+
+### Batch completion rules
+1. Repository code/test/doc tasks can be implemented and submitted as PRs, then merged only after required CI succeeds.
+2. Live staging, provider, billing, device, load and independent-review items require real access/evidence; they remain explicitly blocked rather than simulated.
+3. Each acceptance item must link to code/test/runbook or dated external evidence. Do not infer completion from a green CI run alone.
+4. P0/P1/P2 is considered closed only when the applicable acceptance items are evidenced; the current tracker does not assert full closure.
