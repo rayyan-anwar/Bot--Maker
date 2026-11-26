@@ -59,7 +59,7 @@ test('OpenAI vision adapter rejects unsupported media and malformed prompts befo
 
 
 test('vision endpoint requires login and an explicit user-initiated upload',async()=>{
- const previousAdmin=process.env.BOTFORGE_ADMIN_EMAIL,previousKey=process.env.OPENAI_API_KEY;
+ const previousAdmin=process.env.BOTFORGE_ADMIN_EMAIL,previousKey=process.env.OPENAI_API_KEY,previousScanRequired=process.env.MALWARE_SCAN_REQUIRED,previousClamHost=process.env.CLAMAV_HOST;
  process.env.BOTFORGE_ADMIN_EMAIL='vision-admin@example.test';
  delete process.env.OPENAI_API_KEY;
  const {start,shutdown}=require('../server/index');
@@ -84,10 +84,21 @@ test('vision endpoint requires login and an explicit user-initiated upload',asyn
   const denied=await fetch(base+'/api/vision/analyze',{method:'POST',headers:{cookie},body:form});
   assert.equal(denied.status,400);
   assert.match((await denied.json()).error,/explicitly/);
+
+  process.env.MALWARE_SCAN_REQUIRED='true';
+  delete process.env.CLAMAV_HOST;
+  const scanForm=new FormData();
+  scanForm.append('userInitiated','true');
+  scanForm.append('image',new Blob([Buffer.from([137,80,78,71,13,10,26,10])],{type:'image/png'}),'photo.png');
+  const scanDenied=await fetch(base+'/api/vision/analyze',{method:'POST',headers:{cookie},body:scanForm});
+  assert.equal(scanDenied.status,503);
+  assert.match((await scanDenied.json()).error,/Malware scanning is not configured/);
  }finally{
   try{await shutdown();}finally{
    if(previousAdmin===undefined)delete process.env.BOTFORGE_ADMIN_EMAIL;else process.env.BOTFORGE_ADMIN_EMAIL=previousAdmin;
    if(previousKey===undefined)delete process.env.OPENAI_API_KEY;else process.env.OPENAI_API_KEY=previousKey;
+   if(previousScanRequired===undefined)delete process.env.MALWARE_SCAN_REQUIRED;else process.env.MALWARE_SCAN_REQUIRED=previousScanRequired;
+   if(previousClamHost===undefined)delete process.env.CLAMAV_HOST;else process.env.CLAMAV_HOST=previousClamHost;
   }
  }
 });

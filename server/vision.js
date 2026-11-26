@@ -6,6 +6,7 @@ const rateLimit=require('express-rate-limit');
 const {requireAuth}=require('./auth');
 const providers=require('./providers');
 const usage=require('./usage');
+const {scanBuffer}=require('./malware-scan');
 const {PostgresRateLimitStore}=require('./rate-limit-store');
 const router=express.Router();
 
@@ -38,6 +39,7 @@ router.post('/analyze',requireAuth,limiter,upload.single('image'),async(req,res,
   if(!req.file)return res.status(400).json({error:'Choose one image to analyze.'});
   const mimeType=detectImageType(req.file.buffer);
   if(!mimeType)return res.status(415).json({error:'Only valid JPEG, PNG, and WebP images are supported.'});
+  await scanBuffer(req.file.buffer);
   if(!providers.isProviderConfigured('openai'))return res.status(503).json({error:'Fortisni visual analysis is not configured on this server.'});
   const prompt=typeof req.body.prompt==='string'&&req.body.prompt.trim()?req.body.prompt.trim():'Describe the image and point out important visible details.';
   if(prompt.length>1000)return res.status(400).json({error:'The visual question must be 1 to 1000 characters.'});
