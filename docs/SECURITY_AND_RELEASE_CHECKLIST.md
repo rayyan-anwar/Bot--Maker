@@ -31,6 +31,7 @@ This checklist is a launch gate. A checked item means evidence exists, not merel
 - [x] PDF signature, UTF-8, content/extension mismatch and control-character validation; ClamAV scanning fails closed in production; upload and extracted-text/page limits are enforced. ClamAV staging runtime still requires operator verification.
 - [x] PDF parser runs in a resource-limited worker thread with timeout, page and extracted-text caps. OS/container-level parser sandboxing remains pending.
 - [ ] Uploads stored privately; public URLs are short-lived if used.
+- [x] Fortisni vision image uploads are scanned by ClamAV before provider handoff; scanner-unavailable behavior is fail-closed and covered by an authenticated endpoint regression test. Live daemon/signature readiness remains a staging check.
 - [ ] Async ingestion, retries and dead-letter handling.
 - [ ] File deletion removes source objects, extracted text and vector records.
 
