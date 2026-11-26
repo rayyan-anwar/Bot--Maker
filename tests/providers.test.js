@@ -177,3 +177,21 @@ test('caller cancellation aborts an in-flight provider stream without misreporti
   await assert.rejects(()=>pending,/streaming client disconnected/i);
  }));
 });
+
+
+test('provider stream is cancelled when the downstream token consumer fails',async()=>{
+ await withEnv({ANTHROPIC_API_KEY:'anthropic-stream-key'},()=>withFetch(async()=>{
+  const encoder=new TextEncoder();let cancelled=false;
+  const body=new ReadableStream({
+   start(controller){controller.enqueue(encoder.encode('data: '+JSON.stringify({type:'content_block_delta',delta:{type:'text_delta',text:'partial'}})+'\\n\\n'));},
+   cancel(){cancelled=true;}
+  });
+  return {ok:true,status:200,body};
+ },async()=>{
+  await assert.rejects(()=>providers.generateStream({
+   provider:'anthropic',system:'Rules',messages:[{role:'user',content:'Hi'}],
+   onToken:()=>{throw new Error('downstream disconnected');}
+  }),/downstream disconnected/);
+  assert.equal(cancelled,true);
+ }));
+});
