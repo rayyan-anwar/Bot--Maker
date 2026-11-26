@@ -183,7 +183,7 @@ test('provider stream is cancelled when the downstream token consumer fails',asy
  await withEnv({ANTHROPIC_API_KEY:'anthropic-stream-key'},()=>withFetch(async()=>{
   const encoder=new TextEncoder();let cancelled=false;
   const body=new ReadableStream({
-   start(controller){controller.enqueue(encoder.encode('data: '+JSON.stringify({type:'content_block_delta',delta:{type:'text_delta',text:'partial'}})+'\\n\\n'));},
+   start(controller){controller.enqueue(encoder.encode('data: '+JSON.stringify({type:'content_block_delta',delta:{type:'text_delta',text:'partial'}})+'\n\n'));},
    cancel(){cancelled=true;}
   });
   return {ok:true,status:200,body};
