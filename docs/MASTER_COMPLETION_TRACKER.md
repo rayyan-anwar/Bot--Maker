@@ -1,3 +1,11 @@
+## Verified integration checkpoint — 2026-11-26 (PR #144)
+
+- PR #144 merged to `main` as commit `3b78386200cdaec6e25a211a8f5ebc7f9c626625`.
+- Change: provider response streams are cancelled when stream parsing or downstream token delivery fails; regression coverage asserts cancellation when the consumer throws.
+- Exact PR head `a1608da8e4f5fcab50198584272883860096450a` passed BotForge CI: Node.js 18, 20 and 22 verification, PostgreSQL 16 integration, and Docker image build. Full Chat Browser E2E passed on the same head.
+- This merge does not close the external release gates. Issues #2 and #3 remain open for real staging infrastructure, secret provisioning, live ClamAV readiness, reverse-proxy verification, backup/restore, operations, load and independent security testing.
+- No production deployment or production certification is claimed.
+
 # BotForge Master Completion Tracker
 
 **Repository:** `rayyan-anwar/Bot--Maker`  
