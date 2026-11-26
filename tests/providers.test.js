@@ -180,8 +180,8 @@ test('caller cancellation aborts an in-flight provider stream without misreporti
 
 
 test('provider stream is cancelled when the downstream token consumer fails',async()=>{
+ let cancelled=false;
  await withEnv({ANTHROPIC_API_KEY:'anthropic-stream-key'},()=>withFetch(async()=>{
-  let cancelled=false;
   const encoder=new TextEncoder();
   const body=new ReadableStream({
    start(controller){controller.enqueue(encoder.encode('data: '+JSON.stringify({type:'content_block_delta',delta:{type:'text_delta',text:'partial'}})+'\n\n'));},
