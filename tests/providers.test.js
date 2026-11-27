@@ -196,3 +196,22 @@ test('provider stream is cancelled when the downstream token consumer fails',asy
   assert.equal(cancelled,true);
  }));
 });
+
+test('provider request timeout must be a safe bounded integer',async()=>{
+ for(const timeoutMs of [0,-1,1.5,NaN,120001]){
+  await assert.rejects(()=>providers.generate({provider:'unknown',messages:[],system:'',timeoutMs}),/timeout must be an integer between 1 and 120000/i);
+ }
+ await assert.rejects(()=>providers.generate({provider:'unknown',messages:[],system:'',timeoutMs:'1000'}),/timeout must be an integer between 1 and 120000/i);
+});
+
+test('stream timeout rejects invalid values before network access',async()=>{
+ await withEnv({ANTHROPIC_API_KEY:'test-key'},()=>withFetch(async()=>{throw new Error('network must not be called');},async()=>{
+  await assert.rejects(()=>providers.generateStream({provider:'anthropic',messages:[],system:'',timeoutMs:0}),/timeout must be an integer between 1 and 120000/i);
+ }));
+});
+
+test('vision timeout rejects invalid values before network access',async()=>{
+ await withEnv({OPENAI_API_KEY:'test-key'},()=>withFetch(async()=>{throw new Error('network must not be called');},async()=>{
+  await assert.rejects(()=>providers.generateVision({prompt:'describe',imageBase64:'x',mimeType:'image/png',timeoutMs:120001}),/timeout must be an integer between 1 and 120000/i);
+ }));
+});

@@ -49,6 +49,10 @@ const PROVIDERS = {
 async function safeJson(response) {
   try { return await response.json(); } catch (_) { return {}; }
 }
+function normalizeTimeoutMs(timeoutMs,operation) {
+  if(!Number.isSafeInteger(timeoutMs)||timeoutMs<1||timeoutMs>120000)throw new TypeError(operation+' timeout must be an integer between 1 and 120000 milliseconds.');
+  return timeoutMs;
+}
 function providerError(name,status,data) {
   const message=data?.error?.message || data?.message || 'The provider could not complete the request.';
   const error=new Error(name+' request failed ('+status+').');
@@ -57,6 +61,7 @@ function providerError(name,status,data) {
   return error;
 }
 async function generate({provider='anthropic',model,system,messages,maxTokens=1024,temperature,timeoutMs=45000}) {
+  timeoutMs=normalizeTimeoutMs(timeoutMs,'Provider');
   const adapter=PROVIDERS[provider];
   if(!adapter) throw new Error('Unsupported AI provider.');
   if(provider==='mock'){
@@ -107,6 +112,7 @@ async function streamProviderResponse(response,provider,onToken){
 }
 async function generateStream({provider='anthropic',model,system,messages,maxTokens=1024,temperature,onToken=()=>{},timeoutMs=60000,signal}){
  if(provider==='mock'){const result=await generate({provider,model,system,messages,maxTokens,temperature});for(const word of result.text.match(/\S+\s*/g)||[])await onToken(word);return result;}
+ timeoutMs=normalizeTimeoutMs(timeoutMs,'Streaming provider');
  const adapter=PROVIDERS[provider];if(!adapter)throw new Error('Unsupported AI provider.');
  if(!process.env[adapter.keyEnv])throw new Error('The selected AI provider is not configured on this server.');
  const actualModel=model||adapter.defaultModel;let response;
@@ -120,6 +126,7 @@ async function generateStream({provider='anthropic',model,system,messages,maxTok
 }
 
 async function generateVision({model=process.env.OPENAI_VISION_MODEL||'gpt-5.5',prompt,imageBase64,mimeType,maxTokens=512,timeoutMs=30000}){
+ timeoutMs=normalizeTimeoutMs(timeoutMs,'Vision provider');
  if(typeof prompt!=='string'||!prompt.trim()||prompt.length>1000)throw new TypeError('Vision prompt must contain 1 to 1000 characters.');
  if(typeof imageBase64!=='string'||imageBase64.length>Math.ceil(4*1024*1024*4/3)+8)throw new TypeError('Vision image payload is invalid or too large.');
  if(!['image/jpeg','image/png','image/webp'].includes(mimeType))throw new TypeError('Unsupported vision image type.');
