@@ -111,8 +111,8 @@ async function streamProviderResponse(response,provider,onToken){
  return {text,inputTokens,outputTokens};
 }
 async function generateStream({provider='anthropic',model,system,messages,maxTokens=1024,temperature,onToken=()=>{},timeoutMs=60000,signal}){
- if(provider==='mock'){const result=await generate({provider,model,system,messages,maxTokens,temperature});for(const word of result.text.match(/\S+\s*/g)||[])await onToken(word);return result;}
  timeoutMs=normalizeTimeoutMs(timeoutMs,'Streaming provider');
+ if(provider==='mock'){const result=await generate({provider,model,system,messages,maxTokens,temperature});for(const word of result.text.match(/\S+\s*/g)||[])await onToken(word);return result;}
  const adapter=PROVIDERS[provider];if(!adapter)throw new Error('Unsupported AI provider.');
  if(!process.env[adapter.keyEnv])throw new Error('The selected AI provider is not configured on this server.');
  const actualModel=model||adapter.defaultModel;let response;
