@@ -182,3 +182,29 @@ test('PDF parser worker concurrency is globally bounded and slots are released',
  }finally{for(let i=0;i<acquired.length;i++)releasePdfParserSlot();}
  assert.equal(getPdfParserCapacity().active,0);
 });
+test('document deletion route enforces ownership and returns not found for missing documents',async(t)=>{
+ process.env.NODE_ENV='test';
+ process.env.JWT_SECRET='document-delete-test-secret-with-at-least-thirty-two-characters';
+ const {start,shutdown}=require('../server/index');
+ const server=await start(0,'127.0.0.1');
+ t.after(async()=>{await shutdown();fs.rmSync(suiteDir,{recursive:true,force:true});});
+ const base='http://127.0.0.1:'+server.address().port;
+ const bcrypt=require('bcryptjs'),{v4:uuidv4}=require('uuid'),store=require('../server/store');
+ const owner={id:uuidv4(),email:'document-owner@example.test',name:'Document Owner',passwordHash:await bcrypt.hash('document-owner-password-123',10),createdAt:new Date().toISOString()};
+ const other={id:uuidv4(),email:'document-other@example.test',name:'Other User',passwordHash:await bcrypt.hash('document-other-password-123',10),createdAt:new Date().toISOString()};
+ await store.insertAsync('users',owner);await store.insertAsync('users',other);
+ async function login(email,password){const response=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email,password})});assert.equal(response.status,200);return (response.headers.get('set-cookie')||'').split(';')[0];}
+ const ownerCookie=await login(owner.email,'document-owner-password-123'),otherCookie=await login(other.email,'document-other-password-123');
+ const botResponse=await fetch(base+'/api/bots',{method:'POST',headers:{cookie:ownerCookie,'content-type':'application/json'},body:JSON.stringify({name:'Document deletion bot',instructions:'Test ownership.'})});
+ assert.equal(botResponse.status,201);const bot=(await botResponse.json()).bot;
+ const doc={id:uuidv4(),botId:bot.id,filename:'private.txt',contentHash:'test-hash',characterCount:6,chunks:[{id:uuidv4(),text:'private'}],createdAt:new Date().toISOString()};
+ await store.insertAsync('documents',doc);
+ const forbidden=await fetch(base+'/api/documents/'+bot.id+'/'+doc.id,{method:'DELETE',headers:{cookie:otherCookie}});
+ assert.equal(forbidden.status,403);
+ const missing=await fetch(base+'/api/documents/'+bot.id+'/'+uuidv4(),{method:'DELETE',headers:{cookie:ownerCookie}});
+ assert.equal(missing.status,404);
+ const deleted=await fetch(base+'/api/documents/'+bot.id+'/'+doc.id,{method:'DELETE',headers:{cookie:ownerCookie}});
+ assert.equal(deleted.status,200);assert.deepEqual(await deleted.json(),{ok:true});
+ assert.equal(await store.findByIdAsync('documents',doc.id),null);
+});
+
