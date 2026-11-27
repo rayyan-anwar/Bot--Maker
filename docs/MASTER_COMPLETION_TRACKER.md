@@ -1,3 +1,10 @@
+## Verified integration checkpoint — 2026-11-26 (PR #145 and #146)
+
+- PR #145 merged as documentation reconciliation commit `57b594dc679c7a761d624b9a65cef7add713833e`; its exact head passed Node.js 18/20/22, PostgreSQL 16 and Docker CI.
+- PR #146 merged as `573cffdb87afab8071486174c408e79facb2ec8b`. Fortisni vision image uploads now pass through the existing ClamAV scanner before provider handoff. If scanning is required but unavailable, the endpoint rejects the upload with HTTP 503.
+- PR #146 exact head `e13520a904f93081a5109c11a1e110de8d1b8ed9` passed Node.js 18/20/22 verification (407 tests per runtime, zero failures), PostgreSQL 16 integration, Docker image build and Full Chat Browser E2E.
+- Live ClamAV daemon/signature readiness and real upload verification remain staging tasks. This change does not close issues #2 or #3 and does not certify production readiness.
+
 ## Verified integration checkpoint — 2026-11-26 (PR #144)
 
 - PR #144 merged to `main` as commit `3b78386200cdaec6e25a211a8f5ebc7f9c626625`.
