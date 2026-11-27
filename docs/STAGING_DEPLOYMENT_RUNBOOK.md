@@ -79,6 +79,17 @@ Before inviting users, verify all of the following:
 
 Use synthetic test accounts and non-sensitive documents only.
 
+### Automated live preflight through GitHub Actions
+
+The repository includes `.github/workflows/staging-smoke.yml`. After staging is deployed:
+
+1. Add the exact HTTPS origin as a repository Actions secret named `BOTFORGE_STAGING_URL`. Do not add credentials or query parameters to this URL.
+2. Open GitHub Actions → **BotForge live staging smoke** → **Run workflow**.
+3. Confirm the workflow passes. It checks both health endpoints, PostgreSQL readiness and required reverse-proxy security headers without following redirects.
+4. Save the workflow URL, tested commit and staging deployment ID in the release record.
+
+This automated preflight is a narrow gate, not the complete auth/admin/upload/provider/restore/load or penetration-test rehearsal.
+
 ## 5. Backups and rollback
 
 - Enable managed PostgreSQL automated backups and point-in-time recovery where available.
@@ -120,6 +131,6 @@ To enable self-service customer password recovery, configure `RESEND_API_KEY`, `
 
 ## 10. Prometheus alert rules
 
-The repository provides starter alert rules at `deploy/prometheus-alerts.yml` for sustained HTTP 5xx rate, average request duration and process resident memory. Load the file with Prometheus `rule_files`, configure a scrape target for each BotForge instance, and set the scrape job label to include `botforge` for the target-down conventions used by your monitoring setup. If `METRICS_TOKEN` is configured, supply it through a protected bearer-token file in the Prometheus scrape configuration; never commit the token.
+The repository provides starter alert rules at `deploy/prometheus-alerts.yml` for sustained HTTP 5xx rate, average request duration and process resident memory. Load the file with Prometheus `rule_files`, configure a scrape target for each BotForge instance, and set the scrape job label to include `botforge` for the target-down conventions used in your monitoring setup. If `METRICS_TOKEN` is configured, supply it through a protected bearer-token file in the Prometheus scrape configuration; never commit the token.
 
 These rules only generate Prometheus alerts. Configure Alertmanager receivers, routing, grouping, inhibition and contact escalation in the deployment environment. The in-process counters are per application process and reset on restart; Prometheus rate/increase functions are used to tolerate counter resets. Tune thresholds against real staging traffic before production use.
