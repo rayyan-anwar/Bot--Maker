@@ -44,6 +44,7 @@ test('AI Engineer audit stores bounded operational metadata without prompt or cr
  const store=require('../server/store'),control=require('../server/engineer-control');
  try{
   await control.appendAudit({actorId:'admin-user',method:'POST',route:'/engineer/propose-fix',statusCode:200,repository:'owner/repo',filePath:'server/auth.js',task:'DO NOT STORE THIS',apiKey:'DO NOT STORE THIS'});
+  await store.insertAsync('aiEngineerRuns',{id:'task-run',kind:'agent-task',status:'completed',createdAt:new Date().toISOString(),privateTaskResult:'internal task data'});
   const [event]=await control.listAudit(10);
   assert.equal(event.actorId,'admin-user');
   assert.equal(event.repository,'owner/repo');
@@ -51,7 +52,8 @@ test('AI Engineer audit stores bounded operational metadata without prompt or cr
   assert.equal(event.statusCode,200);
   assert.equal(JSON.stringify(event).includes('DO NOT STORE THIS'),false);
   assert.equal(JSON.stringify(event).includes('apiKey'),false);
-  assert.equal((await store.allAsync('aiEngineerRuns')).length,1);
+  assert.equal((await store.allAsync('aiEngineerRuns')).length,2);
+  assert.equal((await control.listAudit(10)).length,1);
  }finally{
   await store.close();
   delete require.cache[controlPath];delete require.cache[storePath];
