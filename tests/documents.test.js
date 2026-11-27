@@ -185,8 +185,6 @@ test('PDF parser worker concurrency is globally bounded and slots are released',
 test('document deletion route enforces ownership and returns not found for missing documents',async(t)=>{
  process.env.NODE_ENV='test';
  process.env.JWT_SECRET='document-delete-test-secret-with-at-least-thirty-two-characters';
- const testDir=fs.mkdtempSync(path.join(os.tmpdir(),'botforge-document-delete-'));
- process.env.BOTFORGE_DATA_FILE=path.join(testDir,'db.json');
  const {start,shutdown}=require('../server/index');
  const server=await start(0,'127.0.0.1');
  t.after(async()=>{await shutdown();fs.rmSync(suiteDir,{recursive:true,force:true});});
