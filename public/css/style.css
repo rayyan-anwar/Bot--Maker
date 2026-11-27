@@ -412,3 +412,48 @@ label {font-weight:600;letter-spacing:.01em}
 @media(prefers-reduced-motion:reduce) {
   .btn:hover,.bot-card:hover {transform:none}
 }
+
+
+/* 3D depth and usability pass: restrained, fast, and touch-friendly. */
+.card,.bot-card,.usage-card {
+  transform-style:preserve-3d;
+  backface-visibility:hidden;
+}
+.card,.bot-card {
+  transition:transform 220ms cubic-bezier(.2,.7,.2,1),box-shadow 220ms ease,border-color 180ms ease;
+}
+@media (hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference) {
+  .bot-card:hover {
+    transform:perspective(1100px) rotateX(1.2deg) rotateY(-1deg) translate3d(0,-4px,10px);
+    box-shadow:0 22px 48px rgba(0,0,0,.2);
+  }
+  .card:hover {
+    transform:perspective(1400px) rotateX(.55deg) translate3d(0,-2px,5px);
+  }
+  .btn:hover {transform:translate3d(0,-2px,3px)}
+}
+.btn:active {transform:translate3d(0,1px,-1px);box-shadow:none}
+.bot-card:focus-within,.card:focus-within {
+  border-color:color-mix(in srgb,var(--accent) 65%,var(--border));
+}
+.page .section-head {align-items:center;flex-wrap:wrap}
+.page .section-head h1,.page .section-head h2 {margin:0}
+.page form .field {display:grid;gap:7px}
+.page form label {display:block;line-height:1.45}
+.page form small,.page form .muted {line-height:1.55}
+#automation-form label {margin-top:12px}
+#automation-form input,#automation-form select,#automation-form textarea {margin-top:5px}
+#agent-goal {min-height:112px;resize:vertical}
+#agent-plan-submit,#automation-form button[type=submit] {min-width:144px}
+.chat-input-row button,.btn {touch-action:manipulation}
+button,a,input,select,textarea { -webkit-tap-highlight-color:transparent }
+@media(max-width:700px) {
+  .page .section-head {align-items:stretch}
+  .page .section-head > .btn {width:100%}
+  .page form .flex-between {align-items:stretch;flex-direction:column}
+  #agent-plan-submit,#automation-form button[type=submit] {width:100%}
+  .page .card {padding:18px}
+}
+@media(prefers-reduced-motion:reduce) {
+  .card,.bot-card,.btn {transform:none!important;transition:none!important}
+}
