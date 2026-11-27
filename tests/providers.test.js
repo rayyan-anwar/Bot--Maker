@@ -210,6 +210,12 @@ test('stream timeout rejects invalid values before network access',async()=>{
  }));
 });
 
+test('mock streaming rejects invalid timeout values before generating tokens',async()=>{
+ await withEnv({NODE_ENV:'test',BOTFORGE_ENABLE_MOCK_PROVIDER:'true'},async()=>{
+  await assert.rejects(()=>providers.generateStream({provider:'mock',messages:[{role:'user',content:'hello'}],timeoutMs:0}),/timeout must be an integer between 1 and 120000/i);
+ });
+});
+
 test('vision timeout rejects invalid values before network access',async()=>{
  await withEnv({OPENAI_API_KEY:'test-key'},()=>withFetch(async()=>{throw new Error('network must not be called');},async()=>{
   await assert.rejects(()=>providers.generateVision({prompt:'describe',imageBase64:'x',mimeType:'image/png',timeoutMs:120001}),/timeout must be an integer between 1 and 120000/i);
