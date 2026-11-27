@@ -45,7 +45,7 @@ async function appendAudit({actorId,method,route,statusCode,repository,filePath}
 
 async function listAudit(limit=100){
  const safeLimit=Math.max(1,Math.min(100,Number.isInteger(limit)?limit:100));
- return (await store.allAsync('aiEngineerRuns')).sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt)).slice(0,safeLimit);
+ return (await store.allAsync('aiEngineerRuns')).filter(row=>['GET','POST','PUT','PATCH','DELETE','OTHER'].includes(row.method)&&typeof row.route==='string'&&row.route.startsWith('/engineer/')&&Number.isInteger(row.statusCode)).sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt)).slice(0,safeLimit);
 }
 
 module.exports={isEnabled,setEnabled,appendAudit,listAudit,MAX_AUDIT_ROWS};
