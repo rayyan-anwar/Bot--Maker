@@ -309,3 +309,10 @@ This batch is a completion-oriented scope ledger, not a claim that unavailable s
 2. Live staging, provider, billing, device, load and independent-review items require real access/evidence; they remain explicitly blocked rather than simulated.
 3. Each acceptance item must link to code/test/runbook or dated external evidence. Do not infer completion from a green CI run alone.
 4. P0/P1/P2 is considered closed only when the applicable acceptance items are evidenced; the current tracker does not assert full closure.
+
+## Verified integration checkpoint — 2026-11-27 (Ponytail execution)
+
+- PR #150 merged to `main` at commit `c4a703c2266afe3d44087ed44029cf3683b3c947` after all six required checks passed: Docker image build, Node.js 18/20/22 verification, PostgreSQL 16 integration and Full Chat flow.
+- Usage-ledger writes now reject negative, fractional, non-finite, unsafe-integer and string token counts before persistence; regression tests cover malformed input and output counts.
+- Ponytail review of the next knowledge-indexing candidate found that `server/embeddings.js` already validates vector batch length, indexes, duplicates, finite numeric values and consistent dimensions, including across batches. No duplicate validation layer or new dependency was added to `server/documents.js`.
+- Repository simplification remains behavior-preserving and scoped. This checkpoint does not claim broad repository-wide cleanup or production certification.
