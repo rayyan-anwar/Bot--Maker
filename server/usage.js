@@ -3,7 +3,7 @@ function dayKey(d=new Date()){return d.toISOString().slice(0,10);}
 async function getDailyUsage(userId,date=new Date()){return (await store.usageStats(userId,dayKey(date))).used;}
 async function assertCanSend(userId){const user=await store.findByIdAsync('users',userId);if(!user)throw new Error('Account not found.');const limit=plans.getDailyLimit(user),slot=await store.reserveUsageSlot(userId,limit,dayKey());return {...slot,limit,plan:plans.getPlanName(user)};}
 async function releaseReservation(reservationId){await store.releaseUsageSlot(reservationId);}
-async function recordUsage({userId,botId,provider,model,inputTokens=0,outputTokens=0,reservationId}){const record={id:require('crypto').randomUUID(),userId,botId,provider,model,inputTokens,outputTokens,day:dayKey(),createdAt:new Date().toISOString()};await store.commitUsageRecord(record,reservationId);return record;}
+async function recordUsage({userId,botId,provider,model,inputTokens=0,outputTokens=0,reservationId}){for(const [name,value] of [['inputTokens',inputTokens],['outputTokens',outputTokens]])if(!Number.isSafeInteger(value)||value<0)throw new TypeError(name+' must be a non-negative safe integer.');const record={id:require('crypto').randomUUID(),userId,botId,provider,model,inputTokens,outputTokens,day:dayKey(),createdAt:new Date().toISOString()};await store.commitUsageRecord(record,reservationId);return record;}
 async function reserveAiBudget({provider,model,system,messages,maxTokens=1024}){
  if(process.env.BOTFORGE_AI_BUDGET_ENABLED!=='true')return null;
  if(!store.isPostgres())throw Object.assign(new Error('AI budget enforcement requires PostgreSQL storage.'),{status:503});
