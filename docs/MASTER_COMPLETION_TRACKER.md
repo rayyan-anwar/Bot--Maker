@@ -1,3 +1,13 @@
+## Verified integration checkpoint — 2026-11-27 (PR #148–#152)
+
+- PR #148 merged as `6c7eb8edce17f75215e33f9561641273ec9e8343`: provider, streaming and vision request timeouts are validated as safe integers in the 1–120,000 ms range before network requests.
+- PR #149 merged as `8e97468d777ad07edce3f965da90ef314904cdad`: the mock streaming path applies the same timeout validation before emitting tokens.
+- PR #150 merged as `c4a703c2266afe3d44087ed44029cf3683b3c947`: usage-ledger writes reject malformed token counts, including negative, fractional, non-finite, unsafe-integer and string values.
+- PR #151 merged as `d7d4cfa604fe210db6904ed27c6abb5946b7d3dc`: reconciled the preceding usage-integrity and knowledge-indexing review evidence.
+- PR #152 merged as `cf89330ad1e0dc0c2798e6c216c44846eb113ed3`: admin audit listing filters audit-shaped events and excludes unrelated AI Engineer task-run records without deleting those records.
+- Exact current main commit `cf89330ad1e0dc0c2798e6c216c44846eb113ed3` passed all **9/9** post-merge checks: Node.js 18/20/22, PostgreSQL 16 integration, Docker image build, workflow generation, Full Chat browser flow, Fortisni Chromium flow and Admin control flow (run [45961474080](https://github.com/rayyan-anwar/Bot--Maker/actions/runs/45961474080)).
+- These changes improve provider timeout validation, usage integrity and audit-list correctness. They do not verify live provider credentials, production billing, staging infrastructure or production readiness.
+
 ## Verified integration checkpoint — 2026-11-26 (PR #145 and #146)
 
 - PR #145 merged as documentation reconciliation commit `57b594dc679c7a761d624b9a65cef7add713833e`; its exact head passed Node.js 18/20/22, PostgreSQL 16 and Docker CI.
@@ -16,8 +26,8 @@
 # BotForge Master Completion Tracker
 
 **Repository:** `rayyan-anwar/Bot--Maker`  
-**Baseline:** `3709635f028b7e29fa8c66e6b845e07f1af793e6`  
-**Last reconciled:** 2026-11-25 (after PR #132; PR #129–#132 and current launch gates reconciled)
+**Baseline:** `cf89330ad1e0dc0c2798e6c216c44846eb113ed3`  
+**Last reconciled:** 2026-11-27 (after PR #148–#152 and post-merge main CI verification)
 
 ## Recent reconciliation checkpoint (2026-11-25)
 
