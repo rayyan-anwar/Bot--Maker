@@ -6,7 +6,7 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
   v_consumed NUMERIC(20,8);
-  v_percent NUMERIC(20,2);
+  v_percent NUMERIC;
   v_status TEXT;
   v_threshold INTEGER;
   v_message TEXT;
@@ -63,7 +63,7 @@ $$;
 
 DROP TRIGGER IF EXISTS botforge_ai_budget_scope_alert_trigger ON ai_budget_scopes;
 CREATE TRIGGER botforge_ai_budget_scope_alert_trigger
-AFTER INSERT OR UPDATE OF limit_amount, reserved_amount, spent_amount
+AFTER INSERT OR UPDATE OF scope_type, scope_key, currency, limit_amount, reserved_amount, spent_amount, window_start, window_end
 ON ai_budget_scopes
 FOR EACH ROW
 EXECUTE FUNCTION botforge_sync_ai_budget_alert_from_scope();
