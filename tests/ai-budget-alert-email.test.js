@@ -17,7 +17,7 @@ const env = {
 };
 
 test('budget alert email configuration requires a provider key, sender and valid recipient', () => {
-  assert.equal(configuration({}).toString(), '[object Object]');
+  assert.equal(configuration({}), null);
   assert.equal(isBudgetAlertDeliveryConfigured(env), true);
   assert.equal(isBudgetAlertDeliveryConfigured({ ...env, BOTFORGE_BUDGET_ALERT_EMAIL_TO: 'not-an-email' }), false);
   assert.equal(isBudgetAlertDeliveryConfigured({ ...env, RESEND_API_KEY: '' }), false);
