@@ -1,3 +1,13 @@
+## Verified integration checkpoint — 2026-11-28 (PR #159–#162)
+
+- PR #159 merged as `816f212c50e5f4ac06e95c5f2527d4452ffcef4f`: staging smoke utility verifies PostgreSQL readiness and required security headers.
+- PR #160 merged as `085021256bf1bf5da8904868f87c6aae12b8f237`: manual GitHub Actions staging preflight workflow and operator runbook.
+- PR #161 merged as `c4a5dfb9137c36917cb537560d1c956844f9d272`: Render free-staging Blueprint committed; its infrastructure plan is not provisioned.
+- PR #162 merged as `a82c6579ffc0308305e7f73ac47dd895ec82c093`: account-wide personal AI memory can now be edited from the dashboard; owner-scoped PATCH API, duplicate/length validation, and cross-account tests added.
+- Exact PR #162 merge commit passed all 9/9 post-merge checks: Node.js 18/20/22, PostgreSQL 16 integration, Docker image build, workflow generation, Full Chat browser flow, Fortisni Chromium flow and Admin control flow.
+- PR #163 adds editing for bot-specific manual/automatic memory notes with owner/bot isolation. It is under CI validation at this checkpoint.
+- No live staging deployment, provider credential test, payment sandbox, or production certification is implied by these code/CI results.
+
 ## Verified integration checkpoint — 2026-11-27 (PR #148–#152)
 
 - PR #148 merged as `6c7eb8edce17f75215e33f9561641273ec9e8343`: provider, streaming and vision request timeouts are validated as safe integers in the 1–120,000 ms range before network requests.
@@ -70,7 +80,7 @@ Do not calculate a project-wide percentage by counting files, commits, PRs, or c
 | Bot create, configure, edit and delete | Implemented; automated-tested | PR #106 adds JSON atomicity regression coverage; PR #112 verifies PostgreSQL create+history transaction, rollback on version insert failure and concurrent stale-write conflict. Full owner journey and malformed-input coverage remain ongoing |
 | Public bot discovery and safe public view | Implemented baseline; privacy boundaries automated-tested | PR #109 adds bounded search/pagination, owner/private filtering, input validation and dashboard search/load-more. PR #110 moves filtering, sorting, LIMIT/OFFSET and total count into PostgreSQL. PR #111 verifies private instructions, API/provider secrets and owner knowledge documents are not exposed or mutable by visitors. Query indexes, abuse controls and production-scale testing remain |
 | Chat with supported providers | Implemented; live validation required | Anthropic, OpenAI and Gemini adapters/tests exist; verify real credentials, timeouts, limits and provider errors |
-| Conversation history and memory | Partial; privacy guard automated-tested | User-scoped routes and deletion exist; PR #108 adds server-side filtering for common sensitive automatic-memory candidates plus unit and authenticated chat integration tests. Pattern filtering is not exhaustive; inspect/edit/disable/delete, retention and cross-account isolation still need broader verification |
+| Conversation history and memory | Partial; core controls automated-tested | User-scoped routes, add/edit/delete controls for account-wide memory (PR #162) and bot-specific notes (PR #163 pending), automatic-memory opt-in, and sensitive-candidate filtering are implemented. Pattern filtering is not exhaustive; retention, cross-account isolation and live user testing remain release checks |
 | Knowledge uploads and retrieval | Partial | Upload/retrieval tests exist; verify malware scanning, parser limits, citations, prompt-injection resistance and deletion |
 | Usage quotas and AI spend budget | Implemented foundation; live validation required | Ledger/reservation tests exist; validate real model pricing and reconciliation before enabling |
 | Billing foundations | Implemented foundation; external validation required | Stripe/Razorpay signature and idempotency tests exist; PR #124 adds a shared five-attempt/hour per-account checkout limiter backed by PostgreSQL when configured. Perform provider sandbox checkout, refunds and entitlement tests |
