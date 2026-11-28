@@ -36,8 +36,8 @@
 # BotForge Master Completion Tracker
 
 **Repository:** `rayyan-anwar/Bot--Maker`  
-**Baseline:** `f458b7e9719f9702d76da2a25d0052b7c648b6b2`  
-**Last reconciled:** 2026-11-28 (after PR #163 and verified post-merge main CI)
+**Baseline:** `214b46323f22207c4df938ccc4e9417da977fa71`  
+**Last reconciled:** 2026-11-28 (after PR #170 and verified post-merge main CI)
 
 ## Recent reconciliation checkpoint (2026-11-25)
 
@@ -352,3 +352,11 @@ This batch is a completion-oriented scope ledger, not a claim that unavailable s
 - Migration 014 now evaluates budget thresholds on scope creation and changes to limit, reserved amount or spent amount, writing transition events and outbox records without relying on an admin dashboard visit.
 - Added an optional Resend adapter and PostgreSQL lease-backed worker with bounded retries and graceful shutdown.
 - The worker is disabled by default. Live Resend credentials, verified sender domain, real delivery/retry drill and external paging remain staging gates.
+
+
+## Verified integration checkpoint — 2026-11-28 (PR #164 and #170)
+
+- PR #164 merged as `28935b91cbfc0e9cbac880deb023de93d32850df`: provider-specific Social Intelligence OAuth authorization/callback flows for Instagram Business Login, YouTube and LinkedIn; user/platform-bound single-use state; YouTube S256 PKCE; encrypted access/refresh tokens; provider identity lookup; and owner-scoped token refresh. Mocked PR checks passed 6/6; post-merge main checks passed 9/9.
+- PR #170 merged as `214b46323f22207c4df938ccc4e9417da977fa71`: migration 014 automatically evaluates budget scope changes and records alert transitions; an opt-in Resend adapter and PostgreSQL lease-backed worker deliver plain-text email alerts; admin outbox status reflects delivery configuration. PostgreSQL integration tests cover the trigger, outbox leases/retries and backup/restore rehearsal. PR checks passed and post-merge main checks passed 9/9.
+- External release gates remain: live provider app credentials/approvals/consent, real social analytics/publishing and provider revocation; verified Resend sender and live email delivery; KMS-backed key rotation; staging host/database/secrets/HTTPS/ClamAV; real backup/restore/rollback; reverse-proxy and multi-instance verification; independent security and load tests.
+- PR #164/#170 and their CI results are repository evidence only. No live platform account, email, staging service or production deployment is claimed.
