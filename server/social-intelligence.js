@@ -150,7 +150,7 @@ async function requestJson(url, options = {}) {
   return data;
 }
 
-function authorizationUrl(platform, state) {
+function authorizationUrl(platform, state, codeChallenge) {
   const config = getOAuthConfig(platform);
   if (!config) throw new Error('Social provider OAuth credentials or callback URL are not configured.');
   const url = new URL(config.authorize);
@@ -171,7 +171,7 @@ function authorizationUrl(platform, state) {
   return url.toString();
 }
 
-async function exchangeOAuthCodeForUser({ userId, platform, code }) {
+async function exchangeOAuthCodeForUser({ userId, platform, code, codeVerifier }) {
   const config = getOAuthConfig(platform);
   if (!config) throw new Error('Social provider OAuth credentials or callback URL are not configured.');
   if (typeof code !== 'string' || !code.trim() || code.length > 4096) throw new TypeError('Invalid social authorization code.');
@@ -218,7 +218,7 @@ async function exchangeOAuthCodeForUser({ userId, platform, code }) {
 async function completeOAuth({ userId, platform, state, code }) {
   const consumed = await consumeOAuthState(state, userId, platform);
   if (!consumed) throw new Error('Social authorization state is invalid, expired or already used.');
-  return exchangeOAuthCodeForUser({ userId, platform, code });
+  return exchangeOAuthCodeForUser({ userId, platform, code, codeVerifier: consumed.codeVerifier });
 }
 
 async function refreshConnection(userId, connectionId) {
