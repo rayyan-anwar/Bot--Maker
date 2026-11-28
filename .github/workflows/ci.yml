@@ -80,6 +80,10 @@ jobs:
         env:
           BOTFORGE_TEST_DATABASE_URL: postgres://botforge:botforge_test_password@127.0.0.1:5432/botforge_test
         run: node --test tests/postgres-ai-budget-alerts.test.js
+      - name: Exercise automatic PostgreSQL AI budget scope alert triggers
+        env:
+          BOTFORGE_TEST_DATABASE_URL: postgres://botforge:botforge_test_password@127.0.0.1:5432/botforge_test
+        run: node --test tests/postgres-ai-budget-alert-trigger.test.js
       - name: Exercise PostgreSQL AI budget alert outbox leases and retries
         env:
           BOTFORGE_TEST_DATABASE_URL: postgres://botforge:botforge_test_password@127.0.0.1:5432/botforge_test
