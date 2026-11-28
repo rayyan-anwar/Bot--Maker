@@ -183,10 +183,19 @@
     memoryList.replaceChildren();
     memories.forEach(note=>{
       const row=document.createElement('div');row.className='doc-row';
-      const text=document.createElement('span');text.textContent=(note.kind==='automatic'?'Auto: ':'')+note.content;
+      const text=document.createElement('span');text.textContent=(note.kind==='automatic'?'Auto: ':'')+note.content;text.style.flex='1';
+      const edit=document.createElement('button');edit.className='btn btn-ghost';edit.type='button';edit.textContent='Edit';
+      edit.addEventListener('click',()=>{
+        const field=document.createElement('input');field.type='text';field.maxLength=500;field.required=true;field.value=note.content;field.setAttribute('aria-label','Edit bot memory');
+        const save=document.createElement('button');save.className='btn btn-primary';save.type='button';save.textContent='Save';
+        const cancel=document.createElement('button');cancel.className='btn btn-ghost';cancel.type='button';cancel.textContent='Cancel';
+        row.replaceChildren(field,save,cancel);field.focus();
+        cancel.addEventListener('click',()=>loadMemory());
+        save.addEventListener('click',async()=>{save.disabled=true;try{await api('/chat/'+encodeURIComponent(botId)+'/memory/'+encodeURIComponent(note.id),{method:'PATCH',body:{content:field.value}});await loadMemory();}catch(err){window.alert(err.message);save.disabled=false;}});
+      });
       const remove=document.createElement('button');remove.className='btn btn-ghost';remove.type='button';remove.textContent='Remove';
-      remove.addEventListener('click',async()=>{await api('/chat/'+botId+'/memory/'+note.id,{method:'DELETE'});loadMemory();});
-      row.append(text,remove);memoryList.appendChild(row);
+      remove.addEventListener('click',async()=>{await api('/chat/'+encodeURIComponent(botId)+'/memory/'+encodeURIComponent(note.id),{method:'DELETE'});loadMemory();});
+      row.append(text,edit,remove);memoryList.appendChild(row);
     });
   }
   document.getElementById('memory-auto-toggle').addEventListener('change',async e=>{try{await api('/chat/'+botId+'/memory/automatic',{method:'POST',body:{enabled:e.target.checked}});}catch(err){e.target.checked=!e.target.checked;alert(err.message);}});

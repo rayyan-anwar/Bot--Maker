@@ -67,3 +67,20 @@ test('unknown personal memory IDs return not found',async()=>{
  const response=await fetch(base+'/api/chat/memory/me/'+uuidv4(),{method:'PATCH',headers:{cookie:ownerCookie,'content-type':'application/json'},body:JSON.stringify({content:'New value'})});
  assert.equal(response.status,404);
 });
+
+
+test('bot owner can edit manual and automatic notes without crossing bot boundaries',async()=>{
+ const botId=uuidv4();
+ await store.insertAsync('bots',{id:botId,ownerId,isPublic:false,name:'Memory test bot',instructions:'Test'});
+ const note={id:uuidv4(),userId:ownerId,botId,kind:'manual',content:'Prefers examples',createdAt:new Date().toISOString()};
+ const duplicate={id:uuidv4(),userId:ownerId,botId,kind:'manual',content:'Use concise answers',createdAt:new Date().toISOString()};
+ const otherBotNote={id:uuidv4(),userId:ownerId,botId:uuidv4(),kind:'manual',content:'Another bot note',createdAt:new Date().toISOString()};
+ await store.insertAsync('memory',note);await store.insertAsync('memory',duplicate);await store.insertAsync('memory',otherBotNote);
+ const request=(id,content,cookie=ownerCookie)=>fetch(base+'/api/chat/'+botId+'/memory/'+id,{method:'PATCH',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({content})});
+ const changed=await request(note.id,'  Add a worked example  ');
+ assert.equal(changed.status,200);
+ assert.equal((await changed.json()).memory.content,'Add a worked example');
+ assert.equal((await request(note.id,'Use concise answers')).status,409);
+ assert.equal((await request(otherBotNote.id,'Cross bot edit')).status,404);
+ assert.equal((await request(note.id,'Changed by another account',otherCookie)).status,403);
+});
