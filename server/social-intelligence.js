@@ -1,4 +1,5 @@
-'use strict';
+  try { tokenEncryptionKey(); } catch (_) { return null; }
+  const clientId'use strict';
 
 const crypto = require('node:crypto');
 const { v4: uuidv4 } = require('uuid');
