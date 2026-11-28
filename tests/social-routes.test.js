@@ -71,6 +71,7 @@ test('YouTube OAuth completes a user-bound callback, stores encrypted credential
   const target=String(url);providerCalls.push({url:target,options});
   if(target==='https://oauth2.googleapis.com/token'){
    const body=String(options.body);
+   if(body.includes('grant_type=authorization_code'))assert.match(body,/code_verifier=/);
    if(body.includes('grant_type=refresh_token'))return {ok:true,json:async()=>({access_token:'youtube-refreshed-token',expires_in:3600})};
    return {ok:true,json:async()=>({access_token:'youtube-access-token',refresh_token:'youtube-refresh-token',expires_in:3600,scope:'https://www.googleapis.com/auth/youtube.readonly'})};
   }
