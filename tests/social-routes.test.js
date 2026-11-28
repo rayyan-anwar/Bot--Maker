@@ -66,3 +66,60 @@ test('social connection listing and disconnect are scoped to the authenticated a
  assert.equal((await removed.json()).ok,true);
  assert.deepEqual(await social.listConnections(user.id),[]);
 });
+
+
+test('YouTube OAuth completes a user-bound callback, stores encrypted credentials and refreshes tokens',async()=>{
+ process.env.BOTFORGE_YOUTUBE_CLIENT_ID='youtube-test-client';
+ process.env.BOTFORGE_YOUTUBE_CLIENT_SECRET='youtube-test-secret';
+ process.env.BOTFORGE_YOUTUBE_REDIRECT_URI=base+'/api/social/youtube/oauth/callback';
+ const realFetch=global.fetch;
+ const providerCalls=[];
+ global.fetch=async(url,options={})=>{
+  const target=String(url);providerCalls.push({url:target,options});
+  if(target==='https://oauth2.googleapis.com/token'){
+   const body=String(options.body);
+   if(body.includes('grant_type=refresh_token'))return {ok:true,json:async()=>({access_token:'youtube-refreshed-token',expires_in:3600})};
+   return {ok:true,json:async()=>({access_token:'youtube-access-token',refresh_token:'youtube-refresh-token',expires_in:3600,scope:'https://www.googleapis.com/auth/youtube.readonly'})};
+  }
+  if(target.startsWith('https://www.googleapis.com/youtube/v3/channels'))return {ok:true,json:async()=>({items:[{id:'channel-123',snippet:{title:'BotForge Channel'}}]})};
+  return realFetch(url,options);
+ };
+ try{
+  const stateResponse=await realFetch(base+'/api/social/youtube/oauth/state',{method:'POST',headers:{cookie}});
+  assert.equal(stateResponse.status,201);
+  const stateBody=await stateResponse.json();
+  const authorization=new URL(stateBody.authorizationUrl);
+  assert.equal(authorization.origin,'https://accounts.google.com');
+  assert.equal(authorization.searchParams.get('response_type'),'code');
+  assert.equal(authorization.searchParams.get('access_type'),'offline');
+  assert.equal(authorization.searchParams.get('state'),stateBody.state);
+  assert.equal(stateBody.authorizationUrlAvailable,true);
+  const callback=await realFetch(base+'/api/social/youtube/oauth/callback?code=one-time-code&state='+encodeURIComponent(stateBody.state),{headers:{cookie},redirect:'manual'});
+  assert.equal(callback.status,302);
+  assert.match(callback.headers.get('location'),/social_connected=youtube/);
+  const user=(await store.findManyAsync('users',{email:'social-owner@example.test'}))[0];
+  const connections=await social.listConnections(user.id);
+  const connection=connections.find(item=>item.platform==='youtube'&&item.platformAccountId==='channel-123');
+  assert.ok(connection);
+  assert.equal(connection.displayName,'BotForge Channel');
+  assert.equal(JSON.stringify(connection).includes('youtube-access-token'),false);
+  assert.equal((await social.getConnectionCredentials(user.id,connection.id)).refreshToken,'youtube-refresh-token');
+  const refresh=await realFetch(base+'/api/social/connections/'+connection.id+'/refresh',{method:'POST',headers:{cookie}});
+  assert.equal(refresh.status,200);
+  assert.equal((await social.getConnectionCredentials(user.id,connection.id)).accessToken,'youtube-refreshed-token');
+  assert.equal(providerCalls.length,3);
+ }finally{
+  global.fetch=realFetch;
+  delete process.env.BOTFORGE_YOUTUBE_CLIENT_ID;
+  delete process.env.BOTFORGE_YOUTUBE_CLIENT_SECRET;
+  delete process.env.BOTFORGE_YOUTUBE_REDIRECT_URI;
+ }
+});
+
+test('social OAuth refuses to start when provider credentials are incomplete',async()=>{
+ delete process.env.BOTFORGE_LINKEDIN_CLIENT_ID;
+ delete process.env.BOTFORGE_LINKEDIN_CLIENT_SECRET;
+ delete process.env.BOTFORGE_LINKEDIN_REDIRECT_URI;
+ const response=await fetch(base+'/api/social/linkedin/oauth/state',{method:'POST',headers:{cookie}});
+ assert.equal(response.status,503);
+});
