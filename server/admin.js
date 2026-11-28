@@ -253,7 +253,8 @@ router.get('/ai-budget/alerts/outbox',async(req,res,next)=>{
   const result=await store.query(`SELECT id,event_id,scope_id,event_type,payload,delivery_state,attempts,last_error,created_at,available_at,delivered_at
     FROM ai_budget_alert_outbox WHERE ($1::text IS NULL OR delivery_state=$1)
     ORDER BY available_at,created_at LIMIT $2`,[state,Number(limitRaw)]);
-  const deliveryEnabled=process.env.BOTFORGE_BUDGET_ALERT_WORKER==='1'&&isBudgetAlertDeliveryConfigured();\n  res.json({items:result.rows,limit:Number(limitRaw),deliveryEnabled,notice:deliveryEnabled?'Budget alert email delivery worker is enabled.':'Outbox records remain queued until the email adapter and worker are configured.'});
+  const deliveryEnabled=process.env.BOTFORGE_BUDGET_ALERT_WORKER==='1'&&isBudgetAlertDeliveryConfigured();
+  res.json({items:result.rows,limit:Number(limitRaw),deliveryEnabled,notice:deliveryEnabled?'Budget alert email delivery worker is enabled.':'Outbox records remain queued until the email adapter and worker are configured.'});
  }catch(e){next(e);}
 });
 router.get('/ai-budget/reservations',async(req,res,next)=>{
