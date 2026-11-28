@@ -20,7 +20,7 @@ const OAUTH = Object.freeze({
 function getOAuthConfig(platform) {
   const definition = OAUTH[platform];
   if (!definition) throw new TypeError('Unsupported social platform.');
-  const clientId = String(process.env[definition.clientId] || '').trim();
+  try { tokenEncryptionKey(); } catch (_) { return null; }\n  const clientId = String(process.env[definition.clientId] || '').trim();
   const clientSecret = String(process.env[definition.clientSecret] || '').trim();
   const redirectUri = String(process.env[definition.redirectUri] || '').trim();
   if (!clientId || !clientSecret || !redirectUri) return null;
@@ -83,14 +83,14 @@ async function createOAuthState(userId, platform, now = new Date()) {
   const state = crypto.randomBytes(32).toString('base64url');
   const pkce = createPkcePair();
   const expiresAt = new Date(now.getTime() + STATE_TTL_MS);
-  await store.insertAsync('socialOAuthStates', { id: uuidv4(), stateHash: hash(state), userId, platform, codeVerifier: pkce.verifier, createdAt: now.toISOString(), expiresAt: expiresAt.toISOString() });
+  await store.insertAsync('socialOAuthStates', { id: uuidv4(), stateHash: hash(state), userId, platform, codeVerifierEnvelope: encryptToken(pkce.verifier), createdAt: now.toISOString(), expiresAt: expiresAt.toISOString() });
   return { state, codeChallenge: pkce.challenge, codeChallengeMethod: pkce.method, expiresAt: expiresAt.toISOString() };
 }
 
 async function consumeOAuthState(state, userId, platform, now = new Date()) {
   if (typeof state !== 'string' || state.length !== 43 || typeof userId !== 'string' || !(now instanceof Date) || !Number.isFinite(now.getTime())) return null;
   const record = await store.consumeSocialOAuthState(hash(state), userId, platform, now);
-  return record ? { userId: record.userId, platform: record.platform, codeVerifier: record.codeVerifier } : null;
+  return record ? { userId: record.userId, platform: record.platform, codeVerifier: record.codeVerifierEnvelope ? decryptToken(record.codeVerifierEnvelope) : record.codeVerifier } : null;
 }
 
 function publicConnection(row) {
