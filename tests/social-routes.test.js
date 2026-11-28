@@ -44,7 +44,7 @@ test('authenticated user can list safe platform capabilities and create a PKCE s
  const records=await store.findManyAsync('socialOAuthStates');
  assert.equal(records.length,1);
  assert.notEqual(records[0].stateHash,body.state);
- assert.equal(records[0].codeVerifier.length>30,true);
+ assert.equal(typeof records[0].codeVerifierEnvelope,'object');\n assert.equal(Object.hasOwn(records[0],'codeVerifier'),false);
 });
 
 test('unsupported platform cannot create an OAuth state',async()=>{
