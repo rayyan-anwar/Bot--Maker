@@ -345,3 +345,10 @@ This batch is a completion-oriented scope ledger, not a claim that unavailable s
 - Added mocked integration tests for all three callback paths, YouTube PKCE, account metadata isolation and token refresh; added environment examples.
 - Provider calls are mocked in CI. Live app credentials, provider review/approval, real account consent, live analytics/publishing, provider grant revocation and managed key rotation remain external or follow-up gates.
 - Awaiting PR review and CI on this branch; do not treat this as merged or live-connected yet.
+
+
+## Verified implementation checkpoint — 2026-11-28 (AI budget alert delivery)
+
+- Migration 014 now evaluates budget thresholds on scope creation and changes to limit, reserved amount or spent amount, writing transition events and outbox records without relying on an admin dashboard visit.
+- Added an optional Resend adapter and PostgreSQL lease-backed worker with bounded retries and graceful shutdown.
+- The worker is disabled by default. Live Resend credentials, verified sender domain, real delivery/retry drill and external paging remain staging gates.
