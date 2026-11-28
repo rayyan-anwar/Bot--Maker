@@ -171,10 +171,19 @@
     if(!memories.length){profileMemoryList.textContent='No personal memories saved yet.';return;}
     memories.forEach(note=>{
       const row=document.createElement('div');row.className='doc-row';
-      const label=document.createElement('span');label.textContent=note.content;
+      const label=document.createElement('span');label.textContent=note.content;label.style.flex='1';
+      const edit=document.createElement('button');edit.className='btn btn-ghost';edit.type='button';edit.textContent='Edit';
+      edit.addEventListener('click',()=>{
+        const field=document.createElement('input');field.type='text';field.maxLength=500;field.required=true;field.value=note.content;field.setAttribute('aria-label','Edit personal memory');
+        const save=document.createElement('button');save.className='btn btn-primary';save.type='button';save.textContent='Save';
+        const cancel=document.createElement('button');cancel.className='btn btn-ghost';cancel.type='button';cancel.textContent='Cancel';
+        row.replaceChildren(field,save,cancel);field.focus();
+        cancel.addEventListener('click',()=>loadProfileMemory());
+        save.addEventListener('click',async()=>{save.disabled=true;try{await api('/chat/memory/me/'+encodeURIComponent(note.id),{method:'PATCH',body:{content:field.value}});await loadProfileMemory();}catch(err){window.alert(err.message);save.disabled=false;}});
+      });
       const remove=document.createElement('button');remove.className='btn btn-ghost';remove.type='button';remove.textContent='Remove';
-      remove.addEventListener('click',async()=>{try{await api('/chat/memory/me/'+note.id,{method:'DELETE'});await loadProfileMemory();}catch(err){alert(err.message);}});
-      row.append(label,remove);profileMemoryList.appendChild(row);
+      remove.addEventListener('click',async()=>{try{await api('/chat/memory/me/'+encodeURIComponent(note.id),{method:'DELETE'});await loadProfileMemory();}catch(err){alert(err.message);}});
+      row.append(label,edit,remove);profileMemoryList.appendChild(row);
     });
   }
   document.getElementById('profile-memory-form').addEventListener('submit',async e=>{
