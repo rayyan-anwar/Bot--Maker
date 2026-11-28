@@ -29,25 +29,17 @@ test('Social Intelligence APIs require authentication',async()=>{
  assert.equal(response.status,401);
 });
 
-test('authenticated user can list safe platform capabilities and create a PKCE state',async()=>{
+test('authenticated user can list safe platform capabilities and requires OAuth configuration',async()=>{
  const platforms=await fetch(base+'/api/social/platforms',{headers:{cookie}});
  assert.equal(platforms.status,200);
  const rows=(await platforms.json()).platforms;
  assert.deepEqual(rows.map(row=>row.id),['instagram','youtube','linkedin']);
  assert.ok(rows.every(row=>row.liveOAuthAvailable===false&&row.publishingAvailable===false));
- const created=await fetch(base+'/api/social/instagram/oauth/state',{method:'POST',headers:{cookie}});
- assert.equal(created.status,201);
- const body=await created.json();
- assert.equal(body.platform,'instagram');
- assert.equal(body.codeChallengeMethod,'S256');
- assert.equal(body.authorizationUrlAvailable,false);
- const records=await store.findManyAsync('socialOAuthStates');
- assert.equal(records.length,1);
- assert.notEqual(records[0].stateHash,body.state);
- assert.equal(typeof records[0].codeVerifierEnvelope,'object');
- assert.equal(Object.hasOwn(records[0],'codeVerifier'),false);
+ const response=await fetch(base+'/api/social/instagram/oauth/state',{method:'POST',headers:{cookie}});
+ assert.equal(response.status,503);
+ assert.match((await response.json()).error,/not fully configured/);
+ assert.deepEqual(await store.findManyAsync('socialOAuthStates'),[]);
 });
-
 test('unsupported platform cannot create an OAuth state',async()=>{
  const response=await fetch(base+'/api/social/unknown/oauth/state',{method:'POST',headers:{cookie}});
  assert.equal(response.status,404);
