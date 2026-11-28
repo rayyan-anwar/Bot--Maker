@@ -42,7 +42,7 @@ router.post('/:platform/oauth/state', requireAuth, stateLimiter, async (req, res
     if (!Object.prototype.hasOwnProperty.call(social.PLATFORMS, req.params.platform)) return res.status(404).json({ error: 'Unsupported social platform.' });
     if (!social.getOAuthConfig(req.params.platform)) return res.status(503).json({ error: 'This social provider is not fully configured.' });
     const authorization = await social.createOAuthState(req.user.id, req.params.platform);
-    const url = social.authorizationUrl(req.params.platform, authorization.state);
+    const url = social.authorizationUrl(req.params.platform, authorization.state, authorization.codeChallenge);
     res.status(201).json({ platform: req.params.platform, ...authorization, authorizationUrl: url, authorizationUrlAvailable: true });
   } catch (error) { next(error); }
 });
