@@ -1,12 +1,12 @@
 # BotForge next-priority mega-batch progress
 
-Updated: 2026-11-20
+Updated: 2026-11-28
 
 Percentages below are engineering estimates, not test coverage or a claim of production readiness.
 
 | Priority | Estimated completion | Evidence in repository | Remaining gate |
 |---|---:|---|---|
-| Social Intelligence OAuth foundation | 45% | Authenticated platform/state APIs, persistent single-use user/platform-bound state, S256 PKCE, AES-256-GCM token envelopes, owner-scoped encrypted connection lifecycle, unit/API/PostgreSQL tests | Provider-specific authorization URLs/callbacks, token exchange/refresh/revocation, KMS-backed rotation, app credentials and platform review |
+| Social Intelligence OAuth foundation | 65% | Provider-specific authorization URLs and callbacks for Instagram Business Login, YouTube and LinkedIn; one-time owner/platform-bound state; YouTube S256 PKCE; code exchange, profile lookup, encrypted token storage, refresh endpoints and mocked callback tests | Real provider app credentials/approval, live consent and API smoke tests, approved analytics/publishing scopes, remote revocation, KMS-backed key rotation |
 | AI Engineer approval-to-draft-PR | 75% | Admin-only control, kill switch, audit, allowlisted paths, isolated Docker syntax validation, one-time approval and draft PR flow tests | Real least-privilege GitHub app/token, real Docker staging, failure/replay drills |
 | Knowledge Base and ingestion | 80% | Unicode chunking, BM25/hybrid retrieval, stable document/chunk IDs, citation source deduplication, exact-content duplicate prevention, atomic per-bot document and text-capacity limits, PostgreSQL concurrency tests, PDF worker isolation and upload safety tests | Golden dataset evaluation, grounded-answer scoring, malware scanner staging and deletion tests |
 | Fortisni UI and accessibility | 70% | Emotion engine, session continuity, chat lifecycle, visual state styles, browser tests and reduced-motion styling | Full device/browser QA, keyboard/screen-reader review and production visual review |
@@ -120,3 +120,15 @@ These checks validate repository code and CI only. Live provider credentials, ac
 - PR #103 merged to `main` at `dcdf763ba423c6a781ffeb923e5e9141a57a0b7f`; BotForge CI and Full Chat Browser E2E both completed successfully.
 - Follow-up batch created on `feat/fortisni-affection-reaction-consistency`: align browser and server reactions for affectionate English/Hindi/Hinglish messages and prevent `miss you` from being classified as sadness before the affection rule can run.
 - This follow-up is not yet merged or verified; its PR checks must pass before integration.
+
+
+## Verified implementation batch — 2026-11-28 (Social Intelligence OAuth)
+
+- Added provider-specific authorization URL generation and callback handling for Instagram Business Login, YouTube OAuth and LinkedIn OpenID Connect.
+- OAuth state remains random, one-time, ten-minute, and bound to the authenticated account and platform. The callback requires the same authenticated account; state is consumed before code exchange.
+- YouTube authorization uses S256 PKCE and offline access; Instagram exchanges its short-lived token for a long-lived token and supports token refresh; YouTube and LinkedIn use refresh tokens when issued by the provider.
+- Provider tokens are stored only as AES-256-GCM encrypted envelopes. API responses expose connection metadata, never access or refresh tokens.
+- Added an owner-scoped token refresh endpoint, environment configuration examples and mocked integration coverage for all three provider callbacks, YouTube PKCE and token refresh.
+- Tests mock external provider responses. They do not prove live provider app approval, consent, real API permissions, analytics, publishing or revocation.
+- Disconnect removes the locally stored credentials. Remote provider grant revocation and managed KMS key rotation remain unimplemented; users must revoke grants through provider account settings until provider-specific revocation is added.
+- The 65% figure is an engineering estimate for the Social Intelligence workstream, not live integration certification.
