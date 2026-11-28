@@ -10,7 +10,7 @@ Percentages below are engineering estimates, not test coverage or a claim of pro
 | AI Engineer approval-to-draft-PR | 75% | Admin-only control, kill switch, audit, allowlisted paths, isolated Docker syntax validation, one-time approval and draft PR flow tests | Real least-privilege GitHub app/token, real Docker staging, failure/replay drills |
 | Knowledge Base and ingestion | 80% | Unicode chunking, BM25/hybrid retrieval, stable document/chunk IDs, citation source deduplication, exact-content duplicate prevention, atomic per-bot document and text-capacity limits, PostgreSQL concurrency tests, PDF worker isolation and upload safety tests | Golden dataset evaluation, grounded-answer scoring, malware scanner staging and deletion tests |
 | Fortisni UI and accessibility | 70% | Emotion engine, session continuity, chat lifecycle, visual state styles, browser tests and reduced-motion styling | Full device/browser QA, keyboard/screen-reader review and production visual review |
-| Admin monitoring and alerting | 45% | Authenticated Prometheus metrics, request/error/duration and process memory gauges, diagnostics endpoint | External metrics scrape, alert rules, paging route, retention and incident rehearsal |
+| Admin monitoring and alerting | 55% | Authenticated Prometheus metrics, request/error/duration and process memory gauges, diagnostics endpoint, persistent alert transitions/outbox, optional Resend email adapter and lease-backed worker | Configure Resend/recipient, verify real delivery and retry behavior, external metrics scrape, paging route, retention and incident rehearsal |
 | Full application E2E tests | 50% | Browser tests for chat, Fortisni and AI Engineer; API integration/security tests | Full critical user journeys, payments, uploads/RAG, multi-tenant, browser matrix and load tests |
 | PostgreSQL staging deployment | 35% | Dockerfile, PostgreSQL store/migrations, readiness endpoint, staging runbook, smoke-test script | Actual staging host, managed PostgreSQL, secrets, HTTPS, malware scanner and smoke run |
 | Backup/restore/rollback verification | 30% | PostgreSQL backup/restore scripts and release checklist | Real scheduled backup, offsite retention, successful restore drill and rollback rehearsal |
@@ -120,3 +120,12 @@ These checks validate repository code and CI only. Live provider credentials, ac
 - PR #103 merged to `main` at `dcdf763ba423c6a781ffeb923e5e9141a57a0b7f`; BotForge CI and Full Chat Browser E2E both completed successfully.
 - Follow-up batch created on `feat/fortisni-affection-reaction-consistency`: align browser and server reactions for affectionate English/Hindi/Hinglish messages and prevent `miss you` from being classified as sadness before the affection rule can run.
 - This follow-up is not yet merged or verified; its PR checks must pass before integration.
+
+
+## Verified implementation batch — 2026-11-28 (AI budget alert delivery)
+
+- Added a Resend email adapter for persisted AI budget alert events. It sends bounded plain-text messages to the configured budget-alert recipient or administrator email and only confirms success when Resend returns an email ID.
+- Added an opt-in worker that drains the PostgreSQL outbox using existing row leases, bounded retries and single-process overlap protection. Multiple app instances can share the outbox safely through PostgreSQL leases.
+- Worker starts only when PostgreSQL is configured, `BOTFORGE_BUDGET_ALERT_WORKER=1`, and Resend sender/API key plus a valid recipient are configured.
+- Admin outbox status now reflects actual worker configuration; the dashboard no longer always claims delivery is disabled.
+- Added adapter tests for configuration, message safety, confirmed provider acceptance and worker opt-in. CI mocks Resend; actual email delivery, DNS/domain verification, provider rate limits and incident paging remain staging checks.
