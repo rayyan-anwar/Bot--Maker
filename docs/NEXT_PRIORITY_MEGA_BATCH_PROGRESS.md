@@ -124,6 +124,7 @@ These checks validate repository code and CI only. Live provider credentials, ac
 
 ## Verified implementation batch — 2026-11-28 (AI budget alert delivery)
 
+- Added migration 014 to generate alert transitions directly from budget scope inserts/financial updates, so dashboard visits are no longer required to create alert events.
 - Added a Resend email adapter for persisted AI budget alert events. It sends bounded plain-text messages to the configured budget-alert recipient or administrator email and only confirms success when Resend returns an email ID.
 - Added an opt-in worker that drains the PostgreSQL outbox using existing row leases, bounded retries and single-process overlap protection. Multiple app instances can share the outbox safely through PostgreSQL leases.
 - Worker starts only when PostgreSQL is configured, `BOTFORGE_BUDGET_ALERT_WORKER=1`, and Resend sender/API key plus a valid recipient are configured.
