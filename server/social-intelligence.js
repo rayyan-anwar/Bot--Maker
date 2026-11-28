@@ -1,5 +1,4 @@
-  try { tokenEncryptionKey(); } catch (_) { return null; }
-  const clientId'use strict';
+'use strict';
 
 const crypto = require('node:crypto');
 const { v4: uuidv4 } = require('uuid');
@@ -21,7 +20,8 @@ const OAUTH = Object.freeze({
 function getOAuthConfig(platform) {
   const definition = OAUTH[platform];
   if (!definition) throw new TypeError('Unsupported social platform.');
-  try { tokenEncryptionKey(); } catch (_) { return null; }\n  const clientId = String(process.env[definition.clientId] || '').trim();
+  try { tokenEncryptionKey(); } catch (_) { return null; }
+  const clientId = String(process.env[definition.clientId] || '').trim();
   const clientSecret = String(process.env[definition.clientSecret] || '').trim();
   const redirectUri = String(process.env[definition.redirectUri] || '').trim();
   if (!clientId || !clientSecret || !redirectUri) return null;
