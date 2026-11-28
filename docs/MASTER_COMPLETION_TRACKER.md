@@ -344,3 +344,6 @@ This batch is a completion-oriented scope ledger, not a claim that unavailable s
 - Added an opt-in lease-backed worker with bounded batch processing, retries, shutdown draining and cross-instance claim safety through the existing PostgreSQL functions.
 - Admin outbox status and dashboard copy now reflect whether delivery is configured.
 - Automated tests mock provider acceptance and failure. Live Resend credentials, sender-domain verification and real delivery remain external validation.
+
+
+- Follow-up on the 2026-11-28 budget alert delivery batch: migration 014 now automatically evaluates budget thresholds when scope limits/reserved/spent amounts change and writes transition/outbox records. The optional Resend worker is disabled by default and requires verified sender credentials, recipient and PostgreSQL. Live provider delivery remains staging evidence.
