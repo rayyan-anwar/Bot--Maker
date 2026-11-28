@@ -10,7 +10,7 @@ This file is an evidence-based release gate. A feature is not complete merely be
 | Fortisni | Emotion engine, session continuity, chat lifecycle and visual states | Browser accessibility and mobile visual QA; reduced-motion checks |
 | AI Engineer | Admin gate, kill switch, audit, proposal validation, isolated draft PR workflow | Least-privilege GitHub token test; approval replay test; real Docker sandbox test; draft PR review |
 | Social Intelligence | Provider-specific OAuth authorization/token lifecycle foundation implemented; no live platform analytics or publishing assumed | OAuth app approval, real consent/API smoke tests, remote revocation, approved analytics/publishing scopes and encrypted token operations |
-| Admin/operations | Diagnostics, security scan, metrics endpoint, budget controls | Alert routing, log redaction, budget emergency-stop rehearsal |
+| Admin/operations | Diagnostics, security scan, metrics endpoint, budget controls, automatic scope-change alerts and optional lease-backed Resend email worker | Live sender verification, real alert delivery/retry drill, external alert routing, log redaction and budget emergency-stop rehearsal |
 | Deployment | Docker/staging runbook, PostgreSQL runtime, health/readiness probes | Managed staging deployment, migration rehearsal, backups and restore drill, rollback test |
 
 ## Required release gates
