@@ -336,3 +336,11 @@ This batch is a completion-oriented scope ledger, not a claim that unavailable s
 - Usage-ledger writes now reject negative, fractional, non-finite, unsafe-integer and string token counts before persistence; regression tests cover malformed input and output counts.
 - Ponytail review of the next knowledge-indexing candidate found that `server/embeddings.js` already validates vector batch length, indexes, duplicates, finite numeric values and consistent dimensions, including across batches. No duplicate validation layer or new dependency was added to `server/documents.js`.
 - Repository simplification remains behavior-preserving and scoped. This checkpoint does not claim broad repository-wide cleanup or production certification.
+
+
+## Verified implementation checkpoint — 2026-11-28 (AI budget alert delivery)
+
+- Added optional Resend delivery for the existing PostgreSQL AI budget alert outbox.
+- Added an opt-in lease-backed worker with bounded batch processing, retries, shutdown draining and cross-instance claim safety through the existing PostgreSQL functions.
+- Admin outbox status and dashboard copy now reflect whether delivery is configured.
+- Automated tests mock provider acceptance and failure. Live Resend credentials, sender-domain verification and real delivery remain external validation.
