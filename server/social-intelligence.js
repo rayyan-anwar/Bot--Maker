@@ -160,6 +160,10 @@ function authorizationUrl(platform, state, codeChallenge) {
   url.searchParams.set('state', state);
   url.searchParams.set('scope', config.scopes.join(platform === 'instagram' ? ',' : ' '));
   if (platform === 'youtube') {
+    if (typeof codeChallenge === 'string' && codeChallenge) {
+      url.searchParams.set('code_challenge', codeChallenge);
+      url.searchParams.set('code_challenge_method', 'S256');
+    }
     url.searchParams.set('access_type', 'offline');
     url.searchParams.set('include_granted_scopes', 'true');
     url.searchParams.set('prompt', 'consent select_account');
@@ -176,6 +180,7 @@ async function exchangeOAuthCodeForUser({ userId, platform, code, codeVerifier }
   if (!config) throw new Error('Social provider OAuth credentials or callback URL are not configured.');
   if (typeof code !== 'string' || !code.trim() || code.length > 4096) throw new TypeError('Invalid social authorization code.');
   const body = new URLSearchParams({ client_id: config.clientId, client_secret: config.clientSecret, redirect_uri: config.redirectUri, code, grant_type: 'authorization_code' });
+  if (platform === 'youtube' && typeof codeVerifier === 'string') body.set('code_verifier', codeVerifier);
   const token = await requestJson(config.token, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' }, body });
   if (typeof token.access_token !== 'string' || !token.access_token) throw new Error('Social provider did not return an access token.');
   let accessToken = token.access_token;
