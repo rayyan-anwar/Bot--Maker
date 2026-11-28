@@ -92,7 +92,9 @@ test('YouTube OAuth completes a user-bound callback, stores encrypted credential
   assert.equal(authorization.origin,'https://accounts.google.com');
   assert.equal(authorization.searchParams.get('response_type'),'code');
   assert.equal(authorization.searchParams.get('access_type'),'offline');
-  assert.equal(authorization.searchParams.get('state'),stateBody.state);\n  assert.equal(authorization.searchParams.get('code_challenge_method'),'S256');\n  assert.equal(authorization.searchParams.get('code_challenge'),stateBody.codeChallenge);
+  assert.equal(authorization.searchParams.get('state'),stateBody.state);
+  assert.equal(authorization.searchParams.get('code_challenge_method'),'S256');
+  assert.equal(authorization.searchParams.get('code_challenge'),stateBody.codeChallenge);
   assert.equal(stateBody.authorizationUrlAvailable,true);
   const callback=await realFetch(base+'/api/social/youtube/oauth/callback?code=one-time-code&state='+encodeURIComponent(stateBody.state),{headers:{cookie},redirect:'manual'});
   assert.equal(callback.status,302);
