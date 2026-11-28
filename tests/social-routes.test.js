@@ -92,7 +92,7 @@ test('YouTube OAuth completes a user-bound callback, stores encrypted credential
   assert.equal(authorization.origin,'https://accounts.google.com');
   assert.equal(authorization.searchParams.get('response_type'),'code');
   assert.equal(authorization.searchParams.get('access_type'),'offline');
-  assert.equal(authorization.searchParams.get('state'),stateBody.state);
+  assert.equal(authorization.searchParams.get('state'),stateBody.state);\n  assert.equal(authorization.searchParams.get('code_challenge_method'),'S256');\n  assert.equal(authorization.searchParams.get('code_challenge'),stateBody.codeChallenge);
   assert.equal(stateBody.authorizationUrlAvailable,true);
   const callback=await realFetch(base+'/api/social/youtube/oauth/callback?code=one-time-code&state='+encodeURIComponent(stateBody.state),{headers:{cookie},redirect:'manual'});
   assert.equal(callback.status,302);
@@ -122,4 +122,56 @@ test('social OAuth refuses to start when provider credentials are incomplete',as
  delete process.env.BOTFORGE_LINKEDIN_REDIRECT_URI;
  const response=await fetch(base+'/api/social/linkedin/oauth/state',{method:'POST',headers:{cookie}});
  assert.equal(response.status,503);
+});
+
+
+test('LinkedIn and Instagram OAuth callbacks create account-scoped connections',async()=>{
+ const providers={
+  linkedin:{id:'BOTFORGE_LINKEDIN',redirect:base+'/api/social/linkedin/oauth/callback'},
+  instagram:{id:'BOTFORGE_INSTAGRAM',redirect:base+'/api/social/instagram/oauth/callback'}
+ };
+ for(const [platform,config] of Object.entries(providers)){
+  process.env[config.id+'_CLIENT_ID']=platform+'-client';
+  process.env[config.id+'_CLIENT_SECRET']=platform+'-secret';
+  process.env[config.id+'_REDIRECT_URI']=config.redirect;
+ }
+ const realFetch=global.fetch;
+ global.fetch=async(url,options={})=>{
+  const target=String(url);
+  if(target==='https://www.linkedin.com/oauth/v2/accessToken')return {ok:true,json:async()=>({access_token:'linkedin-access-token',expires_in:3600,scope:'openid profile'})};
+  if(target==='https://api.linkedin.com/v2/userinfo')return {ok:true,json:async()=>({sub:'linkedin-member-9',name:'LinkedIn Member'})};
+  if(target==='https://api.instagram.com/oauth/access_token')return {ok:true,json:async()=>({access_token:'instagram-short-token',user_id:'instagram-user-7',expires_in:3600})};
+  if(target.startsWith('https://graph.instagram.com/me'))return {ok:true,json:async()=>({user_id:'instagram-user-7',username:'botforge_demo'})};
+  if(target.startsWith('https://graph.instagram.com/access_token'))return {ok:true,json:async()=>({access_token:'instagram-long-token',expires_in:5184000})};
+  if(target.startsWith('https://graph.instagram.com/refresh_access_token'))return {ok:true,json:async()=>({access_token:'instagram-refreshed-token',expires_in:5184000})};
+  return realFetch(url,options);
+ };
+ try{
+  for(const platform of ['linkedin','instagram']){
+   const stateResponse=await realFetch(base+'/api/social/'+platform+'/oauth/state',{method:'POST',headers:{cookie}});
+   assert.equal(stateResponse.status,201);
+   const stateBody=await stateResponse.json();
+   const authorization=new URL(stateBody.authorizationUrl);
+   assert.equal(authorization.searchParams.get('state'),stateBody.state);
+   const callback=await realFetch(base+'/api/social/'+platform+'/oauth/callback?code=provider-code&state='+encodeURIComponent(stateBody.state),{headers:{cookie},redirect:'manual'});
+   assert.equal(callback.status,302);
+   assert.match(callback.headers.get('location'),new RegExp('social_connected='+platform));
+  }
+  const user=(await store.findManyAsync('users',{email:'social-owner@example.test'}))[0];
+  const connections=await social.listConnections(user.id);
+  assert.ok(connections.some(item=>item.platform==='linkedin'&&item.platformAccountId==='linkedin-member-9'));
+  assert.ok(connections.some(item=>item.platform==='instagram'&&item.platformAccountId==='instagram-user-7'));
+  const instagram=connections.find(item=>item.platform==='instagram');
+  assert.equal((await social.getConnectionCredentials(user.id,instagram.id)).accessToken,'instagram-long-token');
+  const refreshed=await realFetch(base+'/api/social/connections/'+instagram.id+'/refresh',{method:'POST',headers:{cookie}});
+  assert.equal(refreshed.status,200);
+  assert.equal((await social.getConnectionCredentials(user.id,instagram.id)).accessToken,'instagram-refreshed-token');
+ }finally{
+  global.fetch=realFetch;
+  for(const config of Object.values(providers)){
+   delete process.env[config.id+'_CLIENT_ID'];
+   delete process.env[config.id+'_CLIENT_SECRET'];
+   delete process.env[config.id+'_REDIRECT_URI'];
+  }
+ }
 });
