@@ -1,5 +1,4 @@
- assert.equal(typeof records[0].codeVerifierEnvelope,'object');
- assert.equal(Object.hasOwn(records[0],'codeVerifier'),false);const test=require('node:test');
+const test=require('node:test');const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const os=require('node:os');
