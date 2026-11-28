@@ -10,7 +10,7 @@ Percentages below are engineering estimates, not test coverage or a claim of pro
 | AI Engineer approval-to-draft-PR | 75% | Admin-only control, kill switch, audit, allowlisted paths, isolated Docker syntax validation, one-time approval and draft PR flow tests | Real least-privilege GitHub app/token, real Docker staging, failure/replay drills |
 | Knowledge Base and ingestion | 80% | Unicode chunking, BM25/hybrid retrieval, stable document/chunk IDs, citation source deduplication, exact-content duplicate prevention, atomic per-bot document and text-capacity limits, PostgreSQL concurrency tests, PDF worker isolation and upload safety tests | Golden dataset evaluation, grounded-answer scoring, malware scanner staging and deletion tests |
 | Fortisni UI and accessibility | 70% | Emotion engine, session continuity, chat lifecycle, visual state styles, browser tests and reduced-motion styling | Full device/browser QA, keyboard/screen-reader review and production visual review |
-| Admin monitoring and alerting | 45% | Authenticated Prometheus metrics, request/error/duration and process memory gauges, diagnostics endpoint | External metrics scrape, alert rules, paging route, retention and incident rehearsal |
+| Admin monitoring and alerting | 55% | Authenticated Prometheus metrics, request/error/duration and process memory gauges, diagnostics endpoint, persistent alert transitions/outbox, automatic scope-change triggers, optional Resend email adapter and lease-backed worker | Configure Resend/recipient, verify real delivery and retry behavior, external metrics scrape, paging route, retention and incident rehearsal |
 | Full application E2E tests | 50% | Browser tests for chat, Fortisni and AI Engineer; API integration/security tests | Full critical user journeys, payments, uploads/RAG, multi-tenant, browser matrix and load tests |
 | PostgreSQL staging deployment | 35% | Dockerfile, PostgreSQL store/migrations, readiness endpoint, staging runbook, smoke-test script | Actual staging host, managed PostgreSQL, secrets, HTTPS, malware scanner and smoke run |
 | Backup/restore/rollback verification | 30% | PostgreSQL backup/restore scripts and release checklist | Real scheduled backup, offsite retention, successful restore drill and rollback rehearsal |
@@ -132,3 +132,11 @@ These checks validate repository code and CI only. Live provider credentials, ac
 - Tests mock external provider responses. They do not prove live provider app approval, consent, real API permissions, analytics, publishing or revocation.
 - Disconnect removes the locally stored credentials. Remote provider grant revocation and managed KMS key rotation remain unimplemented; users must revoke grants through provider account settings until provider-specific revocation is added.
 - The 65% figure is an engineering estimate for the Social Intelligence workstream, not live integration certification.
+
+
+## Verified implementation batch — 2026-11-28 (AI budget alert delivery)
+
+- Added migration 014 to generate alert transitions directly from budget scope inserts/financial updates, so dashboard visits are no longer required to create alert events.
+- Added a Resend email adapter and optional PostgreSQL worker with bounded batches, leases, retries and graceful shutdown.
+- Worker starts only when PostgreSQL is configured, `BOTFORGE_BUDGET_ALERT_WORKER=1`, and Resend sender/API key plus a valid recipient are configured.
+- Admin outbox status reflects actual worker configuration. CI mocks Resend; actual email delivery and sender-domain verification remain staging checks.
