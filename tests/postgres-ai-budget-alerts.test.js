@@ -20,7 +20,7 @@ test('budget alert transition persistence suppresses repeated statuses and recor
   const events=await client.query('SELECT event_type FROM ai_budget_alert_events WHERE scope_id=$1 ORDER BY created_at',[scopeId]);
   assert.deepEqual(events.rows.map(row=>row.event_type),['escalated','recovered']);
   const outbox=await client.query('SELECT event_type,delivery_state,payload FROM ai_budget_alert_outbox WHERE scope_id=$1 ORDER BY created_at',[scopeId]);
-  assert.deepEqual(outbox.rows.map(row=>row.event_type),['initial','recovered']);
+  assert.deepEqual(outbox.rows.map(row=>row.event_type),['escalated','recovered']);
   assert.ok(outbox.rows.every(row=>row.delivery_state==='pending'));
   assert.equal(outbox.rows[0].payload.eventType,'escalated');
   const state=await client.query('SELECT status,snapshot FROM ai_budget_alert_state WHERE scope_id=$1',[scopeId]);
